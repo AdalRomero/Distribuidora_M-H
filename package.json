@@ -13,7 +13,7 @@
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@headlessui/react": "^2.2.9",
-    "@nozbe/watermelondb": "^0.28.0",
+    "@nozbe/watermelondb": "^0.25.5",
     "@nozbe/with-observables": "^1.6.0",
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.3",
