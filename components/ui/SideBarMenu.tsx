@@ -120,7 +120,7 @@ export const SideBarMenu: React.FC = () => {
               id: "devpanel",
               label: "Dev Panel",
               icon: <Wrench size={20} />,
-              path: "/devpanel",
+              path: "/(dev)/devpanel",
             },
           ],
         },
