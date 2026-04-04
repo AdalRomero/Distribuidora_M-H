@@ -8,7 +8,6 @@ import {
 } from "@nozbe/watermelondb/decorators";
 
 // Importamos los modelos hermanos
-import Empresa from "./empresa";
 import InformacionPerfil from "./informacionPerfil";
 import Permiso from "./permiso";
 
@@ -32,10 +31,5 @@ export default class Perfil extends Model {
   // Observa la tabla 'permisos' buscando el mismo ID
   @lazy permisos = this.collections
     .get<Permiso>("permisos")
-    .findAndObserve(this.id);
-
-  // Observa la tabla 'empresas' buscando el mismo ID
-  @lazy empresas = this.collections
-    .get<Empresa>("empresas")
     .findAndObserve(this.id);
 }

@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from "@nozbe/watermelondb";
 
 export const mySchema = appSchema({
-  version: 2,
+  version: 3,
   tables: [
     // ==================
     // 1. USUARIOS Y PERMISOS
@@ -35,15 +35,6 @@ export const mySchema = appSchema({
         { name: "precios", type: "boolean" },
         { name: "usuarios", type: "boolean" },
         { name: "configuraciones", type: "boolean" },
-        { name: "multi_usuarios", type: "boolean" },
-        { name: "updated_at", type: "number" },
-      ],
-    }),
-    tableSchema({
-      name: "empresas",
-      columns: [
-        { name: "distribuidora", type: "boolean" },
-        { name: "reposteria", type: "boolean" },
         { name: "updated_at", type: "number" },
       ],
     }),
@@ -214,6 +205,22 @@ export const mySchema = appSchema({
         { name: "precio_unitario_aplicado", type: "number" },
         { name: "descuento_aplicado", type: "number" },
         { name: "json_impuestos_aplicados", type: "string", isOptional: true },
+        { name: "created_at", type: "number" },
+        { name: "updated_at", type: "number" },
+      ],
+    }),
+    // ==================
+    // 5. AUDITORÍA Y ERRORES
+    // ==================
+    tableSchema({
+      name: "bitacora_errores",
+      columns: [
+        { name: "tabla_origen", type: "string" }, // ej. 'productos', 'documentos'
+        { name: "registro_id", type: "string", isIndexed: true }, // ID del registro problemático
+        { name: "accion", type: "string" }, // 'crear', 'editar', 'sincronizar'
+        { name: "payload_json", type: "string", isOptional: true }, // Respaldo de los datos para no perderlos
+        { name: "mensaje_error", type: "string" }, // Lo que falló (ej. "Código duplicado")
+        { name: "estado", type: "string" }, // 'pendiente', 'resuelto', 'ignorado'
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],

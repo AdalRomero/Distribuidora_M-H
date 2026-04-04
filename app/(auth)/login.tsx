@@ -7,6 +7,10 @@ import { Q } from "@nozbe/watermelondb";
 import * as Crypto from "expo-crypto";
 import { database } from "../../src/services/DB/indexBD";
 
+import { syncApp } from "../../src/sync";
+// IMPORTAMOS EL CONTEXTO MÁGICO
+import { useAuth } from "../../src/context/AuthContext";
+
 // Images served from public/ directory
 const logoCaja = "/images/logo-mh.svg";
 const logoPastel = "/images/logo-repostero.svg";
@@ -17,6 +21,9 @@ type BusinessType = "caja" | "pastel";
 
 export default function Login() {
   const router = useRouter();
+
+  // EXTRAEMOS LA FUNCIÓN DEL CONTEXTO
+  const { loginLocal } = useAuth();
 
   const [accessNumber, setAccessNumber] = useState("");
   const [username, setUsername] = useState("");
@@ -40,6 +47,8 @@ export default function Login() {
     }
 
     try {
+      const inputIngresado = username.trim();
+
       const hashedInput = await Crypto.digestStringAsync(
         Crypto.CryptoDigestAlgorithm.SHA256,
         accessNumber,
@@ -48,69 +57,190 @@ export default function Login() {
       const infoPerfiles = database.collections.get("informacion_perfil");
       const perfilesDb = database.collections.get("perfiles");
 
-      const usuariosEncontrados = await infoPerfiles
-        .query(Q.where("correo", username))
+      // ==========================================
+      // 1. TRADUCTOR Y BÚSQUEDA LOCAL
+      // ==========================================
+      let userIdLocal: string | null = null;
+      let correoParaSupabase = inputIngresado;
+
+      const busquedaCorreo = await infoPerfiles
+        .query(Q.where("correo", inputIngresado))
         .fetch();
 
-      let accesoConcedido = false;
-      let userId: string | null = null;
+      if (busquedaCorreo.length > 0) {
+        userIdLocal = busquedaCorreo[0].id;
+        correoParaSupabase = (busquedaCorreo[0] as any).correo;
+      } else {
+        const busquedaUsuario = await perfilesDb
+          .query(Q.where("usuario", inputIngresado))
+          .fetch();
 
-      if (usuariosEncontrados.length > 0) {
-        userId = usuariosEncontrados[0].id;
-
-        // CORRECCIÓN 1: Le decimos a TypeScript que trate esto como "any"
-        const perfilLocal = (await perfilesDb.find(userId)) as any;
-
-        if (perfilLocal.hashLocal === hashedInput) {
-          console.log("Inicio de sesión OFFLINE exitoso");
-          accesoConcedido = true;
+        if (busquedaUsuario.length > 0) {
+          userIdLocal = busquedaUsuario[0].id;
+          try {
+            const infoLocal = (await infoPerfiles.find(userIdLocal)) as any;
+            correoParaSupabase = infoLocal.correo;
+          } catch (e) {
+            console.log("No se pudo resolver el correo del usuario.");
+          }
         }
       }
 
-      if (!accesoConcedido) {
+      // ==========================================
+      // 2. NUEVA LÓGICA: ONLINE FIRST -> OFFLINE FALLBACK
+      // ==========================================
+      let accesoConcedido = false;
+      let userId: string | null = null;
+
+      try {
         console.log("Intentando inicio de sesión ONLINE con Supabase...");
 
+        if (!userIdLocal && !inputIngresado.includes("@")) {
+          throw new Error("primer_ingreso_requiere_correo");
+        }
+
+        // INTENTO ONLINE SIEMPRE PRIMERO
         const { data, error: signInError } =
           await supabase.auth.signInWithPassword({
-            email: username,
+            email: correoParaSupabase,
             password: accessNumber,
           });
 
         if (signInError) {
+          // Si es error de red, lanzamos un error específico para caer al catch y activar el modo offline
+          if (
+            signInError.message.includes("Network request failed") ||
+            signInError.message.includes("Failed to fetch") ||
+            signInError.message.includes("network")
+          ) {
+            throw new Error("NETWORK_ERROR");
+          }
+          // Si la contraseña es incorrecta en la nube, rechazamos inmediatamente (bloquea contraseñas viejas)
           if (signInError.message.includes("Invalid login credentials")) {
             throw new Error("Usuario o contraseña incorrectos.");
-          }
-          if (signInError.message.includes("Network request failed")) {
-            throw new Error(
-              "No hay internet. Si es tu primer inicio de sesión, necesitas conexión.",
-            );
           }
           throw signInError;
         }
 
+        // SI LLEGAMOS AQUÍ, LA CONTRASEÑA ES CORRECTA EN LA NUBE
         userId = data.user.id;
         accesoConcedido = true;
 
-        // CORRECCIÓN 2: Nos aseguramos de que userId exista antes de guardar
+        // GUARDADO DE HASH (Actualiza la base local con la nueva contraseña)
         if (userId) {
-          await database.write(async () => {
-            // Agregamos "!" para garantizar a TypeScript que no es nulo y lo casteamos a "any"
-            const perfilAActualizar = (await perfilesDb.find(userId!)) as any;
-            await perfilAActualizar.update((perfil: any) => {
-              perfil.hashLocal = hashedInput;
+          try {
+            const perfilAActualizar = (await perfilesDb.find(userId)) as any;
+
+            await database.write(async () => {
+              await perfilAActualizar.update((perfil: any) => {
+                perfil.hashLocal = hashedInput;
+              });
             });
-          });
+            console.log(
+              "Hash actualizado exitosamente con la contraseña de la nube.",
+            );
+          } catch (e) {
+            console.log(
+              "Primer inicio de sesión detectado. Sincronizando catálogo antes de entrar...",
+            );
+
+            await syncApp();
+
+            try {
+              const perfilDescargado = (await perfilesDb.find(userId)) as any;
+
+              await database.write(async () => {
+                await perfilDescargado.update((perfil: any) => {
+                  perfil.hashLocal = hashedInput;
+                });
+              });
+              console.log("¡Éxito! Catálogo sincronizado y Hash guardado.");
+            } catch (syncError) {
+              console.error("No se pudo guardar el hash tras el sync inicial.");
+            }
+          }
+        }
+      } catch (onlineError: any) {
+        // 3. MODO OFFLINE: Solo entramos aquí si el internet falló ("NETWORK_ERROR")
+        if (onlineError.message === "NETWORK_ERROR") {
           console.log(
-            "Hash guardado exitosamente para futuros inicios sin internet.",
+            "Sin conexión a la nube. Intentando inicio de sesión OFFLINE...",
           );
+
+          if (userIdLocal) {
+            const perfilLocal = (await perfilesDb.find(userIdLocal)) as any;
+
+            // Revisamos contra la base local
+            if (perfilLocal.hashLocal === hashedInput) {
+              console.log("Inicio de sesión OFFLINE exitoso");
+              accesoConcedido = true;
+              userId = userIdLocal;
+            } else {
+              throw new Error("Usuario o contraseña incorrectos.");
+            }
+          } else {
+            throw new Error(
+              "No hay internet. Si es tu primer ingreso, necesitas estar conectado.",
+            );
+          }
+        } else {
+          throw onlineError;
         }
       }
 
+      // ==========================================
+      // 4. INICIAR CONTEXTO Y REDIRECCIONAR
+      // ==========================================
       if (accesoConcedido && userId) {
+        // Le pasamos la estafeta (el UUID) al AuthContext
+        await loginLocal(userId);
+
+        // Redirigimos al Home
         router.replace("/home" as any);
       }
     } catch (err: any) {
-      setError(err.message || "Ocurrió un error al intentar iniciar sesión.");
+      console.error("Error técnico:", err.message);
+
+      let mensajeAmigable =
+        "Ocurrió un problema al intentar iniciar sesión. Intenta nuevamente.";
+      const errorReal = err.message || "";
+
+      if (errorReal.includes("primer_ingreso_requiere_correo")) {
+        mensajeAmigable =
+          "Por ser la primera vez en este equipo, ingresa con tu Correo electrónico. Después podrás usar tu Usuario.";
+      } else if (
+        errorReal.includes("Record perfiles#") &&
+        errorReal.includes("not found")
+      ) {
+        mensajeAmigable =
+          "Tu cuenta es nueva en este dispositivo. Asegúrate de tener internet para descargar tu perfil.";
+      } else if (
+        errorReal.includes("Invalid login credentials") ||
+        errorReal.includes("Usuario o contraseña incorrectos")
+      ) {
+        mensajeAmigable =
+          "El usuario o la contraseña que ingresaste no son correctos.";
+      } else if (
+        errorReal.includes("Email not confirmed") ||
+        errorReal.includes("email unverified")
+      ) {
+        mensajeAmigable =
+          "Debes confirmar tu correo electrónico antes de poder iniciar sesión. Revisa tu bandeja de entrada o spam.";
+      } else if (
+        errorReal.includes("Network request failed") ||
+        errorReal.includes("Failed to fetch")
+      ) {
+        mensajeAmigable =
+          "No hay conexión a internet. Si es tu primer ingreso, necesitas estar conectado.";
+      } else if (
+        errorReal.includes("timeout") ||
+        errorReal.includes("network")
+      ) {
+        mensajeAmigable =
+          "La conexión está inestable. Verifica tu internet y vuelve a intentarlo.";
+      }
+
+      setError(mensajeAmigable);
     } finally {
       setLoading(false);
     }

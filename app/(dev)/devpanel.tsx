@@ -1,9 +1,9 @@
 import { Link } from "expo-router";
 import {
+  AlertTriangle,
   Database,
   FlaskConical,
   MonitorCog,
-  Server,
   ShieldCheck,
   Terminal,
   Wrench,
@@ -23,49 +23,57 @@ const devTools: DevToolCard[] = [
   {
     id: "database",
     label: "Base de Datos",
-    description: "Inspeccionar tablas, ejecutar queries y ver registros en tiempo real.",
+    description:
+      "Inspeccionar tablas, ejecutar queries y ver registros en tiempo real.",
     icon: <Database size={28} />,
-    path: "/(dev)/dev-database",
+    path: "/(panels)/dev-database",
     color: "from-emerald-500 to-teal-600",
   },
   {
-    id: "sync",
-    label: "Sincronización",
-    description: "Estado de la sincronización local ↔ remota y logs de conflictos.",
-    icon: <Server size={28} />,
-    path: "/(dev)/dev-sync",
-    color: "from-blue-500 to-indigo-600",
+    // =====================================
+    // 🔴 TARJETA ACTUALIZADA PARA LA BITÁCORA
+    // =====================================
+    id: "sync-errors",
+    label: "Conflictos y Errores",
+    description:
+      "Bitácora de errores de sincronización. Resuelve colisiones locales y datos atrapados.",
+    icon: <AlertTriangle size={28} />,
+    // Sigue apuntando al componente que creamos antes
+    path: "/(panels)/dev-sync",
+    color: "from-rose-500 to-red-600",
   },
   {
     id: "auth",
     label: "Autenticación",
     description: "Sesiones activas, tokens y gestión de usuarios de prueba.",
     icon: <ShieldCheck size={28} />,
-    path: "/(dev)/dev-auth",
+    path: "/(panels)/dev-auth",
     color: "from-amber-500 to-orange-600",
   },
   {
     id: "logs",
     label: "Logs del Sistema",
-    description: "Consola de logs en tiempo real con filtros por nivel y módulo.",
+    description:
+      "Consola de logs en tiempo real con filtros por nivel y módulo.",
     icon: <Terminal size={28} />,
-    path: "/(dev)/dev-logs",
-    color: "from-rose-500 to-pink-600",
+    path: "/(panels)/dev-logs",
+    color: "from-indigo-500 to-blue-600", // Cambié el color para que no choque con los errores
   },
   {
     id: "experiments",
     label: "Experimentos",
     description: "Feature flags y experimentos A/B activos en la aplicación.",
     icon: <FlaskConical size={28} />,
-    path: "/(dev)/dev-experiments",
+    path: "/(panels)/dev-experiments",
     color: "from-violet-500 to-purple-600",
   },
   {
     id: "system",
     label: "Info del Sistema",
-    description: "Versión de la app, entorno, dependencias y métricas de rendimiento.",
+    description:
+      "Versión de la app, entorno, dependencias y métricas de rendimiento.",
     icon: <MonitorCog size={28} />,
-    path: "/(dev)/dev-system",
+    path: "/(panels)/dev-system",
     color: "from-cyan-500 to-sky-600",
   },
 ];

@@ -10,8 +10,11 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Platform } from "react-native";
+
+// 1. IMPORTAMOS EL CONTEXTO
+import { useAuth } from "../../src/context/AuthContext";
 
 // SVG servido desde public/ (Asegúrate de que la ruta exista)
 const LOGO_MH = "/images/logo-mh.svg";
@@ -20,28 +23,24 @@ export const SideBarMenu: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Estados para manejar el LocalStorage de forma segura en Expo Web
-  const [currentUserRole, setCurrentUserRole] = useState("Empleado");
-  const [currentUserName, setCurrentUserName] = useState("Usuario");
-
-  useEffect(() => {
-    // Solo ejecutamos LocalStorage si estamos en el navegador para evitar errores de SSR
-    if (Platform.OS === "web" && typeof window !== "undefined") {
-      setCurrentUserRole(localStorage.getItem("userRole") || "Empleado");
-      setCurrentUserName(localStorage.getItem("userName") || "Usuario");
-    }
-  }, []);
-
-  const isDev = currentUserRole === "DEV";
-  const avatarName = currentUserName.replace(/[._-]/g, " ");
+  // 2. EXTRAEMOS LA INFO DIRECTAMENTE DEL CONTEXTO MÁGICO
+  const { userName, userRole, isDev, logoutLocal } = useAuth();
 
   const [isExpanded, setIsExpanded] = useState(true);
 
-  const handleLogout = () => {
+  // Formateamos el nombre para el Avatar
+  const avatarName = userName.replace(/[._-]/g, " ");
+
+  const handleLogout = async () => {
+    // 3. Usamos la función del contexto para limpiar todo (local y Supabase)
+    await logoutLocal();
+
+    // 4. Redirigimos sin dejar rastro en el historial
     if (Platform.OS === "web" && typeof window !== "undefined") {
-      localStorage.clear();
+      window.location.replace("/");
+    } else {
+      router.replace("/" as any);
     }
-    router.replace("/" as any);
   };
 
   const titleClass = "text-white";
@@ -109,6 +108,7 @@ export const SideBarMenu: React.FC = () => {
     },
   ];
 
+  // Si isDev es true, agrega el grupo "Sistema" al menú
   const menuGroups = isDev
     ? [
         ...baseMenuGroups,
@@ -191,8 +191,8 @@ export const SideBarMenu: React.FC = () => {
 
                 return (
                   <li key={item.id}>
-                    {/* EL TRUCO ESTÁ AQUÍ: asChild obliga a Link a usar la etiqueta <a> interna */}
-                    <Link href={item.path as any} asChild>
+                    {/* Usamos tu diseño que no rompía en web */}
+                    <Link href={item.path as any} replace asChild>
                       <a
                         className={`flex items-center gap-3 px-3 py-2 transition-colors cursor-pointer ${
                           isExpanded
@@ -229,15 +229,15 @@ export const SideBarMenu: React.FC = () => {
               src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
                 avatarName,
               )}&background=0D8ABC&color=fff&bold=true`}
-              alt={`${currentUserName} avatar`}
+              alt={`${userName} avatar`} // Usamos userName del contexto
               className="w-10 h-10 rounded-full object-cover shrink-0 select-none"
             />
             <div className="flex flex-col overflow-hidden whitespace-nowrap flex-grow">
               <span className="text-sm font-bold truncate">
-                {currentUserName}
+                {userName} {/* Nombre del contexto */}
               </span>
               <span className="text-xs text-slate-500 truncate">
-                {currentUserRole}
+                {userRole} {/* Rol del contexto */}
               </span>
             </div>
             <button
@@ -254,7 +254,7 @@ export const SideBarMenu: React.FC = () => {
               src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
                 avatarName,
               )}&background=0D8ABC&color=fff&bold=true`}
-              alt={`${currentUserName} avatar`}
+              alt={`${userName} avatar`} // Usamos userName del contexto
               className="w-10 h-10 rounded-full object-cover shrink-0 select-none ring-2 ring-white/10"
             />
             <button

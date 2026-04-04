@@ -10,6 +10,5 @@ export default class Permiso extends Model {
   @field("precios") precios!: boolean;
   @field("usuarios") usuarios!: boolean;
   @field("configuraciones") configuraciones!: boolean;
-  @field("multi_usuarios") multiUsuarios!: boolean;
   @readonly @date("updated_at") updatedAt!: number;
 }
