@@ -1,5 +1,6 @@
 import { Link, usePathname, useRouter } from "expo-router";
 import {
+  Bell,
   DollarSignIcon,
   FileText,
   LayoutDashboard,
@@ -13,29 +14,20 @@ import {
 import React, { useState } from "react";
 import { Platform } from "react-native";
 
-// 1. IMPORTAMOS EL CONTEXTO
 import { useAuth } from "../../src/context/AuthContext";
 
-// SVG servido desde public/ (Asegúrate de que la ruta exista)
 const LOGO_MH = "/images/logo-mh.svg";
 
 export const SideBarMenu: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
+  const { userId, userName, userRole, isDev, logoutLocal } = useAuth();
+  const [showProfile, setShowProfile] = useState(false);
 
-  // 2. EXTRAEMOS LA INFO DIRECTAMENTE DEL CONTEXTO MÁGICO
-  const { userName, userRole, isDev, logoutLocal } = useAuth();
-
-  const [isExpanded, setIsExpanded] = useState(true);
-
-  // Formateamos el nombre para el Avatar
   const avatarName = userName.replace(/[._-]/g, " ");
 
   const handleLogout = async () => {
-    // 3. Usamos la función del contexto para limpiar todo (local y Supabase)
     await logoutLocal();
-
-    // 4. Redirigimos sin dejar rastro en el historial
     if (Platform.OS === "web" && typeof window !== "undefined") {
       window.location.replace("/");
     } else {
@@ -43,231 +35,240 @@ export const SideBarMenu: React.FC = () => {
     }
   };
 
-  const titleClass = "text-white";
-
-  const baseMenuGroups = [
-    {
-      title: "Menu Principal",
-      className: titleClass,
-      items: [
-        {
-          id: "Inicio",
-          label: "Inicio",
-          icon: <LayoutDashboard size={20} />,
-          path: "/home",
-        },
-        {
-          id: "Precios",
-          label: "Precios",
-          icon: <DollarSignIcon size={20} />,
-          path: "/prices",
-        },
-      ],
-    },
-    {
-      title: "General",
-      className: titleClass,
-      items: [
-        {
-          id: "Inventario",
-          label: "Inventario",
-          icon: <ShelvingUnitIcon size={20} />,
-          path: "/inventory",
-        },
-        {
-          id: "Clientes",
-          label: "Clientes",
-          icon: <Users size={20} />,
-          path: "/clients",
-        },
-        {
-          id: "Facturas",
-          label: "Facturas",
-          icon: <FileText size={20} />,
-          path: "/invoices",
-        },
-      ],
-    },
-    {
-      title: "Perfiles",
-      className: titleClass,
-      items: [
-        {
-          id: "Usuarios",
-          label: "Usuarios",
-          icon: <User size={20} />,
-          path: "/users",
-        },
-        {
-          id: "configuraciones",
-          label: "Configuraciones",
-          icon: <Settings size={20} />,
-          path: "/settings",
-        },
-      ],
-    },
-  ];
-
-  // Si isDev es true, agrega el grupo "Sistema" al menú
-  const menuGroups = isDev
-    ? [
-        ...baseMenuGroups,
-        {
-          title: "Sistema",
-          className: titleClass,
-          items: [
-            {
-              id: "devpanel",
-              label: "Dev Panel",
-              icon: <Wrench size={20} />,
-              path: "/(dev)/devpanel",
-            },
-          ],
-        },
-      ]
-    : baseMenuGroups;
+  const isActive = (path: string) => {
+    return pathname === path || pathname.startsWith(`${path}/`);
+  };
 
   return (
-    <aside
-      className={`h-screen bg-[#15335c] focus:ring-4 focus:ring-blue-800/30 text-white transition-all duration-300 flex flex-col ${
-        isExpanded ? "w-64" : "w-20"
-      }`}
-    >
-      {/* Cabecera (Logo) */}
-      <div className="flex items-center justify-between p-4 h-16 shrink-0">
+    <nav className="w-full h-16 bg-[radial-gradient(ellipse_at_center,_#1a1f36_0%,_#2c3558_100%)] flex items-center px-4 md:px-6 shadow-md shrink-0 relative z-50">
+      {/* 1. Logo y Nombre */}
+      <div className="flex items-center gap-3 shrink-0 mr-4">
         <div
-          className={`flex items-center gap-3 ${!isExpanded ? "justify-center w-full" : ""}`}
-        >
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="p-1.5 rounded-lg border-2 border-white/40 hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-white/60"
-            title="Toggle Menu"
+          className="w-8 h-8 bg-white"
+          style={{
+            maskImage: `url(${LOGO_MH})`,
+            WebkitMaskImage: `url(${LOGO_MH})`,
+            maskSize: "contain",
+            WebkitMaskSize: "contain",
+            maskRepeat: "no-repeat",
+            WebkitMaskRepeat: "no-repeat",
+            maskPosition: "center",
+            WebkitMaskPosition: "center",
+          }}
+          aria-label="Distribuidora MH Logo"
+          role="img"
+        />
+        <span className="font-bold text-white text-lg tracking-wide whitespace-nowrap">
+          Distribuidora MH
+        </span>
+      </div>
+
+      {/* 2. Un Espacio */}
+      <div className="mr-12 md:mr-24 lg:mr-32 px-4"></div>
+
+      {/* 3. Boton Dev (si aplica) */}
+      {isDev && (
+        <div className="shrink-0 mr-4">
+          <Link href="/(dev)/devpanel" asChild>
+            <a
+              className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors border ${
+                isActive("/(dev)/devpanel")
+                  ? "bg-white/20 border-white/30 text-white"
+                  : "bg-[#252b48] border-transparent hover:bg-white/10 text-slate-300"
+              }`}
+              title="Dev Panel"
+            >
+              <Wrench size={18} />
+            </a>
+          </Link>
+        </div>
+      )}
+
+      {/* 4. Marco con Inicio, Inventario y Facturas */}
+      <div className="flex items-center bg-white p-1 rounded-full shrink-0 mr-4 shadow-sm border border-slate-200">
+        <Link href="/home" asChild>
+          <a
+            className={`flex items-center gap-1.5 px-5 py-2 rounded-full font-semibold transition-all duration-200 text-sm ${
+              isActive("/home")
+                ? "bg-[#2c3558] text-white shadow-sm"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+            }`}
           >
-            <div
-              className="w-7 h-7 bg-white"
-              style={{
-                maskImage: `url(${LOGO_MH})`,
-                WebkitMaskImage: `url(${LOGO_MH})`,
-                maskSize: "contain",
-                WebkitMaskSize: "contain",
-                maskRepeat: "no-repeat",
-                WebkitMaskRepeat: "no-repeat",
-                maskPosition: "center",
-                WebkitMaskPosition: "center",
-              }}
-              aria-label="Distribuidora MH Logo"
-              role="img"
+            <LayoutDashboard size={16} />
+            Inicio
+          </a>
+        </Link>
+        <Link href="/inventory" asChild>
+          <a
+            className={`flex items-center gap-1.5 px-5 py-2 rounded-full font-semibold transition-all duration-200 text-sm ${
+              isActive("/inventory")
+                ? "bg-[#2c3558] text-white shadow-sm"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+            }`}
+          >
+            <ShelvingUnitIcon size={16} />
+            Inventario
+          </a>
+        </Link>
+        <Link href="/invoices" asChild>
+          <a
+            className={`flex items-center gap-1.5 px-5 py-2 rounded-full font-semibold transition-all duration-200 text-sm ${
+              isActive("/invoices")
+                ? "bg-[#2c3558] text-white shadow-sm"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+            }`}
+          >
+            <FileText size={16} />
+            Facturas
+          </a>
+        </Link>
+      </div>
+
+      {/* 5. Burbujas: Clientes, Precios, Usuarios */}
+      <div className="flex items-center gap-2 shrink-0">
+        <Link href="/clients" asChild>
+          <a
+            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${
+              isActive("/clients")
+                ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
+                : "bg-[#252b48] border-transparent hover:bg-white/10 text-slate-300 hover:text-white"
+            }`}
+            title="Clientes"
+          >
+            <Users size={18} />
+          </a>
+        </Link>
+        <Link href="/prices" asChild>
+          <a
+            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${
+              isActive("/prices")
+                ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
+                : "bg-[#252b48] border-transparent hover:bg-white/10 text-slate-300 hover:text-white"
+            }`}
+            title="Precios"
+          >
+            <DollarSignIcon size={18} />
+          </a>
+        </Link>
+        <Link href="/users" asChild>
+          <a
+            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${
+              isActive("/users")
+                ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
+                : "bg-[#252b48] border-transparent hover:bg-white/10 text-slate-300 hover:text-white"
+            }`}
+            title="Usuarios"
+          >
+            <User size={18} />
+          </a>
+        </Link>
+      </div>
+
+      {/* 6. Das el salto */}
+      <div className="flex-1 min-w-[20px]"></div>
+
+      {/* 7. Notificaciones, Configuraciones y la burbuja de Perfil */}
+      <div className="flex items-center gap-3 shrink-0">
+        <button
+          className="flex items-center justify-center w-10 h-10 rounded-full transition-all border bg-[#252b48] border-transparent hover:bg-white/10 text-slate-300 hover:text-white"
+          title="Notificaciones"
+        >
+          <Bell size={18} />
+        </button>
+
+        <Link href="/settings" asChild>
+          <a
+            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${
+              isActive("/settings")
+                ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
+                : "bg-[#252b48] border-transparent hover:bg-white/10 text-slate-300 hover:text-white"
+            }`}
+            title="Configuraciones"
+          >
+            <Settings size={18} />
+          </a>
+        </Link>
+
+        {/* Separador vertical sutil */}
+        <div className="w-px h-8 bg-white/10 mx-1"></div>
+
+        {/* Burbuja Perfil y Menú */}
+        <div className="relative">
+          <button
+            onClick={() => setShowProfile(!showProfile)}
+            className={`w-10 h-10 rounded-full overflow-hidden border-2 transition-all shadow-sm focus:outline-none ${
+              showProfile
+                ? "border-[#abf62d] ring-2 ring-[#abf62d]/30"
+                : "border-[#abf62d]"
+            }`}
+          >
+            <img
+              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
+                avatarName,
+              )}&background=0D8ABC&color=fff&bold=true`}
+              alt="Perfil de Usuario"
+              className="w-full h-full object-cover"
             />
           </button>
 
-          {isExpanded && (
-            <span className="font-bold text-xl tracking-wide whitespace-nowrap">
-              Distribuidora MH
-            </span>
+          {showProfile && (
+            <div className="absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50 transform origin-top-right animate-in fade-in zoom-in-95 duration-100">
+              {/* Header Decorativo */}
+              <div className="bg-[radial-gradient(ellipse_at_center,_#2c3558_0%,_#1a1f36_100%)] p-5 flex items-center gap-4 border-b border-slate-800">
+                <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-[#abf62d] shadow-md shrink-0 bg-white">
+                  <img
+                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(avatarName)}&background=0D8ABC&color=fff&bold=true&size=120`}
+                    alt="Perfil"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="flex flex-col overflow-hidden text-white">
+                  <p className="text-lg font-extrabold truncate drop-shadow-sm">
+                    {userName}
+                  </p>
+                  <p className="text-xs font-medium text-slate-300 uppercase tracking-widest mt-0.5 truncate">
+                    {userRole}
+                  </p>
+                </div>
+              </div>
+
+              {/* Información Adicional Breve */}
+              <div className="p-4 bg-slate-50 border-b border-slate-100 flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#abf62d] shadow-[0_0_8px_#abf62d] animate-pulse"></div>
+                    <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                      En Línea
+                    </span>
+                  </div>
+                  {userId && (
+                    <span className="bg-slate-200 text-slate-500 font-mono text-[10px] px-2 py-0.5 rounded-full">
+                      ID: {userId.split("-")[0]}
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-[11px] text-slate-500 leading-tight">
+                  Módulos habilitados según tus permisos específicos de{" "}
+                  {userRole}. Contacta al administrador si requieres ajustes.
+                </p>
+              </div>
+
+              {/* Acciones */}
+              <div className="p-3 bg-white">
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 active:scale-[0.98] rounded-xl transition-all duration-200 text-sm font-bold border border-red-100"
+                >
+                  <LogOut size={18} strokeWidth={2.5} />
+                  Cerrar Sesión
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>
-
-      {/* Secciones del Menú */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide py-4 flex flex-col gap-6">
-        {menuGroups.map((group, index) => (
-          <div key={index} className="px-3">
-            {isExpanded ? (
-              <h3 className="px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 whitespace-nowrap">
-                {group.title}
-              </h3>
-            ) : (
-              <div className="w-full flex justify-center mb-2">
-                <div className="h-px bg-slate-700 w-8"></div>
-              </div>
-            )}
-
-            <ul className="space-y-1">
-              {group.items.map((item) => {
-                // Comprobación de ruta activa
-                const isActive =
-                  pathname === item.path ||
-                  pathname.startsWith(`${item.path}/`);
-
-                return (
-                  <li key={item.id}>
-                    {/* Usamos tu diseño que no rompía en web */}
-                    <Link href={item.path as any} replace asChild>
-                      <a
-                        className={`flex items-center gap-3 px-3 py-2 transition-colors cursor-pointer ${
-                          isExpanded
-                            ? "rounded-lg"
-                            : "justify-center rounded-xl p-3"
-                        } ${
-                          isActive
-                            ? "bg-white text-slate-900 font-medium shadow-sm"
-                            : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                        }`}
-                        title={!isExpanded ? item.label : undefined}
-                      >
-                        <div className="shrink-0">{item.icon}</div>
-                        {isExpanded && (
-                          <span className="truncate whitespace-nowrap">
-                            {item.label}
-                          </span>
-                        )}
-                      </a>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-      </div>
-
-      {/* Pie (Perfil de Usuario) */}
-      <div className="p-4 shrink-0 mt-auto">
-        {isExpanded ? (
-          <div className="flex flex-row items-center gap-3 bg-white text-slate-900 p-3 rounded-xl shadow-sm transition-all duration-300">
-            <img
-              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
-                avatarName,
-              )}&background=0D8ABC&color=fff&bold=true`}
-              alt={`${userName} avatar`} // Usamos userName del contexto
-              className="w-10 h-10 rounded-full object-cover shrink-0 select-none"
-            />
-            <div className="flex flex-col overflow-hidden whitespace-nowrap flex-grow">
-              <span className="text-sm font-bold truncate">
-                {userName} {/* Nombre del contexto */}
-              </span>
-              <span className="text-xs text-slate-500 truncate">
-                {userRole} {/* Rol del contexto */}
-              </span>
-            </div>
-            <button
-              onClick={handleLogout}
-              title="Cerrar sesión"
-              className="text-red-500 hover:text-red-600 transition-colors bg-red-500/10 hover:bg-red-500/20 p-2 rounded-lg shrink-0 ml-auto cursor-pointer"
-            >
-              <LogOut size={20} />
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center gap-4 transition-all duration-300">
-            <img
-              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
-                avatarName,
-              )}&background=0D8ABC&color=fff&bold=true`}
-              alt={`${userName} avatar`} // Usamos userName del contexto
-              className="w-10 h-10 rounded-full object-cover shrink-0 select-none ring-2 ring-white/10"
-            />
-            <button
-              onClick={handleLogout}
-              title="Cerrar sesión"
-              className="w-10 h-10 flex items-center justify-center rounded-full text-red-400 hover:text-white transition-colors bg-slate-800 hover:bg-red-500 shadow-md shrink-0 cursor-pointer"
-            >
-              <LogOut size={18} className="-ml-0.5" />
-            </button>
-          </div>
-        )}
-      </div>
-    </aside>
+    </nav>
   );
 };
 
