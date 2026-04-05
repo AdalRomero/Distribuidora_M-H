@@ -124,6 +124,34 @@ export default function Login() {
 
         // SI LLEGAMOS AQUÍ, LA CONTRASEÑA ES CORRECTA EN LA NUBE
         userId = data.user.id;
+
+        // VERIFICAR ESTADO EN LA NUBE
+        const { data: perfilData, error: perfilError } = await supabase
+          .from("perfiles")
+          .select("estado")
+          .eq("id", userId)
+          .single();
+
+        let onlineDisabled = false;
+
+        // Si la consulta fue exitosa y devuleve false
+        if (perfilData && perfilData.estado === false) {
+          onlineDisabled = true;
+        }
+
+        // Si hubo error 403 (Forbidden) u otro error de RLS, miramos nuestra base local
+        if (perfilError && userIdLocal) {
+          const checkLocal = (await perfilesDb.find(userIdLocal)) as any;
+          if (checkLocal.estado === false) {
+            onlineDisabled = true;
+          }
+        }
+
+        if (onlineDisabled) {
+          await supabase.auth.signOut();
+          throw new Error("USUARIO_DESHABILITADO");
+        }
+
         accesoConcedido = true;
 
         // GUARDADO DE HASH (Actualiza la base local con la nueva contraseña)
@@ -149,13 +177,22 @@ export default function Login() {
             try {
               const perfilDescargado = (await perfilesDb.find(userId)) as any;
 
+              // Si en el sync bajó como falso, cerramos de inmediato
+              if (perfilDescargado.estado === false) {
+                await supabase.auth.signOut();
+                throw new Error("USUARIO_DESHABILITADO");
+              }
+
               await database.write(async () => {
                 await perfilDescargado.update((perfil: any) => {
                   perfil.hashLocal = hashedInput;
                 });
               });
               console.log("¡Éxito! Catálogo sincronizado y Hash guardado.");
-            } catch (syncError) {
+            } catch (syncError: any) {
+              if (syncError.message === "USUARIO_DESHABILITADO") {
+                throw syncError;
+              }
               console.error("No se pudo guardar el hash tras el sync inicial.");
             }
           }
@@ -169,6 +206,10 @@ export default function Login() {
 
           if (userIdLocal) {
             const perfilLocal = (await perfilesDb.find(userIdLocal)) as any;
+
+            if (perfilLocal.estado === false) {
+              throw new Error("USUARIO_DESHABILITADO");
+            }
 
             // Revisamos contra la base local
             if (perfilLocal.hashLocal === hashedInput) {
@@ -208,6 +249,9 @@ export default function Login() {
       if (errorReal.includes("primer_ingreso_requiere_correo")) {
         mensajeAmigable =
           "Por ser la primera vez en este equipo, ingresa con tu Correo electrónico. Después podrás usar tu Usuario.";
+      } else if (errorReal.includes("USUARIO_DESHABILITADO")) {
+        mensajeAmigable =
+          "Tu cuenta ha sido deshabilitada. No tienes permitido iniciar sesión.";
       } else if (
         errorReal.includes("Record perfiles#") &&
         errorReal.includes("not found")
