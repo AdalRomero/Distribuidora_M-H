@@ -1,6 +1,5 @@
 import { Link, usePathname, useRouter } from "expo-router";
 import {
-  Bell,
   DollarSignIcon,
   FileText,
   LayoutDashboard,
@@ -15,6 +14,7 @@ import React, { useState } from "react";
 import { Platform } from "react-native";
 
 import { useAuth } from "../../src/context/AuthContext";
+import NotificationFlyoutMenu from "./modals/NotificationFlyoutMenu";
 
 const LOGO_MH = "/images/logo-mh.svg";
 
@@ -162,12 +162,7 @@ export const SideBarMenu: React.FC = () => {
 
       {/* 7. Notificaciones, Configuraciones y la burbuja de Perfil */}
       <div className="flex items-center gap-3 shrink-0">
-        <button
-          className="flex items-center justify-center w-10 h-10 rounded-full transition-all border bg-[#15335c] border-transparent hover:bg-white/10 text-slate-300 hover:text-white"
-          title="Notificaciones"
-        >
-          <Bell size={18} />
-        </button>
+        <NotificationFlyoutMenu />
 
         <Link href="/settings" asChild>
           <a
@@ -205,7 +200,7 @@ export const SideBarMenu: React.FC = () => {
           {showProfile && (
             <div className="absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50 transform origin-top-right animate-in fade-in zoom-in-95 duration-100">
               {/* Header Decorativo */}
-              <div className="bg-[radial-gradient(ellipse_at_center,_#2c3558_0%,_#1a1f36_100%)] p-5 flex items-center gap-4 border-b border-slate-800">
+              <div className="bg-[radial-gradient(ellipse_at_center,_#15335c_0%,_#15335c_100%)] p-5 flex items-center gap-4 border-b border-slate-800">
                 <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-[#abf62d] shadow-md shrink-0 bg-white">
                   <img
                     src={`https://ui-avatars.com/api/?name=${encodeURIComponent(avatarName)}&background=0D8ABC&color=fff&bold=true&size=120`}

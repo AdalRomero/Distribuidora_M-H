@@ -82,7 +82,7 @@ export default function Users() {
   const [errorToRecover, setErrorToRecover] = useState<UserSyncError | null>(
     null,
   );
-  
+
   const [warningModalConfig, setWarningModalConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -92,7 +92,7 @@ export default function Users() {
     isOpen: false,
     title: "",
     message: "",
-    onConfirm: () => {},
+    onConfirm: () => { },
   });
 
   const [resetEmailConfig, setResetEmailConfig] = useState<{
@@ -152,7 +152,7 @@ export default function Users() {
           try {
             info = await infoDb.find(p.id);
             perms = await permisosDb.find(p.id);
-          } catch (e) {}
+          } catch (e) { }
 
           const activePerms: string[] = [];
           if (perms) {
@@ -333,7 +333,7 @@ export default function Users() {
     currentStatus: boolean,
   ) => {
     const accion = currentStatus ? "desactivar" : "reactivar";
-    
+
     setWarningModalConfig({
       isOpen: true,
       title: `Confirmar Acción`,
@@ -425,9 +425,9 @@ export default function Users() {
   const handleSendResetEmail = async () => {
     const emailToReset = resetEmailConfig.userEmail;
     if (!emailToReset || emailToReset === "Sin correo") {
-       setMessage({ type: "error", text: "El usuario no tiene un correo válido registrado." });
-       setResetEmailConfig((prev) => ({ ...prev, isOpen: false }));
-       return;
+      setMessage({ type: "error", text: "El usuario no tiene un correo válido registrado." });
+      setResetEmailConfig((prev) => ({ ...prev, isOpen: false }));
+      return;
     }
 
     setResetEmailConfig((prev) => ({ ...prev, isOpen: false }));
@@ -436,7 +436,7 @@ export default function Users() {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(emailToReset);
       if (error) throw error;
-      
+
       setMessage({
         type: "success",
         text: `Link de recuperación enviado correctamente a ${emailToReset}.`,
@@ -654,511 +654,513 @@ export default function Users() {
 
   return (
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen font-sans relative">
-      {/* MODALES REUTILIZABLES */}
-      <SuccessModal
-        isOpen={message?.type === "success"}
-        onClose={() => setMessage(null)}
-        title="¡Éxito!"
-        message={message?.type === "success" ? message.text : ""}
-      />
-      <ErrorModal
-        isOpen={message?.type === "error"}
-        onClose={() => setMessage(null)}
-        title="Ocurrió un problema"
-        message={message?.type === "error" ? message.text : ""}
-      />
-      <WarningModal
-        isOpen={warningModalConfig.isOpen}
-        onClose={() => setWarningModalConfig((prev) => ({ ...prev, isOpen: false }))}
-        onConfirm={warningModalConfig.onConfirm}
-        title={warningModalConfig.title}
-        message={warningModalConfig.message}
-      />
-      
-      <WarningModal
-        isOpen={resetEmailConfig.isOpen}
-        onClose={() => setResetEmailConfig((prev) => ({ ...prev, isOpen: false }))}
-        onConfirm={handleSendResetEmail}
-        title="Enviar Recuperación"
-        message={`¿Enviar link de recuperación de contraseña al correo de ${resetEmailConfig.userName} (${resetEmailConfig.userEmail})?`}
-      />
-      
+      <div className="max-w-7xl mx-auto">
+        {/* MODALES REUTILIZABLES */}
+        <SuccessModal
+          isOpen={message?.type === "success"}
+          onClose={() => setMessage(null)}
+          title="¡Éxito!"
+          message={message?.type === "success" ? message.text : ""}
+        />
+        <ErrorModal
+          isOpen={message?.type === "error"}
+          onClose={() => setMessage(null)}
+          title="Ocurrió un problema"
+          message={message?.type === "error" ? message.text : ""}
+        />
+        <WarningModal
+          isOpen={warningModalConfig.isOpen}
+          onClose={() => setWarningModalConfig((prev) => ({ ...prev, isOpen: false }))}
+          onConfirm={warningModalConfig.onConfirm}
+          title={warningModalConfig.title}
+          message={warningModalConfig.message}
+        />
 
-      <div className="mb-8 flex justify-between items-end">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Gestión de Usuarios
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">
-            Administra los accesos y roles de tu equipo de trabajo.
-          </p>
-        </div>
-        {editingUserId && (
-          <button
-            onClick={resetForm}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 hover:bg-slate-300 font-bold rounded-lg transition-colors text-sm shadow-sm"
-          >
-            <RotateCcw className="w-4 h-4" /> Cancelar Edición
-          </button>
-        )}
-      </div>
+        <WarningModal
+          isOpen={resetEmailConfig.isOpen}
+          onClose={() => setResetEmailConfig((prev) => ({ ...prev, isOpen: false }))}
+          onConfirm={handleSendResetEmail}
+          title="Enviar Recuperación"
+          message={`¿Enviar link de recuperación de contraseña al correo de ${resetEmailConfig.userName} (${resetEmailConfig.userEmail})?`}
+        />
 
-      {/* ✨ BANNER DE ERRORES DE SINCRONIZACIÓN */}
-      {syncErrors.length > 0 && (
-        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm">
-          <h3 className="text-amber-800 font-bold flex items-center gap-2 mb-3">
-            <AlertTriangle className="w-5 h-5" />
-            Problemas detectados al sincronizar
-          </h3>
-          <p className="text-sm text-amber-700 mb-4">
-            Los siguientes usuarios fueron creados o editados offline, pero
-            fueron rechazados por la nube. No te preocupes, rescatamos la
-            información. Haz clic en "Recuperar y Corregir" para cargarlos al
-            formulario.
-          </p>
-          <div className="space-y-3">
-            {syncErrors.map((err) => {
-              const targetUser =
-                err.datosAtrapados?.usuario ||
-                err.datosAtrapados?.correo ||
-                err.datosAtrapados?.nombres ||
-                "Usuario Desconocido";
-              const accionText =
-                err.accion === "created" ? "crear" : "modificar";
 
-              return (
-                <div
-                  key={err.id}
-                  className="flex flex-col md:flex-row justify-between md:items-center bg-white p-4 rounded-xl border border-amber-100 gap-4 shadow-sm"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">
-                      Error al intentar {accionText} al usuario:{" "}
-                      <span className="text-amber-600">{targetUser}</span>
-                    </p>
-                    <p className="text-xs text-slate-600 mt-1">
-                      <span className="font-bold">Motivo:</span>{" "}
-                      {traducirErrorPostgres(err.mensaje)}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
-                    <button
-                      onClick={() => triggerRecovery(err)}
-                      className="flex items-center gap-1.5 px-4 py-2 text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-lg text-sm font-bold transition-colors shadow-sm"
-                      title="Cargar estos datos rescatados en el formulario"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                      Recuperar y Corregir
-                    </button>
-                    <button
-                      onClick={() => handleDismissError(err.id)}
-                      className="flex items-center gap-1.5 px-4 py-2 text-slate-500 bg-slate-100 hover:bg-slate-200 hover:text-slate-700 rounded-lg text-sm font-bold transition-colors"
-                      title="Eliminar esta notificación (se perderá la información rescatada)"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Descartar
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+        <div className="mb-8 flex justify-between items-end">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+              Gestión de Usuarios
+            </h1>
+            <p className="text-slate-500 text-sm mt-1">
+              Administra los accesos y roles de tu equipo de trabajo.
+            </p>
           </div>
+          {editingUserId && (
+            <button
+              onClick={resetForm}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 hover:bg-slate-300 font-bold rounded-lg transition-colors text-sm shadow-sm"
+            >
+              <RotateCcw className="w-4 h-4" /> Cancelar Edición
+            </button>
+          )}
         </div>
-      )}
 
-      <div className="flex flex-col xl:flex-row gap-6">
-        {/* Panel Izquierdo: Lista de Usuarios */}
-        <div className="w-full xl:w-2/3 flex flex-col gap-4">
-          <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-200 flex items-center">
-            <div className="relative flex-1">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="w-5 h-5 text-slate-400" />
-              </div>
-              <input
-                type="text"
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400"
-                placeholder="Buscar usuarios por nombre, apellido o correo..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+        {/* ✨ BANNER DE ERRORES DE SINCRONIZACIÓN */}
+        {syncErrors.length > 0 && (
+          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm">
+            <h3 className="text-amber-800 font-bold flex items-center gap-2 mb-3">
+              <AlertTriangle className="w-5 h-5" />
+              Problemas detectados al sincronizar
+            </h3>
+            <p className="text-sm text-amber-700 mb-4">
+              Los siguientes usuarios fueron creados o editados offline, pero
+              fueron rechazados por la nube. No te preocupes, rescatamos la
+              información. Haz clic en "Recuperar y Corregir" para cargarlos al
+              formulario.
+            </p>
+            <div className="space-y-3">
+              {syncErrors.map((err) => {
+                const targetUser =
+                  err.datosAtrapados?.usuario ||
+                  err.datosAtrapados?.correo ||
+                  err.datosAtrapados?.nombres ||
+                  "Usuario Desconocido";
+                const accionText =
+                  err.accion === "created" ? "crear" : "modificar";
+
+                return (
+                  <div
+                    key={err.id}
+                    className="flex flex-col md:flex-row justify-between md:items-center bg-white p-4 rounded-xl border border-amber-100 gap-4 shadow-sm"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">
+                        Error al intentar {accionText} al usuario:{" "}
+                        <span className="text-amber-600">{targetUser}</span>
+                      </p>
+                      <p className="text-xs text-slate-600 mt-1">
+                        <span className="font-bold">Motivo:</span>{" "}
+                        {traducirErrorPostgres(err.mensaje)}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
+                      <button
+                        onClick={() => triggerRecovery(err)}
+                        className="flex items-center gap-1.5 px-4 py-2 text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-lg text-sm font-bold transition-colors shadow-sm"
+                        title="Cargar estos datos rescatados en el formulario"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        Recuperar y Corregir
+                      </button>
+                      <button
+                        onClick={() => handleDismissError(err.id)}
+                        className="flex items-center gap-1.5 px-4 py-2 text-slate-500 bg-slate-100 hover:bg-slate-200 hover:text-slate-700 rounded-lg text-sm font-bold transition-colors"
+                        title="Eliminar esta notificación (se perderá la información rescatada)"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Descartar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
+        )}
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex-1">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead className="bg-slate-50/80 text-slate-500 border-b border-slate-200 text-xs uppercase tracking-wider font-bold">
-                  <tr>
-                    <th className="px-4 py-3 xl:px-3">Usuario</th>
-                    <th className="px-4 py-3 xl:px-3">Rol</th>
-                    <th className="px-4 py-3 xl:px-3">Permisos</th>
-                    <th className="px-4 py-3 xl:px-3">Estado</th>
-                    <th className="px-4 py-3 xl:px-3 text-center">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 relative">
-                  {isLoadingTable ? (
+        <div className="flex flex-col xl:flex-row gap-6">
+          {/* Panel Izquierdo: Lista de Usuarios */}
+          <div className="w-full xl:w-2/3 flex flex-col gap-4">
+            <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+              <div className="relative flex-1">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search className="w-5 h-5 text-slate-400" />
+                </div>
+                <input
+                  type="text"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400"
+                  placeholder="Buscar usuarios por nombre, apellido o correo..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex-1">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm whitespace-nowrap">
+                  <thead className="bg-slate-50/80 text-slate-500 border-b border-slate-200 text-xs uppercase tracking-wider font-bold">
                     <tr>
-                      <td colSpan={5} className="py-10 text-center">
-                        <Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-500" />
-                      </td>
+                      <th className="px-4 py-3 xl:px-3">Usuario</th>
+                      <th className="px-4 py-3 xl:px-3">Rol</th>
+                      <th className="px-4 py-3 xl:px-3">Permisos</th>
+                      <th className="px-4 py-3 xl:px-3">Estado</th>
+                      <th className="px-4 py-3 xl:px-3 text-center">Acciones</th>
                     </tr>
-                  ) : filteredUsers.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="py-10 text-center text-slate-500"
-                      >
-                        No hay usuarios que coincidan con la búsqueda.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredUsers.map((user) => (
-                      <tr
-                        key={user.id}
-                        className={`transition-colors group ${editingUserId === user.id ? "bg-blue-50/50" : "hover:bg-slate-50/80"}`}
-                      >
-                        <td className="px-4 py-3 xl:px-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0 border text-slate-700 font-bold text-sm shadow-sm">
-                              {user.nombres[0]?.toUpperCase() || ""}
-                              {user.apePaterno[0]?.toUpperCase() || ""}
-                            </div>
-                            <div>
-                              <p className="text-slate-900 font-bold">
-                                {user.nombres} {user.apePaterno}
-                              </p>
-                              <p className="text-slate-500 text-xs mt-0.5 flex gap-2">
-                                <span>{user.username}</span> •{" "}
-                                <span className="text-blue-500">
-                                  {user.email}
-                                </span>
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 xl:px-3">
-                          <RoleBadge roleName={user.role} />
-                        </td>
-                        <td className="px-4 py-3 xl:px-3">
-                          {user.role === "Administrador" ? (
-                            <span className="text-xs font-bold text-slate-500 italic">
-                              Acceso Total
-                            </span>
-                          ) : (
-                            <div className="flex flex-wrap gap-1 max-w-[140px] whitespace-normal">
-                              {user.permissions &&
-                              user.permissions.length > 0 ? (
-                                user.permissions.map((p: string) => (
-                                  <span
-                                    key={p}
-                                    className="px-2 py-0.5 bg-slate-100 border text-slate-600 rounded-md text-[10px] font-bold uppercase"
-                                  >
-                                    {p}
-                                  </span>
-                                ))
-                              ) : (
-                                <span className="text-xs font-medium text-slate-400 italic">
-                                  Sin permisos
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 xl:px-3">
-                          <StatusBadge active={user.status} />
-                        </td>
-                        <td className="px-4 py-3 xl:px-3 text-center text-slate-400">
-                          <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={() => handleEditClick(user)}
-                              className="p-2 hover:text-blue-600 hover:bg-blue-50 rounded-lg shadow-sm"
-                              title="Editar"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => setResetEmailConfig({
-                                isOpen: true,
-                                userEmail: user.email,
-                                userName: user.nombres,
-                              })}
-                              className="p-2 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg shadow-sm"
-                              title="Enviar Link de Recuperación"
-                            >
-                              <Mail className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleToggleStatus(
-                                  user.id,
-                                  user.nombres,
-                                  user.status,
-                                )
-                              }
-                              className={`p-2 rounded-lg shadow-sm ${user.status ? "hover:text-rose-600 hover:bg-rose-50" : "hover:text-emerald-600 hover:bg-emerald-50"}`}
-                              title={user.status ? "Desactivar" : "Reactivar"}
-                            >
-                              {user.status ? (
-                                <Trash2 className="w-4 h-4" />
-                              ) : (
-                                <RotateCcw className="w-4 h-4" />
-                              )}
-                            </button>
-                          </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 relative">
+                    {isLoadingTable ? (
+                      <tr>
+                        <td colSpan={5} className="py-10 text-center">
+                          <Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-500" />
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : filteredUsers.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="py-10 text-center text-slate-500"
+                        >
+                          No hay usuarios que coincidan con la búsqueda.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredUsers.map((user) => (
+                        <tr
+                          key={user.id}
+                          className={`transition-colors group ${editingUserId === user.id ? "bg-blue-50/50" : "hover:bg-slate-50/80"}`}
+                        >
+                          <td className="px-4 py-3 xl:px-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0 border text-slate-700 font-bold text-sm shadow-sm">
+                                {user.nombres[0]?.toUpperCase() || ""}
+                                {user.apePaterno[0]?.toUpperCase() || ""}
+                              </div>
+                              <div>
+                                <p className="text-slate-900 font-bold">
+                                  {user.nombres} {user.apePaterno}
+                                </p>
+                                <p className="text-slate-500 text-xs mt-0.5 flex gap-2">
+                                  <span>{user.username}</span> •{" "}
+                                  <span className="text-blue-500">
+                                    {user.email}
+                                  </span>
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 xl:px-3">
+                            <RoleBadge roleName={user.role} />
+                          </td>
+                          <td className="px-4 py-3 xl:px-3">
+                            {user.role === "Administrador" ? (
+                              <span className="text-xs font-bold text-slate-500 italic">
+                                Acceso Total
+                              </span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1 max-w-[140px] whitespace-normal">
+                                {user.permissions &&
+                                  user.permissions.length > 0 ? (
+                                  user.permissions.map((p: string) => (
+                                    <span
+                                      key={p}
+                                      className="px-2 py-0.5 bg-slate-100 border text-slate-600 rounded-md text-[10px] font-bold uppercase"
+                                    >
+                                      {p}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-xs font-medium text-slate-400 italic">
+                                    Sin permisos
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 xl:px-3">
+                            <StatusBadge active={user.status} />
+                          </td>
+                          <td className="px-4 py-3 xl:px-3 text-center text-slate-400">
+                            <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => handleEditClick(user)}
+                                className="p-2 hover:text-blue-600 hover:bg-blue-50 rounded-lg shadow-sm"
+                                title="Editar"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => setResetEmailConfig({
+                                  isOpen: true,
+                                  userEmail: user.email,
+                                  userName: user.nombres,
+                                })}
+                                className="p-2 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg shadow-sm"
+                                title="Enviar Link de Recuperación"
+                              >
+                                <Mail className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handleToggleStatus(
+                                    user.id,
+                                    user.nombres,
+                                    user.status,
+                                  )
+                                }
+                                className={`p-2 rounded-lg shadow-sm ${user.status ? "hover:text-rose-600 hover:bg-rose-50" : "hover:text-emerald-600 hover:bg-emerald-50"}`}
+                                title={user.status ? "Desactivar" : "Reactivar"}
+                              >
+                                {user.status ? (
+                                  <Trash2 className="w-4 h-4" />
+                                ) : (
+                                  <RotateCcw className="w-4 h-4" />
+                                )}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Panel Derecho: Formulario de Captura */}
-        <div className="w-full xl:w-1/3">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSubmit();
-            }}
-            className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-5"
-          >
-            <h2 className="text-lg font-bold text-slate-800">
-              {editingUserId ? "Editar Usuario" : "Registrar Nuevo Usuario"}
-            </h2>
+          {/* Panel Derecho: Formulario de Captura */}
+          <div className="w-full xl:w-1/3">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSubmit();
+              }}
+              className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-5"
+            >
+              <h2 className="text-lg font-bold text-slate-800">
+                {editingUserId ? "Editar Usuario" : "Registrar Nuevo Usuario"}
+              </h2>
 
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Nombre(s) <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                    <UserIcon className="w-4 h-4 text-slate-400" />
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                    placeholder="Ej: Ana María"
-                    value={nombres}
-                    onChange={(e) => setNombres(e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Ap. Paterno <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                    placeholder="Ej: Martinez"
-                    value={apePaterno}
-                    onChange={(e) => setApePaterno(e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Ap. Materno
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                    placeholder="Ej: Hernandez"
-                    value={apeMaterno}
-                    onChange={(e) => setApeMaterno(e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              {!editingUserId && (
-                <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3 flex items-center gap-3">
-                  <div className="p-1.5 bg-blue-100 rounded-md text-blue-600">
-                    <AtSign size={16} />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 font-medium">
-                      Usuario de Acceso (Auto-generado)
-                    </p>
-                    <p className="text-sm font-bold text-blue-700">
-                      {generatePreviewUsername()}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {!editingUserId && (
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Correo Electrónico <span className="text-rose-500">*</span>
+                    Nombre(s) <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                      <Mail className="w-4 h-4 text-slate-400" />
+                      <UserIcon className="w-4 h-4 text-slate-400" />
                     </div>
                     <input
-                      type="email"
+                      type="text"
                       required
                       className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                      placeholder="ana@distribuidoramh.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Ej: Ana María"
+                      value={nombres}
+                      onChange={(e) => setNombres(e.target.value)}
                       disabled={isLoading}
                     />
                   </div>
                 </div>
-              )}
 
-              {/* 🔥 CONTRASEÑA COMPLETAMENTE REMOVIDA EN MODO EDICIÓN */}
-              {!editingUserId && (
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Contraseña <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 hover:text-blue-500 transition-colors z-10"
-                    >
-                      {showPassword ? (
-                        <Unlock className="w-4 h-4" />
-                      ) : (
-                        <Lock className="w-4 h-4" />
-                      )}
-                    </button>
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 border rounded-xl text-sm font-medium outline-none transition-all ${password.length > 0 && password.length < 6 ? "border-rose-400 focus:ring-2 focus:ring-rose-500/20" : "border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500"}`}
-                      placeholder="Mínimo 6 caracteres"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      disabled={isLoading}
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Rol
-                  </label>
-                  <select
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all cursor-pointer"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value as RoleType)}
-                    disabled={isLoading}
-                  >
-                    <option value="Empleado">Empleado</option>
-                    <option value="Administrador">Administrador</option>
-                    <option value="Ventas">Ventas</option>
-                    <option value="Cobranza">Cobranza</option>
-                    <option value="Personalizado">Personalizado</option>
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Estado
-                  </label>
-                  <div className="flex flex-col justify-center h-[42px] px-1">
-                    <label className="flex items-center cursor-pointer relative">
-                      <input
-                        type="checkbox"
-                        className="sr-only peer"
-                        checked={isActive}
-                        onChange={() => setIsActive(!isActive)}
-                        disabled={isLoading}
-                      />
-                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 shadow-inner"></div>
-                      <span
-                        className={`ml-3 text-sm font-bold ${isActive ? "text-blue-700" : "text-slate-400"}`}
-                      >
-                        {isActive ? "Activo" : "Inactivo"}
-                      </span>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Ap. Paterno <span className="text-rose-500">*</span>
                     </label>
+                    <input
+                      type="text"
+                      required
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                      placeholder="Ej: Martinez"
+                      value={apePaterno}
+                      onChange={(e) => setApePaterno(e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Ap. Materno
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                      placeholder="Ej: Hernandez"
+                      value={apeMaterno}
+                      onChange={(e) => setApeMaterno(e.target.value)}
+                      disabled={isLoading}
+                    />
                   </div>
                 </div>
-              </div>
 
-              <div className="space-y-3 pt-4 border-t border-slate-100">
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Permisos de Acceso
-                </label>
-                {role === "Administrador" ? (
-                  <p className="text-xs font-bold text-slate-500 italic py-2">
-                    El rol Administrador tiene acceso total a todos los módulos.
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2.5">
-                    {permissionOptions.map((perm) => {
-                      const isSelected = selectedPermissions.includes(perm);
-                      return (
-                        <button
-                          key={perm}
-                          type="button"
-                          onClick={() => togglePermission(perm)}
-                          disabled={isLoading}
-                          className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all text-left ${isSelected ? "bg-blue-50/50 border-blue-300 shadow-sm shadow-blue-500/10" : "bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50"}`}
-                        >
-                          <div
-                            className={`w-4 h-4 rounded-md flex items-center justify-center transition-all shrink-0 ${isSelected ? "bg-blue-600 text-white scale-110" : "bg-white border-2 border-slate-300"}`}
-                          >
-                            {isSelected && (
-                              <Check className="w-3 h-3" strokeWidth={3} />
-                            )}
-                          </div>
-                          <span
-                            className={`text-xs font-bold tracking-wide truncate ${isSelected ? "text-blue-800" : "text-slate-600"}`}
-                          >
-                            {perm}
-                          </span>
-                        </button>
-                      );
-                    })}
+                {!editingUserId && (
+                  <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3 flex items-center gap-3">
+                    <div className="p-1.5 bg-blue-100 rounded-md text-blue-600">
+                      <AtSign size={16} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 font-medium">
+                        Usuario de Acceso (Auto-generado)
+                      </p>
+                      <p className="text-sm font-bold text-blue-700">
+                        {generatePreviewUsername()}
+                      </p>
+                    </div>
                   </div>
                 )}
-              </div>
 
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className={`w-full py-3.5 text-white rounded-xl font-bold transition-all shadow-md flex justify-center items-center gap-2 active:scale-[0.98] ${isLoading ? "bg-slate-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Procesando...</span>
-                    </>
-                  ) : editingUserId ? (
-                    <>
-                      <Edit2 className="w-5 h-5" />
-                      <span>Guardar Cambios</span>
-                    </>
+                {!editingUserId && (
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Correo Electrónico <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                        <Mail className="w-4 h-4 text-slate-400" />
+                      </div>
+                      <input
+                        type="email"
+                        required
+                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                        placeholder="ana@distribuidoramh.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        disabled={isLoading}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* 🔥 CONTRASEÑA COMPLETAMENTE REMOVIDA EN MODO EDICIÓN */}
+                {!editingUserId && (
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Contraseña <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 hover:text-blue-500 transition-colors z-10"
+                      >
+                        {showPassword ? (
+                          <Unlock className="w-4 h-4" />
+                        ) : (
+                          <Lock className="w-4 h-4" />
+                        )}
+                      </button>
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 border rounded-xl text-sm font-medium outline-none transition-all ${password.length > 0 && password.length < 6 ? "border-rose-400 focus:ring-2 focus:ring-rose-500/20" : "border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500"}`}
+                        placeholder="Mínimo 6 caracteres"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={isLoading}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Rol
+                    </label>
+                    <select
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all cursor-pointer"
+                      value={role}
+                      onChange={(e) => setRole(e.target.value as RoleType)}
+                      disabled={isLoading}
+                    >
+                      <option value="Empleado">Empleado</option>
+                      <option value="Administrador">Administrador</option>
+                      <option value="Ventas">Ventas</option>
+                      <option value="Cobranza">Cobranza</option>
+                      <option value="Personalizado">Personalizado</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Estado
+                    </label>
+                    <div className="flex flex-col justify-center h-[42px] px-1">
+                      <label className="flex items-center cursor-pointer relative">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={isActive}
+                          onChange={() => setIsActive(!isActive)}
+                          disabled={isLoading}
+                        />
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 shadow-inner"></div>
+                        <span
+                          className={`ml-3 text-sm font-bold ${isActive ? "text-blue-700" : "text-slate-400"}`}
+                        >
+                          {isActive ? "Activo" : "Inactivo"}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-4 border-t border-slate-100">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Permisos de Acceso
+                  </label>
+                  {role === "Administrador" ? (
+                    <p className="text-xs font-bold text-slate-500 italic py-2">
+                      El rol Administrador tiene acceso total a todos los módulos.
+                    </p>
                   ) : (
-                    <>
-                      <Shield className="w-5 h-5" />
-                      <span>Registrar Usuario</span>
-                    </>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {permissionOptions.map((perm) => {
+                        const isSelected = selectedPermissions.includes(perm);
+                        return (
+                          <button
+                            key={perm}
+                            type="button"
+                            onClick={() => togglePermission(perm)}
+                            disabled={isLoading}
+                            className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all text-left ${isSelected ? "bg-blue-50/50 border-blue-300 shadow-sm shadow-blue-500/10" : "bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50"}`}
+                          >
+                            <div
+                              className={`w-4 h-4 rounded-md flex items-center justify-center transition-all shrink-0 ${isSelected ? "bg-blue-600 text-white scale-110" : "bg-white border-2 border-slate-300"}`}
+                            >
+                              {isSelected && (
+                                <Check className="w-3 h-3" strokeWidth={3} />
+                              )}
+                            </div>
+                            <span
+                              className={`text-xs font-bold tracking-wide truncate ${isSelected ? "text-blue-800" : "text-slate-600"}`}
+                            >
+                              {perm}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
-                </button>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className={`w-full py-3.5 text-white rounded-xl font-bold transition-all shadow-md flex justify-center items-center gap-2 active:scale-[0.98] ${isLoading ? "bg-slate-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Procesando...</span>
+                      </>
+                    ) : editingUserId ? (
+                      <>
+                        <Edit2 className="w-5 h-5" />
+                        <span>Guardar Cambios</span>
+                      </>
+                    ) : (
+                      <>
+                        <Shield className="w-5 h-5" />
+                        <span>Registrar Usuario</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
+        <br />
       </div>
-      <br />
     </div>
   );
 }
