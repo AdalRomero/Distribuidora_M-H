@@ -1,19 +1,80 @@
-import { useState } from 'react';
-import { X, Building2, Tags, Contact, MapPin } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { X, Building2, Tags, Contact, MapPin, Loader2 } from 'lucide-react';
 
-interface AddClientProps { isOpen: boolean; onClose: () => void; onSave?: (data: any) => void; }
+export interface ClientData {
+    nombre: string;
+    rfc: string;
+    categoria: string;
+    listaPrecios: string;
+    descuentoGlobal: string;
+    contacto: string;
+    estado: string;
+    calle: string;
+    colonia: string;
+    cp: string;
+    ciudad: string;
+}
 
-interface ClientData { nombre: string; rfc: string; categoria: string; listaPrecios: string; contacto: string; estado: string; calle: string; colonia: string; cp: string; ciudad: string; }
+interface AddClientProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSave?: (data: ClientData) => Promise<void>;
+    isLoading?: boolean;
+    /** If provided, the modal opens in edit mode with pre-filled fields */
+    editData?: ClientData | null;
+}
 
-const initialState: ClientData = { nombre: '', rfc: '', categoria: 'Panadería', listaPrecios: 'Público General', contacto: '', estado: 'Activo', calle: '', colonia: '', cp: '', ciudad: '' };
+const initialState: ClientData = {
+    nombre: '',
+    rfc: '',
+    categoria: 'General',
+    listaPrecios: 'lista',
+    descuentoGlobal: '0',
+    contacto: '',
+    estado: 'Activo',
+    calle: '',
+    colonia: '',
+    cp: '',
+    ciudad: '',
+};
 
 const inputClass = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors';
 
-export default function AddClient({ isOpen, onClose, onSave }: AddClientProps) {
+export default function AddClient({ isOpen, onClose, onSave, isLoading = false, editData }: AddClientProps) {
     const [form, setForm] = useState<ClientData>(initialState);
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => { const { name, value } = e.target; setForm(prev => ({ ...prev, [name]: value })); };
-    const handleSave = () => { if (!form.nombre.trim()) { alert('El nombre o razón social es obligatorio.'); return; } onSave?.(form); setForm(initialState); onClose(); };
-    const handleClose = () => { setForm(initialState); onClose(); };
+    const isEditMode = !!editData;
+
+    // Sync form when editData changes or modal opens
+    useEffect(() => {
+        if (isOpen && editData) {
+            setForm(editData);
+        } else if (isOpen && !editData) {
+            setForm(initialState);
+        }
+    }, [isOpen, editData]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setForm(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleSave = async () => {
+        if (!form.nombre.trim()) {
+            alert('El nombre o razón social es obligatorio.');
+            return;
+        }
+        if (onSave) {
+            await onSave(form);
+        }
+        setForm(initialState);
+        onClose();
+    };
+
+    const handleClose = () => {
+        if (isLoading) return;
+        setForm(initialState);
+        onClose();
+    };
 
     if (!isOpen) return null;
 
@@ -26,8 +87,8 @@ export default function AddClient({ isOpen, onClose, onSave }: AddClientProps) {
 
                         {/* Header */}
                         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white shrink-0">
-                            <h3 className="text-xl font-bold text-slate-800">Agregar Nuevo Cliente</h3>
-                            <button onClick={handleClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
+                            <h3 className="text-xl font-bold text-slate-800">{isEditMode ? 'Editar Cliente' : 'Agregar Nuevo Cliente'}</h3>
+                            <button onClick={handleClose} disabled={isLoading} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"><X className="w-5 h-5" /></button>
                         </div>
 
                         {/* Body */}
@@ -47,8 +108,9 @@ export default function AddClient({ isOpen, onClose, onSave }: AddClientProps) {
                                 <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
                                     <div className="flex items-center gap-2 mb-4"><Tags className="w-5 h-5 text-blue-800" /><h4 className="font-semibold text-blue-900 text-sm">Clasificación Comercial</h4></div>
                                     <div className="space-y-4">
-                                        <div><label className="block text-sm font-medium text-slate-700 mb-1">Categoría de Cliente</label><select name="categoria" value={form.categoria} onChange={handleChange} className={inputClass}><option>Panadería</option><option>Dulcería</option><option>Abarrotes</option><option>General</option></select></div>
-                                        <div><label className="block text-sm font-medium text-slate-700 mb-1">Lista de Precios Asignada</label><select name="listaPrecios" value={form.listaPrecios} onChange={handleChange} className={inputClass}><option>Público General</option><option>Mayoreo Nivel 1</option><option>Especial Franquicias</option></select></div>
+                                        <div><label className="block text-sm font-medium text-slate-700 mb-1">Categoría de Cliente</label><select name="categoria" value={form.categoria} onChange={handleChange} className={inputClass}><option>General</option><option>Panadería</option><option>Dulcería</option><option>Abarrotes</option></select></div>
+                                        <div><label className="block text-sm font-medium text-slate-700 mb-1">Lista de Precios Asignada</label><select name="listaPrecios" value={form.listaPrecios} onChange={handleChange} className={inputClass}><option value="lista">Precio Lista</option><option value="mayoreo">Mayoreo</option><option value="menudeo">Menudeo</option></select></div>
+                                        <div><label className="block text-sm font-medium text-slate-700 mb-1">Descuento Global (%)</label><input type="number" name="descuentoGlobal" value={form.descuentoGlobal} onChange={handleChange} placeholder="0" min="0" max="100" className={inputClass} /></div>
                                     </div>
                                 </div>
 
@@ -76,8 +138,11 @@ export default function AddClient({ isOpen, onClose, onSave }: AddClientProps) {
 
                         {/* Footer */}
                         <div className="px-6 py-4 border-t border-slate-200 bg-white shrink-0 flex justify-end gap-3">
-                            <button type="button" onClick={handleClose} className="px-6 py-2 rounded-xl text-slate-500 text-sm font-medium hover:bg-slate-100 transition-colors">Cancelar</button>
-                            <button type="button" onClick={handleSave} className="px-6 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition-all active:scale-95 shadow-md shadow-blue-500/20">Guardar Cliente</button>
+                            <button type="button" onClick={handleClose} disabled={isLoading} className="px-6 py-2 rounded-xl text-slate-500 text-sm font-medium hover:bg-slate-100 transition-colors disabled:opacity-50">Cancelar</button>
+                            <button type="button" onClick={handleSave} disabled={isLoading} className="px-6 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition-all active:scale-95 shadow-md shadow-blue-500/20 disabled:opacity-50 flex items-center gap-2">
+                                {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                                {isLoading ? 'Guardando...' : (isEditMode ? 'Actualizar Cliente' : 'Guardar Cliente')}
+                            </button>
                         </div>
                     </div>
                 </div>

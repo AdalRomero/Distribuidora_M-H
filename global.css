@@ -7,6 +7,12 @@
   --color-mh-blue-dark: #0f2744;
   --color-mh-pink: #e11d48;
   --color-mist-300: #c8d5e0;
+  --animate-fade-in: fade-in 0.15s ease-out;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 body {

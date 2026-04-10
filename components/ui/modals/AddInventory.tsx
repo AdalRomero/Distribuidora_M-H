@@ -1,16 +1,16 @@
+import withObservables from '@nozbe/with-observables';
+import { decode } from 'base64-arraybuffer';
+import * as ImagePicker from 'expo-image-picker';
+import { Calendar, Camera, DollarSign, ImagesIcon, Info, Package, X } from 'lucide-react';
 import React, { useState } from 'react';
 import { Alert, Platform } from 'react-native';
-import { X, UploadCloud, Info, DollarSign, Package, Calendar, ImagesIcon, Camera } from 'lucide-react';
-import * as ImagePicker from 'expo-image-picker';
-import { decode } from 'base64-arraybuffer';
 import { supabase } from '../../../src/services/api/supabaseClient';
 import { database } from '../../../src/services/DB/indexBD';
-import withObservables from '@nozbe/with-observables';
-import Producto from '../../../src/services/DB/models/catalogo/producto';
-import FamiliaModel from '../../../src/services/DB/models/bases/familia';
 import AlmacenModel from '../../../src/services/DB/models/bases/almacen';
+import FamiliaModel from '../../../src/services/DB/models/bases/familia';
 import ImpuestoModel from '../../../src/services/DB/models/bases/impuesto';
 import Lote from '../../../src/services/DB/models/catalogo/lote';
+import Producto from '../../../src/services/DB/models/catalogo/producto';
 import ProductoImpuesto from '../../../src/services/DB/models/catalogo/productoImpuesto';
 import MovimientoInventario from '../../../src/services/DB/models/registros/movimientoInventario';
 
@@ -215,12 +215,12 @@ function AddInventoryInner({ isOpen, onClose, familias, almacenes, impuestos }: 
 
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                    <form className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <form className="flex flex-col gap-8">
 
-                        {/* LEFT COLUMN */}
-                        <div className="space-y-6">
+                        {/* ROW 1: Información General + Inventario y Lotes */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
                             {/* Información General */}
-                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5">
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5 flex flex-col">
                                 <div className="flex items-center gap-2 mb-4 border-b border-slate-50 pb-3">
                                     <Info className="w-5 h-5 text-blue-600" /><h3 className="text-base font-bold text-slate-700">Información General</h3>
                                 </div>
@@ -247,7 +247,7 @@ function AddInventoryInner({ isOpen, onClose, familias, almacenes, impuestos }: 
                                         <input type="text" className={inputClass} placeholder="Ej. Codigo de Barras" value={codigoAlterno} onChange={e => setCodigoAlterno(e.target.value)} />
                                     </div>
                                 </div>
-                                <div>
+                                <div className="flex-1">
                                     <label className="block text-sm font-medium text-slate-700 mb-1.5">Categoría de Margen</label>
                                     <div className="grid grid-cols-2 gap-3 mt-1">
                                         {['Margen Ideal', 'De Servicio', 'Margen Alto', 'Margen Bajo'].map((m) => (
@@ -259,34 +259,8 @@ function AddInventoryInner({ isOpen, onClose, familias, almacenes, impuestos }: 
                                 </div>
                             </div>
 
-                            {/* Fotografía */}
-                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                                <div className="flex items-center gap-2 mb-4 border-b border-slate-50 pb-3">
-                                    <ImagesIcon className="w-5 h-5 text-teal-400" /><h3 className="text-base font-bold text-slate-700">Fotografía del Producto</h3>
-                                </div>
-                                <div onClick={chooseImageSource} className="border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:bg-slate-50 hover:border-blue-400 transition-all cursor-pointer group relative overflow-hidden">
-                                    {imageUri ? (
-                                        <img src={imageUri} alt="Producto" className="absolute inset-0 w-full h-full object-cover" />
-                                    ) : (
-                                        <>
-                                            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><Camera className="w-6 h-6" /></div>
-                                            <p className="text-sm font-medium text-slate-700">Haz clic para tomar o subir imagen</p>
-                                            <p className="text-xs text-slate-400 mt-1">PNG, JPG o WEBP (Max. 2MB)</p>
-                                        </>
-                                    )}
-                                </div>
-                                {imageUri && (
-                                    <button type="button" onClick={() => { setImageUri(null); setImageBase64(null); }} className="mt-3 text-sm text-red-500 font-medium hover:text-red-700 w-full text-center">
-                                        Eliminar Imagen
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* RIGHT COLUMN */}
-                        <div className="space-y-6">
                             {/* Inventario y Lotes */}
-                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5">
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5 flex flex-col">
                                 <div className="flex items-center gap-2 mb-4 border-b border-slate-50 pb-3">
                                     <Package className="w-5 h-5 text-rose-500" /><h3 className="text-base font-bold text-slate-700">Inventario y Control de Lotes</h3>
                                 </div>
@@ -317,7 +291,7 @@ function AddInventoryInner({ isOpen, onClose, familias, almacenes, impuestos }: 
                                         <select className={selectClass} value={unidad} onChange={e => setUnidad(e.target.value)}><option value="pzas">Piezas (pzas)</option><option value="kg">Kilogramos (kg)</option><option value="litros">Litros (L)</option><option value="cajas">Cajas</option><option value="bultos">Bultos</option><option value="galones">Galones</option></select>
                                     </div>
                                 </div>
-                                <div>
+                                <div className="flex-1">
                                     <label className="block text-sm font-medium text-slate-700 mb-1.5 flex items-center gap-2"><Calendar className="w-4 h-4 text-slate-400" />Fecha de Caducidad</label>
                                     <input type="date" className={`${inputClass} text-slate-600`} value={caducidad} onChange={e => setCaducidad(e.target.value)} />
                                 </div>
@@ -349,9 +323,35 @@ function AddInventoryInner({ isOpen, onClose, familias, almacenes, impuestos }: 
                                     );
                                 })()}
                             </div>
+                        </div>
+
+                        {/* ROW 2: Fotografía + Fiscal y Finanzas */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+                            {/* Fotografía */}
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
+                                <div className="flex items-center gap-2 mb-4 border-b border-slate-50 pb-3">
+                                    <ImagesIcon className="w-5 h-5 text-teal-400" /><h3 className="text-base font-bold text-slate-700">Fotografía del Producto</h3>
+                                </div>
+                                <div onClick={chooseImageSource} className="border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:bg-slate-50 hover:border-blue-400 transition-all cursor-pointer group relative overflow-hidden flex-1">
+                                    {imageUri ? (
+                                        <img src={imageUri} alt="Producto" className="absolute inset-0 w-full h-full object-cover" />
+                                    ) : (
+                                        <>
+                                            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><Camera className="w-6 h-6" /></div>
+                                            <p className="text-sm font-medium text-slate-700">Haz clic para tomar o subir imagen</p>
+                                            <p className="text-xs text-slate-400 mt-1">PNG, JPG o WEBP (Max. 2MB)</p>
+                                        </>
+                                    )}
+                                </div>
+                                {imageUri && (
+                                    <button type="button" onClick={() => { setImageUri(null); setImageBase64(null); }} className="mt-3 text-sm text-red-500 font-medium hover:text-red-700 w-full text-center">
+                                        Eliminar Imagen
+                                    </button>
+                                )}
+                            </div>
 
                             {/* Fiscal y Finanzas */}
-                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5">
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5 flex flex-col">
                                 <div className="flex items-center gap-2 mb-4 border-b border-slate-50 pb-3">
                                     <DollarSign className="w-5 h-5 text-emerald-500" /><h3 className="text-base font-bold text-slate-700">Fiscal y Finanzas</h3>
                                 </div>
@@ -368,7 +368,7 @@ function AddInventoryInner({ isOpen, onClose, familias, almacenes, impuestos }: 
                                         <input type="text" className={inputClass} placeholder="Ej. 50121500" value={sat} onChange={e => setSat(e.target.value)} />
                                     </div>
                                 </div>
-                                <div>
+                                <div className="flex-1">
                                     <label className="block text-sm font-medium text-slate-700 mb-2">Impuestos Aplicables</label>
                                     <div className="grid grid-cols-2 gap-3">
                                         {impuestos.filter(imp => imp.activo).map(imp => (

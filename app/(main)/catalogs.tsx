@@ -1,6 +1,5 @@
 import withObservables from "@nozbe/with-observables";
 import {
-  BookOpen,
   Check,
   Edit2,
   Layers,
@@ -15,7 +14,7 @@ import {
   ToggleRight,
   Trash2,
   Warehouse,
-  X,
+  X
 } from "lucide-react";
 import React, { useState } from "react";
 import ErrorModal from "../../components/ui/modals/ErrorModal";
@@ -107,60 +106,59 @@ function CatalogsContent({ familias, almacenes, impuestos }: CatalogsProps) {
     ];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* ── Modals ── */}
-      <SuccessModal isOpen={modal.success.open} onClose={closeSuccess} title={modal.success.title} message={modal.success.message} />
-      <ErrorModal isOpen={modal.error.open} onClose={closeError} title={modal.error.title} message={modal.error.message} />
-      <WarningModal isOpen={modal.warning.open} onClose={closeWarning} onConfirm={() => { modal.warning.onConfirm(); closeWarning(); }} title={modal.warning.title} message={modal.warning.message} />
+    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen font-sans">
+      <div className="max-w-7xl mx-auto">
+        {/* ── Modals ── */}
+        <SuccessModal isOpen={modal.success.open} onClose={closeSuccess} title={modal.success.title} message={modal.success.message} />
+        <ErrorModal isOpen={modal.error.open} onClose={closeError} title={modal.error.title} message={modal.error.message} />
+        <WarningModal isOpen={modal.warning.open} onClose={closeWarning} onConfirm={() => { modal.warning.onConfirm(); closeWarning(); }} title={modal.warning.title} message={modal.warning.message} />
 
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
-          <BookOpen className="w-5 h-5 text-indigo-600" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Catálogos</h1>
-          <p className="text-sm text-slate-500">
-            Administra las bases de datos de Familias, Almacenes e Impuestos
-          </p>
-        </div>
-        {syncing && (
-          <div className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg">
-            <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-            <span className="text-xs font-medium text-blue-600">Sincronizando...</span>
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-mh-blue-dark tracking-tight">Catálogos</h1>
+            <p className="text-slate-500 text-sm mt-1">
+              Administra las bases de datos de Familias, Almacenes e Impuestos
+            </p>
           </div>
-        )}
-      </div>
+          {syncing && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg">
+              <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+              <span className="text-xs font-medium text-blue-600">Sincronizando...</span>
+            </div>
+          )}
+        </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-slate-100 p-1 rounded-xl w-fit">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === t.key
-              ? "bg-white text-indigo-700 shadow-sm font-bold"
-              : "text-slate-500 hover:text-slate-700"
-              }`}
-          >
-            {t.icon}
-            {t.label}
-            <span
-              className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${tab === t.key
-                ? "bg-indigo-100 text-indigo-600"
-                : "bg-slate-200 text-slate-500"
+        {/* Tabs */}
+        <div className="flex gap-1 mb-6 bg-slate-100 p-1 rounded-xl w-fit">
+          {tabs.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === t.key
+                ? "bg-white text-mh-blue-dark shadow-sm font-bold"
+                : "text-slate-500 hover:text-slate-700"
                 }`}
             >
-              {t.count}
-            </span>
-          </button>
-        ))}
-      </div>
+              {t.icon}
+              {t.label}
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${tab === t.key
+                  ? "bg-blue-100 text-blue-700"
+                  : "bg-slate-200 text-slate-500"
+                  }`}
+              >
+                {t.count}
+              </span>
+            </button>
+          ))}
+        </div>
 
-      {/* Tab Content */}
-      {tab === "familias" && <FamiliasTab familias={familias} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} />}
-      {tab === "almacenes" && <AlmacenesTab almacenes={almacenes} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} />}
-      {tab === "impuestos" && <ImpuestosTab impuestos={impuestos} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} />}
+        {/* Tab Content */}
+        {tab === "familias" && <FamiliasTab familias={familias} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} />}
+        {tab === "almacenes" && <AlmacenesTab almacenes={almacenes} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} />}
+        {tab === "impuestos" && <ImpuestosTab impuestos={impuestos} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} />}
+      </div>
     </div>
   );
 }
@@ -316,9 +314,9 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
 
       {/* Add form */}
       {showAdd && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-indigo-100 mb-6 space-y-4">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-100 mb-6 space-y-4">
           <h3 className="font-bold text-slate-700 flex items-center gap-2">
-            <Plus className="w-4 h-4 text-indigo-500" />
+            <Plus className="w-4 h-4 text-blue-500" />
             Crear Nueva Familia
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -328,7 +326,7 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
               </label>
               <input
                 type="text"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 placeholder="Ej. 01"
                 value={codigo}
                 onChange={(e) => setCodigo(e.target.value)}
@@ -340,7 +338,7 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
               </label>
               <input
                 type="text"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 placeholder="Ej. Harinas"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
@@ -436,7 +434,7 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
             </button>
             <button
               onClick={handleAdd}
-              className="px-4 py-2 text-sm text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors font-medium shadow-sm"
+              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors font-medium shadow-sm"
             >
               Guardar
             </button>
@@ -470,7 +468,7 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
               familias.map((f) => (
                 <tr
                   key={f.id}
-                  className="hover:bg-slate-50/50 transition-colors group"
+                  className={`hover:bg-slate-50/50 transition-colors group ${!f.estado ? 'opacity-50 bg-slate-50/30' : ''}`}
                 >
                   {editId === f.id ? (
                     <>
@@ -537,7 +535,7 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
                   ) : (
                     <>
                       <td className="px-6 py-4">
-                        <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-md text-xs font-bold">
+                        <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-bold">
                           {f.codigoFamilia}
                         </span>
                       </td>
@@ -706,7 +704,7 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
       <div className="flex justify-end mb-4">
         <button
           onClick={() => setShowAdd(!showAdd)}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium text-sm shadow-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm shadow-sm"
         >
           <Plus className="w-4 h-4" />
           Nuevo Almacén
@@ -714,9 +712,9 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
       </div>
 
       {showAdd && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-indigo-100 mb-6 space-y-4">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-100 mb-6 space-y-4">
           <h3 className="font-bold text-slate-700 flex items-center gap-2">
-            <Plus className="w-4 h-4 text-indigo-500" />
+            <Plus className="w-4 h-4 text-blue-500" />
             Crear Nuevo Almacén
           </h3>
           <div>
@@ -725,7 +723,7 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
             </label>
             <input
               type="text"
-              className="w-full max-w-md px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              className="w-full max-w-md px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
               placeholder="Ej. Bodega Central"
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
@@ -740,7 +738,7 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
             </button>
             <button
               onClick={handleAdd}
-              className="px-4 py-2 text-sm text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors font-medium shadow-sm"
+              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors font-medium shadow-sm"
             >
               Guardar
             </button>
@@ -771,7 +769,7 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
               almacenes.map((a) => (
                 <tr
                   key={a.id}
-                  className="hover:bg-slate-50/50 transition-colors group"
+                  className={`hover:bg-slate-50/50 transition-colors group ${!a.estado ? 'opacity-50 bg-slate-50/30' : ''}`}
                 >
                   {editId === a.id ? (
                     <>
@@ -805,8 +803,8 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
                     <>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
-                            <Warehouse className="w-4 h-4 text-indigo-600" />
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                            <Warehouse className="w-4 h-4 text-blue-600" />
                           </div>
                           <span className="font-medium text-slate-800">
                             {a.nombre}
@@ -967,7 +965,7 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
       <div className="flex justify-end mb-4">
         <button
           onClick={() => setShowAdd(!showAdd)}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium text-sm shadow-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm shadow-sm"
         >
           <Plus className="w-4 h-4" />
           Nuevo Impuesto
@@ -975,9 +973,9 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
       </div>
 
       {showAdd && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-indigo-100 mb-6 space-y-4">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-100 mb-6 space-y-4">
           <h3 className="font-bold text-slate-700 flex items-center gap-2">
-            <Plus className="w-4 h-4 text-indigo-500" />
+            <Plus className="w-4 h-4 text-blue-500" />
             Crear Nuevo Impuesto
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-md">
@@ -987,7 +985,7 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
               </label>
               <input
                 type="text"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 placeholder="Ej. IVA"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
@@ -1001,7 +999,7 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
                 type="number"
                 step="0.01"
                 min="0"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 placeholder="Ej. 16"
                 value={tasa}
                 onChange={(e) => setTasa(e.target.value)}
@@ -1017,7 +1015,7 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
             </button>
             <button
               onClick={handleAdd}
-              className="px-4 py-2 text-sm text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors font-medium shadow-sm"
+              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors font-medium shadow-sm"
             >
               Guardar
             </button>
@@ -1049,7 +1047,7 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
               impuestos.map((i) => (
                 <tr
                   key={i.id}
-                  className="hover:bg-slate-50/50 transition-colors group"
+                  className={`hover:bg-slate-50/50 transition-colors group ${!i.activo ? 'opacity-50 bg-slate-50/30' : ''}`}
                 >
                   {editId === i.id ? (
                     <>
