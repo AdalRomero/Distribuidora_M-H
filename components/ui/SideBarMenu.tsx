@@ -1,5 +1,6 @@
 import { Link, usePathname, useRouter } from "expo-router";
 import {
+  BookOpen,
   DollarSignIcon,
   FileText,
   LayoutDashboard,
@@ -153,6 +154,17 @@ export const SideBarMenu: React.FC = () => {
             title="Usuarios"
           >
             <User size={18} />
+          </a>
+        </Link>
+        <Link href="/catalogs" asChild>
+          <a
+            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${isActive("/catalogs")
+              ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
+              : "bg-[#15335c] border-transparent hover:bg-white/10 text-slate-300 hover:text-white"
+              }`}
+            title="Catálogos"
+          >
+            <BookOpen size={18} />
           </a>
         </Link>
       </div>

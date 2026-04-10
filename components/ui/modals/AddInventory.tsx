@@ -5,17 +5,30 @@ import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
 import { supabase } from '../../../src/services/api/supabaseClient';
 import { database } from '../../../src/services/DB/indexBD';
+import withObservables from '@nozbe/with-observables';
 import Producto from '../../../src/services/DB/models/catalogo/producto';
+import FamiliaModel from '../../../src/services/DB/models/bases/familia';
+import AlmacenModel from '../../../src/services/DB/models/bases/almacen';
+import ImpuestoModel from '../../../src/services/DB/models/bases/impuesto';
+import Lote from '../../../src/services/DB/models/catalogo/lote';
+import ProductoImpuesto from '../../../src/services/DB/models/catalogo/productoImpuesto';
+import MovimientoInventario from '../../../src/services/DB/models/registros/movimientoInventario';
 
-interface AddInventoryProps { isOpen: boolean; onClose: () => void; }
+interface AddInventoryInnerProps {
+    isOpen: boolean;
+    onClose: () => void;
+    familias: FamiliaModel[];
+    almacenes: AlmacenModel[];
+    impuestos: ImpuestoModel[];
+}
 
-export default function AddInventory({ isOpen, onClose }: AddInventoryProps) {
+function AddInventoryInner({ isOpen, onClose, familias, almacenes, impuestos }: AddInventoryInnerProps) {
     const [nombre, setNombre] = useState('');
-    const [familia, setFamilia] = useState('');
+    const [familiaId, setFamiliaId] = useState('');
     const [codigoInterno, setCodigoInterno] = useState('');
     const [codigoAlterno, setCodigoAlterno] = useState('');
     const [margen, setMargen] = useState('');
-    const [almacen, setAlmacen] = useState('');
+    const [almacenId, setAlmacenId] = useState('');
     const [lote, setLote] = useState('');
     const [existencia, setExistencia] = useState('');
     const [margenMinimo, setMargenMinimo] = useState('');
@@ -23,8 +36,7 @@ export default function AddInventory({ isOpen, onClose }: AddInventoryProps) {
     const [caducidad, setCaducidad] = useState('');
     const [costoPromedio, setCostoPromedio] = useState('');
     const [sat, setSat] = useState('');
-    const [iva, setIva] = useState(false);
-    const [ieps, setIeps] = useState(false);
+    const [selectedImpuestos, setSelectedImpuestos] = useState<string[]>([]);
 
     const [imageUri, setImageUri] = useState<string | null>(null);
     const [imageBase64, setImageBase64] = useState<string | null>(null);
@@ -35,6 +47,12 @@ export default function AddInventory({ isOpen, onClose }: AddInventoryProps) {
 
     const inputClass = "w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400";
     const selectClass = "w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-slate-600";
+
+    const toggleImpuesto = (id: string) => {
+        setSelectedImpuestos(prev =>
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
 
     const chooseImageSource = () => {
         if (Platform.OS === 'web') {
@@ -86,6 +104,13 @@ export default function AddInventory({ isOpen, onClose }: AddInventoryProps) {
         }
     };
 
+    const resetForm = () => {
+        setNombre(''); setFamiliaId(''); setCodigoInterno(''); setCodigoAlterno('');
+        setMargen(''); setAlmacenId(''); setLote(''); setExistencia('');
+        setMargenMinimo(''); setUnidad('pzas'); setCaducidad(''); setCostoPromedio('');
+        setSat(''); setSelectedImpuestos([]); setImageUri(null); setImageBase64(null);
+    };
+
     const handleSave = async () => {
         try {
             if (!nombre || !codigoInterno) {
@@ -95,6 +120,7 @@ export default function AddInventory({ isOpen, onClose }: AddInventoryProps) {
             setIsUploading(true);
             let publicUrl = null;
 
+            // Upload image if exists
             if (imageBase64) {
                 const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${imageExt || 'jpeg'}`;
                 const { error: uploadError } = await supabase.storage
@@ -102,28 +128,69 @@ export default function AddInventory({ isOpen, onClose }: AddInventoryProps) {
                     .upload(`public/${fileName}`, decode(imageBase64), {
                         contentType: `image/${imageExt || 'jpeg'}`,
                     });
-                
+
                 if (uploadError) throw uploadError;
 
                 const { data } = supabase.storage.from('productos').getPublicUrl(`public/${fileName}`);
                 publicUrl = data.publicUrl;
             }
 
+            // Create all records in a single batch
             await database.write(async () => {
-                await database.get<Producto>('productos').create(p => {
+                const precio = parseFloat(costoPromedio) || 0;
+
+                // 1. Create Producto
+                const nuevoProducto = await database.get<Producto>('productos').create(p => {
                     p.descripcion = nombre;
                     p.codigoInterno = codigoInterno;
-                    // TODO: Ligar familia real si existe
-                    // p.familia.id = familia || ''; 
+                    if (familiaId) {
+                        (p as any)._raw.familia_id = familiaId;
+                    }
                     p.estado = true;
                     if (publicUrl) p.imagen = publicUrl;
-                    p.precioLista = parseFloat(costoPromedio) || 0;
-                    p.precioMayoreo = parseFloat(costoPromedio) || 0;
-                    p.precioMenudeo = parseFloat(costoPromedio) || 0;
+                    p.precioLista = precio;
+                    p.precioMayoreo = precio;
+                    p.precioMenudeo = precio;
                 });
+
+                // 2. Create Lote (if lote identifier provided)
+                let nuevoLote: Lote | null = null;
+                if (lote) {
+                    nuevoLote = await database.get<Lote>('lotes').create(l => {
+                        (l as any)._raw.producto_id = nuevoProducto.id;
+                        l.identificadorLote = lote;
+                        l.unidadMedida = unidad;
+                        if (caducidad) {
+                            (l as any)._raw.fecha_caducidad = new Date(caducidad).getTime();
+                        }
+                    });
+                }
+
+                // 3. Create ProductoImpuesto junction records
+                for (const impId of selectedImpuestos) {
+                    await database.get<ProductoImpuesto>('producto_impuestos').create(pi => {
+                        (pi as any)._raw.producto_id = nuevoProducto.id;
+                        (pi as any)._raw.impuesto_id = impId;
+                    });
+                }
+
+                // 4. Create MovimientoInventario (initial stock entry)
+                if (almacenId && existencia && parseInt(existencia) > 0) {
+                    await database.get<MovimientoInventario>('movimientos_inventario').create(mi => {
+                        (mi as any)._raw.almacen_id = almacenId;
+                        (mi as any)._raw.producto_id = nuevoProducto.id;
+                        if (nuevoLote) {
+                            (mi as any)._raw.lote_id = nuevoLote.id;
+                        }
+                        mi.usuarioId = 'system'; // TODO: Use real user ID from auth context
+                        mi.tipo = 'ENTRADA_COMPRA';
+                        mi.cantidad = parseInt(existencia);
+                    });
+                }
             });
 
             setIsUploading(false);
+            resetForm();
             onClose();
         } catch (error: any) {
             console.error("Error saving product:", error);
@@ -164,7 +231,12 @@ export default function AddInventory({ isOpen, onClose }: AddInventoryProps) {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1.5">Familia *</label>
-                                        <select className={selectClass} value={familia} onChange={e => setFamilia(e.target.value)}><option value="">Selecciona...</option><option value="harinas">Harinas</option><option value="colorantes">Colorantes</option><option value="saborizantes">Saborizantes</option><option value="chocolates">Chocolates</option><option value="levaduras">Levaduras</option></select>
+                                        <select className={selectClass} value={familiaId} onChange={e => setFamiliaId(e.target.value)}>
+                                            <option value="">Selecciona...</option>
+                                            {familias.filter(f => f.estado).map(f => (
+                                                <option key={f.id} value={f.id}>{f.nombre}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1.5">Código Interno *</label>
@@ -221,7 +293,12 @@ export default function AddInventory({ isOpen, onClose }: AddInventoryProps) {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="col-span-2 sm:col-span-1">
                                         <label className="block text-sm font-medium text-slate-700 mb-1.5">Almacén de Entrada *</label>
-                                        <select className={selectClass} value={almacen} onChange={e => setAlmacen(e.target.value)}><option value="">Selecciona...</option><option value="central">Bodega Central</option><option value="estante-a">Estante A (Mostrador)</option><option value="estante-b">Estante B (Mostrador)</option><option value="fria">Bodega Fría</option></select>
+                                        <select className={selectClass} value={almacenId} onChange={e => setAlmacenId(e.target.value)}>
+                                            <option value="">Selecciona...</option>
+                                            {almacenes.filter(a => a.estado).map(a => (
+                                                <option key={a.id} value={a.id}>{a.nombre}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                     <div className="col-span-2 sm:col-span-1">
                                         <label className="block text-sm font-medium text-slate-700 mb-1.5">Lote *</label>
@@ -244,10 +321,33 @@ export default function AddInventory({ isOpen, onClose }: AddInventoryProps) {
                                     <label className="block text-sm font-medium text-slate-700 mb-1.5 flex items-center gap-2"><Calendar className="w-4 h-4 text-slate-400" />Fecha de Caducidad</label>
                                     <input type="date" className={`${inputClass} text-slate-600`} value={caducidad} onChange={e => setCaducidad(e.target.value)} />
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <button type="button" className="w-full px-3 py-2.5 rounded-xl font-medium text-sm text-white bg-yellow-400 hover:bg-yellow-500 shadow-md shadow-yellow-500/20 active:scale-95 transition-all">Avisame 3 meses antes</button>
-                                    <button type="button" className="w-full px-3 py-2.5 rounded-xl font-medium text-sm text-white bg-red-700 hover:bg-red-800 shadow-md shadow-red-500/20 active:scale-95 transition-all">Avisame 1 mes antes</button>
-                                </div>
+
+                                {/* Alert preview based on selected family */}
+                                {familiaId && caducidad && (() => {
+                                    const selectedFam = familias.find(f => f.id === familiaId);
+                                    if (!selectedFam) return null;
+                                    const today = new Date();
+                                    const expDate = new Date(caducidad);
+                                    const daysRemaining = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+                                    let levelColor = 'emerald';
+                                    let levelText = 'OK — Verde';
+                                    if (daysRemaining <= 0) { levelColor = 'gray'; levelText = 'VENCIDO — Negro'; }
+                                    else if (daysRemaining <= selectedFam.umbralAmarilloDias) { levelColor = 'rose'; levelText = `Urgente — Rojo (${daysRemaining} días)`; }
+                                    else if (daysRemaining <= selectedFam.umbralVerdeDias) { levelColor = 'amber'; levelText = `Precaución — Amarillo (${daysRemaining} días)`; }
+                                    else { levelText = `OK — Verde (${daysRemaining} días)`; }
+
+                                    return (
+                                        <div className={`mt-3 px-4 py-3 rounded-xl border ${daysRemaining <= 0 ? 'bg-gray-900 border-gray-700' : `bg-${levelColor}-50 border-${levelColor}-200`}`}>
+                                            <p className={`text-xs font-bold ${daysRemaining <= 0 ? 'text-white' : `text-${levelColor}-700`}`}>
+                                                ⚡ Aviso para "{selectedFam.nombre}": {levelText}
+                                            </p>
+                                            <p className={`text-[10px] mt-0.5 ${daysRemaining <= 0 ? 'text-gray-400' : `text-${levelColor}-600`}`}>
+                                                Umbrales: Verde &gt;{selectedFam.umbralVerdeDias}d | Amarillo &gt;{selectedFam.umbralAmarilloDias}d | Rojo ≤{selectedFam.umbralAmarilloDias}d
+                                            </p>
+                                        </div>
+                                    );
+                                })()}
                             </div>
 
                             {/* Fiscal y Finanzas */}
@@ -270,13 +370,16 @@ export default function AddInventory({ isOpen, onClose }: AddInventoryProps) {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-2">Impuestos Aplicables</label>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <label className={`flex items-center gap-2 bg-slate-50 px-4 py-2.5 rounded-xl border cursor-pointer hover:border-blue-400 transition-colors ${iva ? 'border-blue-500' : 'border-slate-200'}`}>
-                                            <input type="checkbox" className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4" checked={iva} onChange={e => setIva(e.target.checked)} /><span className="text-sm font-medium text-slate-700">Aplica IVA (16%)</span>
-                                        </label>
-                                        <label className={`flex items-center gap-2 bg-slate-50 px-4 py-2.5 rounded-xl border cursor-pointer hover:border-blue-400 transition-colors ${ieps ? 'border-blue-500' : 'border-slate-200'}`}>
-                                            <input type="checkbox" className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4" checked={ieps} onChange={e => setIeps(e.target.checked)} /><span className="text-sm font-medium text-slate-700">Aplica IEPS (8%)</span>
-                                        </label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {impuestos.filter(imp => imp.activo).map(imp => (
+                                            <label key={imp.id} className={`flex items-center gap-2 bg-slate-50 px-4 py-2.5 rounded-xl border cursor-pointer hover:border-blue-400 transition-colors ${selectedImpuestos.includes(imp.id) ? 'border-blue-500 bg-blue-50/50' : 'border-slate-200'}`}>
+                                                <input type="checkbox" className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4" checked={selectedImpuestos.includes(imp.id)} onChange={() => toggleImpuesto(imp.id)} />
+                                                <span className="text-sm font-medium text-slate-700">{imp.nombre} ({imp.tasa}%)</span>
+                                            </label>
+                                        ))}
+                                        {impuestos.filter(imp => imp.activo).length === 0 && (
+                                            <p className="text-xs text-slate-400 col-span-2">No hay impuestos registrados. Créalos en Catálogos.</p>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -295,3 +398,13 @@ export default function AddInventory({ isOpen, onClose }: AddInventoryProps) {
         </div>
     );
 }
+
+// ─── withObservables Wrapper ────────────────────────────────
+const enhance = withObservables([], () => ({
+    familias: database.collections.get<FamiliaModel>('familias').query().observe(),
+    almacenes: database.collections.get<AlmacenModel>('almacenes').query().observe(),
+    impuestos: database.collections.get<ImpuestoModel>('impuestos').query().observe(),
+}));
+
+const AddInventory = enhance(AddInventoryInner);
+export default AddInventory;

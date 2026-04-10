@@ -1,44 +1,36 @@
 import React, { useState } from 'react';
-import { Download, Plus, Search, Filter, Package, DollarSign, AlertTriangle, Clock, Edit2, Trash2, Image as ImageIcon } from 'lucide-react';
+import { Download, Plus, Search, Filter, Package, DollarSign, AlertTriangle, Clock } from 'lucide-react';
 import AddInventory from '../../components/ui/modals/AddInventory';
+import ProductRow from '../../components/ui/ProductRow';
 import withObservables from '@nozbe/with-observables';
 import { database } from '../../src/services/DB/indexBD';
 import ProductoModel from '../../src/services/DB/models/catalogo/producto';
+import FamiliaModel from '../../src/services/DB/models/bases/familia';
 
 interface InventoryProps {
     productos: ProductoModel[];
+    familias: FamiliaModel[];
 }
 
-function InventoryContent({ productos }: InventoryProps) {
+function InventoryContent({ productos, familias }: InventoryProps) {
     const [searchTerm, setSearchTerm] = useState('');
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [filterOpen, setFilterOpen] = useState(false);
-
-    const getMarginBadgeStyle = (category: string) => {
-        switch (category) {
-            case 'Margen Ideal': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-            case 'Margen Alto': return 'bg-purple-100 text-purple-700 border-purple-200';
-            case 'De Servicio': return 'bg-slate-100 text-slate-600 border-slate-200';
-            default: return 'bg-orange-100 text-orange-700 border-orange-200';
-        }
-    };
-
-    const isLowStock = (stock: number) => stock <= 10;
-    const isExpiringSoon = (dateStr: string) => {
-        if(!dateStr) return false;
-        const today = new Date(); const expDate = new Date(dateStr);
-        return Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) <= 30;
-    };
+    const [filterFamilia, setFilterFamilia] = useState('');
 
     const handleDelete = async (producto: ProductoModel) => {
-        if(window.confirm('¿Seguro que deseas eliminar este producto?')) {
+        if (window.confirm('¿Seguro que deseas eliminar este producto?')) {
             await database.write(async () => {
-                await producto.markAsDeleted(); // O producto.destroyPermanently()
+                await producto.markAsDeleted();
             });
         }
     };
 
-    const filteredProductos = productos.filter(p => p.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) || p.codigoInterno.toLowerCase().includes(searchTerm.toLowerCase()));
+    const filteredProductos = productos.filter(p => {
+        const matchesSearch = p.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            p.codigoInterno.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesFamilia = !filterFamilia || (p as any).familiaId === filterFamilia;
+        return matchesSearch && matchesFamilia;
+    });
 
     return (
         <div className="p-8 bg-slate-50 min-h-screen font-sans">
@@ -66,15 +58,15 @@ function InventoryContent({ productos }: InventoryProps) {
                 </div>
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
                     <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center shrink-0"><DollarSign className="w-6 h-6 text-emerald-600" /></div>
-                    <div><p className="text-sm text-slate-500 font-medium">Costo de Stock</p><p className="text-xl font-bold text-slate-800">... Calculando</p></div>
+                    <div><p className="text-sm text-slate-500 font-medium">Familias Activas</p><p className="text-xl font-bold text-slate-800">{familias.filter(f => f.estado).length}</p></div>
                 </div>
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
                     <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center shrink-0"><AlertTriangle className="w-6 h-6 text-amber-500" /></div>
-                    <div><p className="text-sm text-slate-500 font-medium">Stock Bajo</p><p className="text-xl font-bold text-amber-600">0 Prods</p></div>
+                    <div><p className="text-sm text-slate-500 font-medium">Stock Bajo</p><p className="text-xl font-bold text-amber-600">— Prods</p></div>
                 </div>
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
                     <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 bg-rose-50"><Clock className="w-6 h-6 text-rose-500" /></div>
-                    <div><p className="text-sm text-slate-500 font-medium">Próximos a Caducar</p><p className="text-xl font-bold text-rose-600">0 Prods</p></div>
+                    <div><p className="text-sm text-slate-500 font-medium">Próximos a Caducar</p><p className="text-xl font-bold text-rose-600">— Prods</p></div>
                 </div>
             </div>
 
@@ -85,15 +77,39 @@ function InventoryContent({ productos }: InventoryProps) {
                     <input type="text" className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400" placeholder="Buscar por código, nombre o lote..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
                 <div className="flex gap-3">
-                    <select className="px-4 py-2.5 bg-slate-50 border-none rounded-xl text-sm font-medium text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer">
-                        <option value="">Todas las Familias</option><option value="harinas">Harinas</option><option value="colorantes">Colorantes</option><option value="saborizantes">Saborizantes</option><option value="chocolates">Chocolates</option>
+                    <select
+                        value={filterFamilia}
+                        onChange={e => setFilterFamilia(e.target.value)}
+                        className="px-4 py-2.5 bg-slate-50 border-none rounded-xl text-sm font-medium text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+                    >
+                        <option value="">Todas las Familias</option>
+                        {familias.filter(f => f.estado).map(fam => (
+                            <option key={fam.id} value={fam.id}>{fam.nombre}</option>
+                        ))}
                     </select>
-                    <div className="relative inline-block">
-                        <button onClick={() => setFilterOpen(!filterOpen)} className="flex items-center justify-center w-10 h-10 bg-slate-50 hover:bg-slate-100 transition-colors rounded-xl text-slate-600 cursor-pointer focus:ring-2 focus:ring-blue-500 outline-none">
-                            <Filter className="w-4 h-4" />
-                        </button>
-                    </div>
                 </div>
+            </div>
+
+            {/* Alert Legend */}
+            <div className="flex flex-wrap items-center gap-3 mb-4 px-1">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Avisos:</span>
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 rounded-full border border-emerald-200">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                    <span className="text-[10px] font-bold text-emerald-700">OK</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-50 rounded-full border border-amber-200">
+                    <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+                    <span className="text-[10px] font-bold text-amber-700">Precaución</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-rose-50 rounded-full border border-rose-200">
+                    <div className="w-2 h-2 rounded-full bg-rose-500"></div>
+                    <span className="text-[10px] font-bold text-rose-700">Urgente</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-900 rounded-full border border-gray-700">
+                    <div className="w-2 h-2 rounded-full bg-white"></div>
+                    <span className="text-[10px] font-bold text-white">Vencido</span>
+                </div>
+            </div>
 
             {/* Table */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -112,99 +128,19 @@ function InventoryContent({ productos }: InventoryProps) {
                         <tbody className="divide-y divide-slate-100">
                             {filteredProductos.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
-                                        No se encontraron productos. Crea uno nevo para empezar.
+                                    <td colSpan={6} className="px-6 py-12 text-center">
+                                        <div className="flex flex-col items-center gap-3">
+                                            <Package className="w-10 h-10 text-slate-300" />
+                                            <p className="text-slate-500 font-medium">No se encontraron productos</p>
+                                            <p className="text-slate-400 text-xs">Crea uno nuevo para empezar a gestionar tu inventario</p>
+                                        </div>
                                     </td>
                                 </tr>
                             ) : filteredProductos.map((item) => (
-                                <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200 overflow-hidden">
-                                                {item.imagen ? (
-                                                    <img src={item.imagen} alt="Producto" className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <ImageIcon className="w-5 h-5 text-slate-400" />
-                                                )}
-                                            </div>
-                                            <div><p className="text-slate-900 font-bold max-w-xs truncate" title={item.descripcion}>{item.descripcion}</p><p className="text-slate-500 text-xs mt-0.5">{item.codigoInterno}</p></div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div><p className="text-slate-700 font-medium">Sin Familia</p>
-                                        <span className={`inline-block mt-1 px-2 py-0.5 rounded-md text-[10px] font-bold border uppercase tracking-wider ${getMarginBadgeStyle('Margen Ideal')}`}>Margen Ideal</span></div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div><p className="text-slate-800 font-bold">${(item.precioLista || 0).toFixed(2)}</p>
-                                        <div className="flex items-center gap-1.5 mt-1">
-                                            <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 text-[10px] rounded-md font-bold">Por definir</span>
-                                        </div></div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div><p className="text-slate-700 font-medium">N/A</p><p className="text-slate-500 text-xs mt-0.5">Almacén Central</p></div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div>
-                                            <p className={`font-bold text-base ${isLowStock(0) ? 'text-amber-600' : 'text-slate-800'}`}>0 <span className="text-sm font-medium text-slate-500">pzas</span></p>
-                                            <div className="flex items-center gap-1.5 mt-0.5">
-                                                <Clock className={`w-3 h-3 text-slate-400`} />
-                                                <span className={`text-xs font-medium text-slate-500`}>N/A</span>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-center">
-                                        <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
-                                            <button onClick={() => handleDelete(item)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {mockInventory.map((item) => (
-                                    <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200"><ImageIcon className="w-5 h-5 text-slate-400" /></div>
-                                                <div><p className="text-slate-900 font-bold">{item.name}</p><p className="text-slate-500 text-xs mt-0.5">{item.internalCode}</p></div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div><p className="text-slate-700 font-medium">{item.family}</p>
-                                                <span className={`inline-block mt-1 px-2 py-0.5 rounded-md text-[10px] font-bold border uppercase tracking-wider ${getMarginBadgeStyle(item.marginCategory)}`}>{item.marginCategory}</span></div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div><p className="text-slate-800 font-bold">${item.averageCost.toFixed(2)}</p>
-                                                <div className="flex items-center gap-1.5 mt-1">
-                                                    {item.hasIva && <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 text-[10px] rounded-md font-bold">IVA</span>}
-                                                    {item.hasIeps && <span className="px-1.5 py-0.5 bg-purple-50 text-purple-600 text-[10px] rounded-md font-bold">IEPS</span>}
-                                                    {(!item.hasIva && !item.hasIeps) && <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 text-[10px] rounded-md font-bold">Excento</span>}
-                                                    <span className="text-slate-400 text-[11px] ml-1">SAT: {item.satCode}</span>
-                                                </div></div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div><p className="text-slate-700 font-medium">{item.batch}</p><p className="text-slate-500 text-xs mt-0.5">{item.warehouse}</p></div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div>
-                                                <p className={`font-bold text-base ${isLowStock(item.stock) ? 'text-amber-600' : 'text-slate-800'}`}>{item.stock} <span className="text-sm font-medium text-slate-500">{item.unit}</span></p>
-                                                <div className="flex items-center gap-1.5 mt-0.5">
-                                                    <Clock className={`w-3 h-3 ${isExpiringSoon(item.expirationDate) ? 'text-rose-500' : 'text-slate-400'}`} />
-                                                    <span className={`text-xs font-medium ${isExpiringSoon(item.expirationDate) ? 'text-rose-600' : 'text-slate-500'}`}>{item.expirationDate}</span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
-                                                <button className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                <ProductRow key={item.id} producto={item} onDelete={handleDelete} />
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -215,4 +151,5 @@ function InventoryContent({ productos }: InventoryProps) {
 
 export default withObservables([], () => ({
     productos: database.collections.get<ProductoModel>('productos').query().observe(),
+    familias: database.collections.get<FamiliaModel>('familias').query().observe(),
 }))(InventoryContent);
