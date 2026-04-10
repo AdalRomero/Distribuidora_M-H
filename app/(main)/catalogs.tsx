@@ -1,31 +1,31 @@
 import withObservables from "@nozbe/with-observables";
 import {
-    BookOpen,
-    Check,
-    Edit2,
-    Layers,
-    Loader2,
-    Plus,
-    Receipt,
-    ShieldCheck,
-    ShieldAlert,
-    ShieldX,
-    Skull,
-    ToggleLeft,
-    ToggleRight,
-    Trash2,
-    Warehouse,
-    X,
+  BookOpen,
+  Check,
+  Edit2,
+  Layers,
+  Loader2,
+  Plus,
+  Receipt,
+  ShieldAlert,
+  ShieldCheck,
+  ShieldX,
+  Skull,
+  ToggleLeft,
+  ToggleRight,
+  Trash2,
+  Warehouse,
+  X,
 } from "lucide-react";
 import React, { useState } from "react";
+import ErrorModal from "../../components/ui/modals/ErrorModal";
+import SuccessModal from "../../components/ui/modals/SuccessModal";
+import WarningModal from "../../components/ui/modals/WarningModal";
 import { database } from "../../src/services/DB/indexBD";
 import AlmacenModel from "../../src/services/DB/models/bases/almacen";
 import FamiliaModel from "../../src/services/DB/models/bases/familia";
 import ImpuestoModel from "../../src/services/DB/models/bases/impuesto";
 import { syncApp } from "../../src/sync";
-import SuccessModal from "../../components/ui/modals/SuccessModal";
-import ErrorModal from "../../components/ui/modals/ErrorModal";
-import WarningModal from "../../components/ui/modals/WarningModal";
 
 // ─── Types ──────────────────────────────────────────────────
 type ActiveTab = "familias" | "almacenes" | "impuestos";
@@ -46,7 +46,7 @@ interface ModalState {
 const initialModalState: ModalState = {
   success: { open: false, title: "", message: "" },
   error: { open: false, title: "", message: "" },
-  warning: { open: false, title: "", message: "", onConfirm: () => {} },
+  warning: { open: false, title: "", message: "", onConfirm: () => { } },
 };
 
 
@@ -86,28 +86,28 @@ function CatalogsContent({ familias, almacenes, impuestos }: CatalogsProps) {
     icon: React.ReactNode;
     count: number;
   }[] = [
-    {
-      key: "familias",
-      label: "Familias",
-      icon: <Layers className="w-4 h-4" />,
-      count: familias.length,
-    },
-    {
-      key: "almacenes",
-      label: "Almacenes",
-      icon: <Warehouse className="w-4 h-4" />,
-      count: almacenes.length,
-    },
-    {
-      key: "impuestos",
-      label: "Impuestos",
-      icon: <Receipt className="w-4 h-4" />,
-      count: impuestos.length,
-    },
-  ];
+      {
+        key: "familias",
+        label: "Familias",
+        icon: <Layers className="w-4 h-4" />,
+        count: familias.length,
+      },
+      {
+        key: "almacenes",
+        label: "Almacenes",
+        icon: <Warehouse className="w-4 h-4" />,
+        count: almacenes.length,
+      },
+      {
+        key: "impuestos",
+        label: "Impuestos",
+        icon: <Receipt className="w-4 h-4" />,
+        count: impuestos.length,
+      },
+    ];
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6 max-w-7xl mx-auto">
       {/* ── Modals ── */}
       <SuccessModal isOpen={modal.success.open} onClose={closeSuccess} title={modal.success.title} message={modal.success.message} />
       <ErrorModal isOpen={modal.error.open} onClose={closeError} title={modal.error.title} message={modal.error.message} />
@@ -138,20 +138,18 @@ function CatalogsContent({ familias, almacenes, impuestos }: CatalogsProps) {
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              tab === t.key
-                ? "bg-white text-indigo-700 shadow-sm font-bold"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === t.key
+              ? "bg-white text-indigo-700 shadow-sm font-bold"
+              : "text-slate-500 hover:text-slate-700"
+              }`}
           >
             {t.icon}
             {t.label}
             <span
-              className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                tab === t.key
-                  ? "bg-indigo-100 text-indigo-600"
-                  : "bg-slate-200 text-slate-500"
-              }`}
+              className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${tab === t.key
+                ? "bg-indigo-100 text-indigo-600"
+                : "bg-slate-200 text-slate-500"
+                }`}
             >
               {t.count}
             </span>
@@ -309,7 +307,7 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
       <div className="flex justify-end mb-4">
         <button
           onClick={() => setShowAdd(!showAdd)}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium text-sm shadow-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm shadow-sm"
         >
           <Plus className="w-4 h-4" />
           Nueva Familia
@@ -565,11 +563,10 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
                       <td className="px-6 py-4">
                         <button
                           onClick={() => toggleEstado(f)}
-                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 ${
-                            f.estado
-                              ? "bg-emerald-50 border border-emerald-200 hover:bg-emerald-100"
-                              : "bg-slate-50 border border-slate-200 hover:bg-slate-100"
-                          }`}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 ${f.estado
+                            ? "bg-emerald-50 border border-emerald-200 hover:bg-emerald-100"
+                            : "bg-slate-50 border border-slate-200 hover:bg-slate-100"
+                            }`}
                         >
                           {f.estado ? (
                             <>
@@ -819,11 +816,10 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
                       <td className="px-6 py-4">
                         <button
                           onClick={() => toggleEstado(a)}
-                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 ${
-                            a.estado
-                              ? "bg-emerald-50 border border-emerald-200 hover:bg-emerald-100"
-                              : "bg-slate-50 border border-slate-200 hover:bg-slate-100"
-                          }`}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 ${a.estado
+                            ? "bg-emerald-50 border border-emerald-200 hover:bg-emerald-100"
+                            : "bg-slate-50 border border-slate-200 hover:bg-slate-100"
+                            }`}
                         >
                           {a.estado ? (
                             <>
@@ -1112,11 +1108,10 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
                       <td className="px-6 py-4">
                         <button
                           onClick={() => toggleActivo(i)}
-                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 ${
-                            i.activo
-                              ? "bg-emerald-50 border border-emerald-200 hover:bg-emerald-100"
-                              : "bg-slate-50 border border-slate-200 hover:bg-slate-100"
-                          }`}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 ${i.activo
+                            ? "bg-emerald-50 border border-emerald-200 hover:bg-emerald-100"
+                            : "bg-slate-50 border border-slate-200 hover:bg-slate-100"
+                            }`}
                         >
                           {i.activo ? (
                             <>
