@@ -128,22 +128,32 @@ export default function DevAuth() {
     if (!confirm(`¿Cambiar el rol de este usuario a ${newRole}?`)) return;
 
     try {
-      const infoDb = database.collections.get("informacion_perfil");
-      const infoRecord = (await infoDb.find(userId)) as any;
+      // 1. Actualizar en Supabase
+      const { error: supabaseError } = await supabase
+        .from("informacion_perfil")
+        .update({ rol: newRole })
+        .eq("id", userId);
 
-      await database.write(async () => {
-        await infoRecord.update((info: any) => {
-          info.rol = newRole;
+      if (supabaseError) throw new Error(`Error en la nube: ${supabaseError.message}`);
+
+      // 2. Actualizar localmente si existe
+      try {
+        const infoDb = database.collections.get("informacion_perfil");
+        const infoRecord = (await infoDb.find(userId)) as any;
+
+        await database.write(async () => {
+          await infoRecord.update((info: any) => {
+            info.rol = newRole;
+          });
         });
-      });
-      alert(
-        `✅ Rol actualizado a ${newRole} localmente. (Sincroniza para subir a la nube)`,
-      );
+      } catch (localError) {
+        console.warn("Información no encontrada localmente, pero rol actualizado en la nube.");
+      }
+
+      alert(`✅ Rol actualizado a ${newRole} en la nube y localmente.`);
       loadUsers();
-    } catch (error) {
-      alert(
-        "Error. ¿Aseguraste que el usuario esté descargado en Local primero?",
-      );
+    } catch (error: any) {
+      alert(`Error al actualizar rol: ${error.message}`);
     }
   };
 
@@ -156,23 +166,32 @@ export default function DevAuth() {
     if (!confirm(`¿Deseas ${action} el acceso de ${username}?`)) return;
 
     try {
-      const perfilesDb = database.collections.get("perfiles");
-      const perfilRecord = (await perfilesDb.find(userId)) as any;
+      // 1. Actualizar en Supabase
+      const { error: supabaseError } = await supabase
+        .from("perfiles")
+        .update({ estado: !currentStatus })
+        .eq("id", userId);
 
-      await database.write(async () => {
-        await perfilRecord.update((p: any) => {
-          p.estado = !currentStatus;
+      if (supabaseError) throw new Error(`Error en la nube: ${supabaseError.message}`);
+
+      // 2. Actualizar localmente si existe
+      try {
+        const perfilesDb = database.collections.get("perfiles");
+        const perfilRecord = (await perfilesDb.find(userId)) as any;
+
+        await database.write(async () => {
+          await perfilRecord.update((p: any) => {
+            p.estado = !currentStatus;
+          });
         });
-      });
+      } catch (localError) {
+        console.warn("Usuario no encontrado localmente, pero actualizado en la nube.");
+      }
 
-      alert(
-        `✅ Usuario ${action}D localmente. (Sincroniza para subir a la nube)`,
-      );
+      alert(`✅ Usuario ${action}D en la nube y localmente.`);
       loadUsers();
     } catch (error: any) {
-      alert(
-        "Error. Si estás en modo NUBE, primero debes tener al usuario en tu BD Local para modificarlo.",
-      );
+      alert(`Error al actualizar estado: ${error.message}`);
     }
   };
 

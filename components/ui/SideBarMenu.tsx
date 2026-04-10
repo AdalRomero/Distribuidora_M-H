@@ -234,10 +234,12 @@ export const SideBarMenu: React.FC = () => {
                   )}
                 </div>
 
-                <p className="text-[11px] text-slate-500 leading-tight">
-                  Módulos habilitados según tus permisos específicos de{" "}
-                  {userRole}. Contacta al administrador si requieres ajustes.
-                </p>
+                {userRole !== "ADMIN" && userRole !== "DEV" && (
+                  <p className="text-[11px] text-slate-500 leading-tight">
+                    Módulos habilitados según tus permisos específicos de{" "}
+                    {userRole}. Contacta al administrador si requieres ajustes.
+                  </p>
+                )}
               </div>
 
               {/* Acciones */}
