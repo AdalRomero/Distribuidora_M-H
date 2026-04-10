@@ -108,6 +108,7 @@ export const mySchema = appSchema({
         { name: "precio_lista", type: "number" },
         { name: "precio_mayoreo", type: "number" },
         { name: "precio_menudeo", type: "number" },
+        { name: "imagen", type: "string", isOptional: true },
         { name: "estado", type: "boolean" }, // BORRADO LÓGICO
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },

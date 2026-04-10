@@ -27,6 +27,7 @@ export default class Producto extends Model {
   @field("precio_lista") precioLista!: number;
   @field("precio_mayoreo") precioMayoreo!: number;
   @field("precio_menudeo") precioMenudeo!: number;
+  @text("imagen") imagen?: string;
   @field("estado") estado!: boolean;
   @readonly @date("created_at") createdAt!: number;
   @readonly @date("updated_at") updatedAt!: number;
