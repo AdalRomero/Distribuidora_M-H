@@ -85,7 +85,7 @@ function InventoryContent({ productos, familias }: InventoryProps) {
                         >
                             <option value="">Todas las Familias</option>
                             {familias.filter(f => f.estado).map(fam => (
-                                <option key={fam.id} value={fam.id}>{fam.nombre}</option>
+                                <option key={fam.id} value={fam.id}>{fam.codigoFamilia}-{fam.nombre}</option>
                             ))}
                         </select>
                     </div>

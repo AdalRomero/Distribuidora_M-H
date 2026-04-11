@@ -6,6 +6,7 @@ import Almacen from "./models/bases/almacen";
 import Cliente from "./models/bases/cliente";
 import Familia from "./models/bases/familia";
 import Impuesto from "./models/bases/impuesto";
+import Margen from "./models/bases/margen";
 import Proveedor from "./models/bases/proveedor";
 
 import CodigoAlterno from "./models/catalogo/codigoAlterno";
@@ -36,6 +37,7 @@ export const database = new Database({
     Impuesto,
     Almacen,
     Proveedor,
+    Margen,
     Cliente,
 
     Producto,

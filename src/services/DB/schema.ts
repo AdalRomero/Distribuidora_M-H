@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from "@nozbe/watermelondb";
 
 export const mySchema = appSchema({
-  version: 5,
+  version: 6,
   tables: [
     // ==================
     // 1. USUARIOS Y PERMISOS
@@ -69,6 +69,16 @@ export const mySchema = appSchema({
       name: "almacenes",
       columns: [
         { name: "nombre", type: "string" },
+        { name: "estado", type: "boolean" },
+        { name: "created_at", type: "number" },
+        { name: "updated_at", type: "number" },
+      ],
+    }),
+    tableSchema({
+      name: "margenes",
+      columns: [
+        { name: "nombre", type: "string" },
+        { name: "porcentaje", type: "number" },
         { name: "estado", type: "boolean" },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
@@ -147,6 +157,7 @@ export const mySchema = appSchema({
         { name: "producto_id", type: "string", isIndexed: true },
         { name: "identificador_lote", type: "string" },
         { name: "unidad_medida", type: "string" },
+        { name: "costo_adquisicion", type: "number" },
         { name: "fecha_caducidad", type: "number", isOptional: true },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },

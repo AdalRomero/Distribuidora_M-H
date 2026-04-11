@@ -137,7 +137,7 @@ function ProductRowInner({ producto, familia, lotes, impuestosLinks, stockGlobal
             {/* Clasificación */}
             <td className="px-6 py-4">
                 <div>
-                    <p className="text-slate-700 font-medium">{familia?.nombre ?? 'Sin Familia'}</p>
+                    <p className="text-slate-700 font-medium">{familia ? `${familia.codigoFamilia}-${familia.nombre}` : 'Sin Familia'}</p>
                     <span className={`inline-block mt-1 px-2 py-0.5 rounded-md text-[10px] font-bold border uppercase tracking-wider ${getMarginBadgeStyle('Margen Ideal')}`}>Margen Ideal</span>
                 </div>
             </td>
