@@ -1,6 +1,7 @@
 import withObservables from "@nozbe/with-observables";
 import {
   Check,
+  DollarSign,
   Edit2,
   Layers,
   Loader2,
@@ -24,15 +25,17 @@ import { database } from "../../src/services/DB/indexBD";
 import AlmacenModel from "../../src/services/DB/models/bases/almacen";
 import FamiliaModel from "../../src/services/DB/models/bases/familia";
 import ImpuestoModel from "../../src/services/DB/models/bases/impuesto";
+import MargenModel from "../../src/services/DB/models/bases/margen";
 import { syncApp } from "../../src/sync";
 
 // ─── Types ──────────────────────────────────────────────────
-type ActiveTab = "familias" | "almacenes" | "impuestos";
+type ActiveTab = "familias" | "almacenes" | "impuestos" | "margenes";
 
 interface CatalogsProps {
   familias: FamiliaModel[];
   almacenes: AlmacenModel[];
   impuestos: ImpuestoModel[];
+  margenes: MargenModel[];
 }
 
 // ─── Modal State type ────────────────────────────────────────
@@ -50,7 +53,7 @@ const initialModalState: ModalState = {
 
 
 // ─── Main Component ─────────────────────────────────────────
-function CatalogsContent({ familias, almacenes, impuestos }: CatalogsProps) {
+function CatalogsContent({ familias, almacenes, impuestos, margenes }: CatalogsProps) {
   const [tab, setTab] = useState<ActiveTab>("familias");
   const [modal, setModal] = useState<ModalState>(initialModalState);
   const [syncing, setSyncing] = useState(false);
@@ -102,6 +105,12 @@ function CatalogsContent({ familias, almacenes, impuestos }: CatalogsProps) {
         label: "Impuestos",
         icon: <Receipt className="w-4 h-4" />,
         count: impuestos.length,
+      },
+      {
+        key: "margenes",
+        label: "Márgenes",
+        icon: <DollarSign className="w-4 h-4" />,
+        count: margenes.length,
       },
     ];
 
@@ -158,6 +167,7 @@ function CatalogsContent({ familias, almacenes, impuestos }: CatalogsProps) {
         {tab === "familias" && <FamiliasTab familias={familias} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} />}
         {tab === "almacenes" && <AlmacenesTab almacenes={almacenes} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} />}
         {tab === "impuestos" && <ImpuestosTab impuestos={impuestos} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} />}
+        {tab === "margenes" && <MargenesTab margenes={margenes} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} />}
       </div>
     </div>
   );
@@ -1160,6 +1170,299 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
   );
 }
 
+// ═══════════════════════════════════════════════════════════
+// MARGENES TAB
+// ═══════════════════════════════════════════════════════════
+function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterOp }: { margenes: MargenModel[] } & TabCallbacks) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [nombre, setNombre] = useState("");
+  const [porcentaje, setPorcentaje] = useState("");
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editNombre, setEditNombre] = useState("");
+  const [editPorcentaje, setEditPorcentaje] = useState("");
+
+  const handleAdd = async () => {
+    if (!nombre || !porcentaje) {
+      showError("Campos requeridos", "El Nombre y el Porcentaje son obligatorios para crear un margen.");
+      return;
+    }
+    const duplicado = margenes.find(
+      (m) => m.nombre.trim().toLowerCase() === nombre.trim().toLowerCase()
+    );
+    if (duplicado) {
+      showError("Nombre duplicado", `Ya existe un margen con el nombre "${nombre}".`);
+      return;
+    }
+    try {
+      await database.write(async () => {
+        await database.get<MargenModel>("margenes").create((m) => {
+          m.nombre = nombre;
+          m.porcentaje = parseFloat(porcentaje);
+          m.estado = true;
+        });
+      });
+      showSuccess("Margen creado", `El margen "${nombre}" (${porcentaje}%) se ha guardado correctamente.`);
+      setNombre("");
+      setPorcentaje("");
+      setShowAdd(false);
+      await syncAfterOp();
+    } catch (e: any) {
+      showError("Error al crear", e.message || "No se pudo crear el margen.");
+    }
+  };
+
+  const handleSaveEdit = async (m: MargenModel) => {
+    try {
+      await database.write(async () => {
+        await m.update((record) => {
+          record.nombre = editNombre;
+          record.porcentaje = parseFloat(editPorcentaje);
+        });
+      });
+      setEditId(null);
+      showSuccess("Margen actualizado", `Los cambios en "${editNombre}" se guardaron correctamente.`);
+      await syncAfterOp();
+    } catch (e: any) {
+      showError("Error al actualizar", e.message || "No se pudo actualizar el margen.");
+    }
+  };
+
+  const toggleEstado = async (m: MargenModel) => {
+    const nuevoEstado = !m.estado;
+    try {
+      await database.write(async () => {
+        await m.update((record) => {
+          record.estado = nuevoEstado;
+        });
+      });
+      showSuccess(
+        nuevoEstado ? "Margen activado" : "Margen desactivado",
+        `"${m.nombre}" ahora está ${nuevoEstado ? "activo" : "inactivo"}.`
+      );
+      await syncAfterOp();
+    } catch (e: any) {
+      showError("Error", e.message || "No se pudo cambiar el estado.");
+    }
+  };
+
+  const handleDelete = (m: MargenModel) => {
+    showWarning(
+      "Eliminar margen",
+      `¿Estás seguro de eliminar el margen "${m.nombre}"?`,
+      async () => {
+        try {
+          await database.write(async () => {
+            await m.markAsDeleted();
+          });
+          showSuccess("Margen eliminado", `"${m.nombre}" ha sido eliminado correctamente.`);
+          await syncAfterOp();
+        } catch (e: any) {
+          showError("Error al eliminar", e.message || "No se pudo eliminar el margen.");
+        }
+      }
+    );
+  };
+
+  return (
+    <div>
+      <div className="flex justify-end mb-4">
+        <button
+          onClick={() => setShowAdd(!showAdd)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm shadow-sm"
+        >
+          <Plus className="w-4 h-4" />
+          Nuevo Margen
+        </button>
+      </div>
+
+      {showAdd && (
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-100 mb-6 space-y-4">
+          <h3 className="font-bold text-slate-700 flex items-center gap-2">
+            <Plus className="w-4 h-4 text-blue-500" />
+            Crear Nuevo Margen
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-md">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Nombre *
+              </label>
+              <input
+                type="text"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="Ej. Margen Ideal"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Porcentaje (%) *
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="Ej. 35"
+                value={porcentaje}
+                onChange={(e) => setPorcentaje(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setShowAdd(false)}
+              className="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleAdd}
+              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors font-medium shadow-sm"
+            >
+              Guardar
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-50/50 text-slate-500 font-semibold border-b border-slate-100">
+            <tr>
+              <th className="px-6 py-4">Nombre</th>
+              <th className="px-6 py-4">Porcentaje</th>
+              <th className="px-6 py-4">Estado</th>
+              <th className="px-6 py-4 text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {margenes.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={4}
+                  className="px-6 py-10 text-center text-slate-400"
+                >
+                  No hay márgenes registrados.
+                </td>
+              </tr>
+            ) : (
+              margenes.map((m) => (
+                <tr
+                  key={m.id}
+                  className={`hover:bg-slate-50/50 transition-colors group ${!m.estado ? 'opacity-50 bg-slate-50/30' : ''}`}
+                >
+                  {editId === m.id ? (
+                    <>
+                      <td className="px-6 py-3">
+                        <input
+                          type="text"
+                          className="px-2 py-1.5 border rounded-lg text-sm w-40"
+                          value={editNombre}
+                          onChange={(e) => setEditNombre(e.target.value)}
+                        />
+                      </td>
+                      <td className="px-6 py-3">
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="px-2 py-1.5 border rounded-lg text-sm w-20"
+                          value={editPorcentaje}
+                          onChange={(e) => setEditPorcentaje(e.target.value)}
+                        />
+                      </td>
+                      <td className="px-6 py-3"></td>
+                      <td className="px-6 py-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => handleSaveEdit(m)}
+                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setEditId(null)}
+                            className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+                            <DollarSign className="w-4 h-4 text-emerald-600" />
+                          </div>
+                          <span className="font-medium text-slate-800">
+                            {m.nombre}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold">
+                          {m.porcentaje}%
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => toggleEstado(m)}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 ${m.estado
+                            ? "bg-emerald-50 border border-emerald-200 hover:bg-emerald-100"
+                            : "bg-slate-50 border border-slate-200 hover:bg-slate-100"
+                            }`}
+                        >
+                          {m.estado ? (
+                            <>
+                              <ToggleRight className="w-6 h-6 text-emerald-500" />
+                              <span className="text-xs font-bold text-emerald-600">
+                                Activo
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <ToggleLeft className="w-6 h-6 text-slate-400" />
+                              <span className="text-xs font-bold text-slate-400">
+                                Inactivo
+                              </span>
+                            </>
+                          )}
+                        </button>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => {
+                              setEditId(m.id);
+                              setEditNombre(m.nombre);
+                              setEditPorcentaje(String(m.porcentaje));
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(m)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ─── withObservables Wrapper ────────────────────────────────
 export default withObservables([], () => ({
   familias: database.collections
@@ -1172,6 +1475,10 @@ export default withObservables([], () => ({
     .observe(),
   impuestos: database.collections
     .get<ImpuestoModel>("impuestos")
+    .query()
+    .observe(),
+  margenes: database.collections
+    .get<MargenModel>("margenes")
     .query()
     .observe(),
 }))(CatalogsContent);

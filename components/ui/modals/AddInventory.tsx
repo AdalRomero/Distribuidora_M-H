@@ -18,16 +18,15 @@ import { database } from "../../../src/services/DB/indexBD";
 import AlmacenModel from "../../../src/services/DB/models/bases/almacen";
 import FamiliaModel from "../../../src/services/DB/models/bases/familia";
 import ImpuestoModel from "../../../src/services/DB/models/bases/impuesto";
-import Lote from "../../../src/services/DB/models/catalogo/lote";
+import MargenModel from "../../../src/services/DB/models/bases/margen";
 import Producto from "../../../src/services/DB/models/catalogo/producto";
 import ProductoImpuesto from "../../../src/services/DB/models/catalogo/productoImpuesto";
-import MovimientoInventario from "../../../src/services/DB/models/registros/movimientoInventario";
 
 interface AddInventoryInnerProps {
   isOpen: boolean;
   onClose: () => void;
   familias: FamiliaModel[];
-  almacenes: AlmacenModel[];
+  margenes: MargenModel[];
   impuestos: ImpuestoModel[];
 }
 
@@ -35,7 +34,7 @@ function AddInventoryInner({
   isOpen,
   onClose,
   familias,
-  almacenes,
+  margenes,
   impuestos,
 }: AddInventoryInnerProps) {
   const [nombre, setNombre] = useState("");
@@ -43,12 +42,6 @@ function AddInventoryInner({
   const [codigoInterno, setCodigoInterno] = useState("");
   const [codigoAlterno, setCodigoAlterno] = useState("");
   const [margen, setMargen] = useState("");
-  const [almacenId, setAlmacenId] = useState("");
-  const [lote, setLote] = useState("");
-  const [existencia, setExistencia] = useState("");
-  const [margenMinimo, setMargenMinimo] = useState("");
-  const [unidad, setUnidad] = useState("pzas");
-  const [caducidad, setCaducidad] = useState("");
   const [costoPromedio, setCostoPromedio] = useState("");
   const [sat, setSat] = useState("");
   const [selectedImpuestos, setSelectedImpuestos] = useState<string[]>([]);
@@ -152,12 +145,6 @@ function AddInventoryInner({
     setCodigoInterno("");
     setCodigoAlterno("");
     setMargen("");
-    setAlmacenId("");
-    setLote("");
-    setExistencia("");
-    setMargenMinimo("");
-    setUnidad("pzas");
-    setCaducidad("");
     setCostoPromedio("");
     setSat("");
     setSelectedImpuestos([]);
@@ -213,42 +200,13 @@ function AddInventoryInner({
             p.precioMenudeo = precio;
           });
 
-        // 2. Create Lote (if lote identifier provided)
-        let nuevoLote: Lote | null = null;
-        if (lote) {
-          nuevoLote = await database.get<Lote>("lotes").create((l) => {
-            (l as any)._raw.producto_id = nuevoProducto.id;
-            l.identificadorLote = lote;
-            l.unidadMedida = unidad;
-            if (caducidad) {
-              (l as any)._raw.fecha_caducidad = new Date(caducidad).getTime();
-            }
-          });
-        }
-
-        // 3. Create ProductoImpuesto junction records
+        // 2. Create ProductoImpuesto junction records
         for (const impId of selectedImpuestos) {
           await database
             .get<ProductoImpuesto>("producto_impuestos")
             .create((pi) => {
               (pi as any)._raw.producto_id = nuevoProducto.id;
               (pi as any)._raw.impuesto_id = impId;
-            });
-        }
-
-        // 4. Create MovimientoInventario (initial stock entry)
-        if (almacenId && existencia && parseInt(existencia) > 0) {
-          await database
-            .get<MovimientoInventario>("movimientos_inventario")
-            .create((mi) => {
-              (mi as any)._raw.almacen_id = almacenId;
-              (mi as any)._raw.producto_id = nuevoProducto.id;
-              if (nuevoLote) {
-                (mi as any)._raw.lote_id = nuevoLote.id;
-              }
-              mi.usuarioId = "system"; // TODO: Use real user ID from auth context
-              mi.tipo = "ENTRADA_COMPRA";
-              mi.cantidad = parseInt(existencia);
             });
         }
       });
@@ -364,26 +322,21 @@ function AddInventoryInner({
                     Categoría de Margen
                   </label>
                   <div className="grid grid-cols-2 gap-3 mt-1">
-                    {[
-                      "Margen Ideal",
-                      "De Servicio",
-                      "Margen Alto",
-                      "Margen Bajo",
-                    ].map((m) => (
+                    {margenes.filter(m => m.estado).map((m) => (
                       <label
-                        key={m}
-                        className={`flex items-center gap-2 p-3 border rounded-xl cursor-pointer transition-colors ${margen === m ? "border-blue-500 bg-blue-50/50" : "border-slate-200 hover:bg-slate-50"}`}
+                        key={m.id}
+                        className={`flex items-center gap-2 p-3 border rounded-xl cursor-pointer transition-colors ${margen === m.id ? "border-blue-500 bg-blue-50/50" : "border-slate-200 hover:bg-slate-50"}`}
                       >
                         <input
                           type="radio"
                           name="margen"
-                          value={m}
-                          checked={margen === m}
+                          value={m.id}
+                          checked={margen === m.id}
                           onChange={(e) => setMargen(e.target.value)}
                           className="text-blue-600 focus:ring-blue-500"
                         />
                         <span className="text-sm text-slate-600 font-medium">
-                          {m}
+                          {m.nombre} ({m.porcentaje}%)
                         </span>
                       </label>
                     ))}
@@ -391,155 +344,7 @@ function AddInventoryInner({
                 </div>
               </div>
 
-              {/* Inventario y Lotes */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5 flex flex-col">
-                <div className="flex items-center gap-2 mb-4 border-b border-slate-50 pb-3">
-                  <Package className="w-5 h-5 text-rose-500" />
-                  <h3 className="text-base font-bold text-slate-700">
-                    Inventario y Control de Lotes
-                  </h3>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2 sm:col-span-1">
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Almacén de Entrada *
-                    </label>
-                    <select
-                      className={selectClass}
-                      value={almacenId}
-                      onChange={(e) => setAlmacenId(e.target.value)}
-                    >
-                      <option value="">Selecciona...</option>
-                      {almacenes
-                        .filter((a) => a.estado)
-                        .map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.nombre}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                  <div className="col-span-2 sm:col-span-1">
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Lote *
-                    </label>
-                    <input
-                      type="text"
-                      className={inputClass}
-                      placeholder="Identificador de lote"
-                      value={lote}
-                      onChange={(e) => setLote(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Existencia Inicial *
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      className={inputClass}
-                      placeholder="0"
-                      value={existencia}
-                      onChange={(e) => setExistencia(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Margen mínimo *
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      className={inputClass}
-                      placeholder="Ej. 8"
-                      value={margenMinimo}
-                      onChange={(e) => setMargenMinimo(e.target.value)}
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Unidad de Medida *
-                    </label>
-                    <select
-                      className={selectClass}
-                      value={unidad}
-                      onChange={(e) => setUnidad(e.target.value)}
-                    >
-                      <option value="pzas">Piezas (pzas)</option>
-                      <option value="kg">Kilogramos (kg)</option>
-                      <option value="litros">Litros (L)</option>
-                      <option value="cajas">Cajas</option>
-                      <option value="bultos">Bultos</option>
-                      <option value="galones">Galones</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5 flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-slate-400" />
-                    Fecha de Caducidad
-                  </label>
-                  <input
-                    type="date"
-                    className={`${inputClass} text-slate-600`}
-                    value={caducidad}
-                    onChange={(e) => setCaducidad(e.target.value)}
-                  />
-                </div>
 
-                {/* Alert preview based on selected family */}
-                {familiaId &&
-                  caducidad &&
-                  (() => {
-                    const selectedFam = familias.find(
-                      (f) => f.id === familiaId,
-                    );
-                    if (!selectedFam) return null;
-                    const today = new Date();
-                    const expDate = new Date(caducidad);
-                    const daysRemaining = Math.ceil(
-                      (expDate.getTime() - today.getTime()) /
-                        (1000 * 60 * 60 * 24),
-                    );
-
-                    let levelColor = "emerald";
-                    let levelText = "OK — Verde";
-                    if (daysRemaining <= 0) {
-                      levelColor = "gray";
-                      levelText = "VENCIDO — Negro";
-                    } else if (
-                      daysRemaining <= selectedFam.umbralAmarilloDias
-                    ) {
-                      levelColor = "rose";
-                      levelText = `Urgente — Rojo (${daysRemaining} días)`;
-                    } else if (daysRemaining <= selectedFam.umbralVerdeDias) {
-                      levelColor = "amber";
-                      levelText = `Precaución — Amarillo (${daysRemaining} días)`;
-                    } else {
-                      levelText = `OK — Verde (${daysRemaining} días)`;
-                    }
-
-                    return (
-                      <div
-                        className={`mt-3 px-4 py-3 rounded-xl border ${daysRemaining <= 0 ? "bg-gray-900 border-gray-700" : `bg-${levelColor}-50 border-${levelColor}-200`}`}
-                      >
-                        <p
-                          className={`text-xs font-bold ${daysRemaining <= 0 ? "text-white" : `text-${levelColor}-700`}`}
-                        >
-                          ⚡ Aviso para "{selectedFam.nombre}": {levelText}
-                        </p>
-                        <p
-                          className={`text-[10px] mt-0.5 ${daysRemaining <= 0 ? "text-gray-400" : `text-${levelColor}-600`}`}
-                        >
-                          Umbrales: Verde &gt;{selectedFam.umbralVerdeDias}d |
-                          Amarillo &gt;{selectedFam.umbralAmarilloDias}d | Rojo
-                          ≤{selectedFam.umbralAmarilloDias}d
-                        </p>
-                      </div>
-                    );
-                  })()}
-              </div>
             </div>
 
             {/* ROW 2: Fotografía + Fiscal y Finanzas */}
@@ -696,8 +501,8 @@ const enhance = withObservables([], () => ({
     .get<FamiliaModel>("familias")
     .query()
     .observe(),
-  almacenes: database.collections
-    .get<AlmacenModel>("almacenes")
+  margenes: database.collections
+    .get<MargenModel>("margenes")
     .query()
     .observe(),
   impuestos: database.collections

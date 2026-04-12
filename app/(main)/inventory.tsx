@@ -1,6 +1,7 @@
 import withObservables from '@nozbe/with-observables';
 import { AlertTriangle, Clock, DollarSign, Download, Package, Plus, Search } from 'lucide-react';
 import React, { useState } from 'react';
+import AddEntry from '../../components/ui/modals/AddEntry';
 import AddInventory from '../../components/ui/modals/AddInventory';
 import ProductRow from '../../components/ui/ProductRow';
 import { database } from '../../src/services/DB/indexBD';
@@ -15,6 +16,7 @@ interface InventoryProps {
 function InventoryContent({ productos, familias }: InventoryProps) {
     const [searchTerm, setSearchTerm] = useState('');
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [isAddEntryOpen, setIsAddEntryOpen] = useState(false);
     const [filterFamilia, setFilterFamilia] = useState('');
 
     const handleDelete = async (producto: ProductoModel) => {
@@ -44,6 +46,9 @@ function InventoryContent({ productos, familias }: InventoryProps) {
                     <div className="flex gap-3">
                         <button className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg bg-white text-slate-700 hover:bg-slate-50 transition-colors font-medium text-sm shadow-sm">
                             <Download className="w-4 h-4" /><span>Exportar</span>
+                        </button>
+                        <button onClick={() => setIsAddEntryOpen(true)} className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg bg-white text-slate-700 hover:bg-slate-50 transition-colors font-medium text-sm shadow-sm">
+                            <Package className="w-4 h-4" /><span>Registrar Entrada</span>
                         </button>
                         <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm shadow-sm">
                             <Plus className="w-4 h-4" /><span>Nuevo Producto</span>
@@ -146,6 +151,7 @@ function InventoryContent({ productos, familias }: InventoryProps) {
                 </div>
 
                 <AddInventory isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+                <AddEntry isOpen={isAddEntryOpen} onClose={() => setIsAddEntryOpen(false)} />
             </div>
         </div>
     );
