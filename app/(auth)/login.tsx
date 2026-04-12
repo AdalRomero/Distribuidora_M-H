@@ -294,52 +294,76 @@ export default function Login() {
 
   const bgImage = isCaja ? `url(${imgPaquetes})` : `url(${imgPasteles})`;
 
-  const formThemeClass = isCaja
-    ? "bg-mist-300 border-mist-300/30 backdrop-blur-xl"
-    : "bg-[#cab6af]/95 border-[#cab6af]/30 backdrop-blur-xl";
+  /* ── Colores de acento según el negocio ── */
+  const accentColor = isCaja ? "#15335c" : "#be123c"; // blue-900-ish / rose-700
+  const accentRing = isCaja ? "rgba(21,51,92,0.25)" : "rgba(190,18,60,0.25)";
+  const accentBorder = isCaja ? "#3b82f6" : "#fb7185";
 
-  const whiteBorder =
-    "[text-shadow:_-1px_-1px_0_#fff,_1px_-1px_0_#fff,_-1px_1px_0_#fff,_1px_1px_0_#fff,_0_3px_6px_rgba(0,0,0,0.15)]";
+  const titleClass = isCaja
+    ? "text-4xl text-blue-900 font-sans tracking-tight"
+    : "text-5xl text-pink-800 font-cookie tracking-tight";
 
-  const titleClass = `${isCaja ? "text-4xl text-blue-900 font-sans tracking-tight" : "text-5xl text-pink-800 font-cookie tracking-tight"} ${whiteBorder}`;
-  const headingClass = `${isCaja ? "text-gray-900" : "text-rose-500"}`;
-  const labelClass = isCaja ? "text-gray-800" : "text-rose-900 font-medium";
-
-  const inputClass = `w-full pl-11 pr-4 py-3 mt-1 text-gray-900 bg-white/95 border rounded-xl shadow-sm outline-none transition-all duration-300 
-    ${
-      isCaja
-        ? "border-blue-200/50 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/20 placeholder:text-gray-400"
-        : "border-rose-200/50 focus:border-rose-400 focus:bg-white focus:ring-4 focus:ring-rose-400/20 placeholder:text-rose-300"
-    }`;
+  const headingClass = isCaja ? "text-gray-900" : "text-rose-500";
+  const labelClass = isCaja ? "text-gray-700" : "text-rose-900 font-medium";
 
   const iconColorClass = isCaja ? "text-blue-500" : "text-rose-400";
 
-  const submitButtonClass = `w-full py-3 px-4 mt-8 text-white font-medium text-lg rounded-xl shadow-lg transition-all duration-300 active:scale-[0.98] 
-    ${
-      isCaja
-        ? "bg-[#15335c] hover:bg-[#15335c]/80 focus:ring-4 focus:ring-[#15335c]/30"
-        : "bg-rose-400 hover:bg-rose-500 focus:ring-4 focus:ring-rose-500/30"
+  const inputClass = `w-full pl-11 pr-4 py-3.5 text-gray-900 bg-white border rounded-2xl outline-none transition-all duration-300
+    ${isCaja
+      ? "border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 placeholder:text-gray-400"
+      : "border-rose-200 focus:border-rose-400 focus:ring-4 focus:ring-rose-400/15 placeholder:text-rose-300"
     }`;
 
+  const submitButtonClass = `w-full py-3.5 px-4 text-white font-semibold text-base rounded-2xl shadow-lg transition-all duration-300 active:scale-[0.97]
+    ${isCaja
+      ? "bg-[#15335c] hover:bg-[#1c4278] focus:ring-4 focus:ring-[#15335c]/30"
+      : "bg-rose-500 hover:bg-rose-600 focus:ring-4 focus:ring-rose-500/30"
+    }`;
+
+  /* ── Gradient overlay del panel izquierdo ── */
+  const overlayGradient = isCaja
+    ? "from-blue-900/60 via-blue-900/30 to-transparent"
+    : "from-rose-900/60 via-rose-900/30 to-transparent";
+
   return (
-    <div
-      className={`flex min-h-screen w-full transition-all duration-700 ease-in-out ${isFormLeft ? "flex-row" : "flex-row-reverse"}`}
-    >
+    <div className="flex min-h-screen w-full bg-gray-100">
+      {/* ════════════════════════════════════════════
+          PANEL IZQUIERDO — Imagen + overlay
+         ════════════════════════════════════════════ */}
       <div
-        className={`relative z-10 w-full lg:w-[400px] xl:w-[450px] shrink-0 flex flex-col justify-center px-8 sm:px-12 py-8 shadow-2xl transition-colors duration-500 ${formThemeClass}`}
+        className={`hidden lg:flex flex-1 relative bg-cover bg-center transition-all duration-700 ease-in-out ${isFormLeft ? "order-first" : "order-last"
+          }`}
+        style={{ backgroundImage: bgImage }}
       >
+        {/* Gradient overlay */}
+        <div
+          className={`absolute inset-0 bg-gradient-to-r ${overlayGradient} transition-all duration-700`}
+        />
+
+        {/* Decorative content on the image side */}
+        <div className="relative z-10 flex flex-col justify-end p-12 pb-16 max-w-lg">
+          <h2 className="text-white text-4xl font-bold leading-tight drop-shadow-lg">
+            {isCaja ? "DISTRIBUIDORA M-H" : "La Tiendita del Repostero"}
+          </h2>
+          <p className="text-white/80 mt-4 text-lg leading-relaxed drop-shadow">
+            {isCaja
+              ? "Sistema de gestión integral para tu distribuidora."
+              : "Administra pedidos, clientes y más en un solo lugar."}
+          </p>
+        </div>
+
+        {/* Swap-side button */}
         <button
           type="button"
           onClick={() => setIsFormLeft(!isFormLeft)}
-          className="absolute top-6 right-6 z-20 p-2 rounded-full hover:bg-black/10 transition-colors text-gray-800"
+          className="absolute top-6 right-6 z-20 p-2.5 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-sm transition-colors text-white"
           title="Intercambiar vista"
         >
           <svg
-            className="w-6 h-6"
+            className="w-5 h-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
           >
             <path
               strokeLinecap="round"
@@ -349,168 +373,187 @@ export default function Login() {
             />
           </svg>
         </button>
-
-        <div className="text-center mb-8">
-          <h1 className={`font-bold transition-all duration-300 ${titleClass}`}>
-            {isCaja ? "DISTRIBUIDORA M-H" : "La Tiendita del Repostero"}
-          </h1>
-          <h2
-            className={`text-2xl font-bold mt-1 transition-all duration-300 ${headingClass}`}
-          >
-            Iniciar Sesión
-          </h2>
-          <p
-            className={`mt-2 text-sm font-medium transition-colors duration-300 ${isCaja ? "text-gray-800" : "text-pink-900"}`}
-          >
-            Selecciona el área de trabajo
-          </p>
-        </div>
-
-        <div className="flex justify-center gap-10 mb-8 relative">
-          <button
-            type="button"
-            onClick={() => setBusinessType("caja")}
-            className={`relative flex items-center justify-center w-16 h-16 rounded-full border-2 transition-all duration-500 ease-out overflow-visible ${
-              isCaja
-                ? "bg-white border-blue-500 shadow-[0_8px_24px_-6px_rgba(59,130,246,0.6)] scale-110 z-10"
-                : "bg-white/40 border-white/50 shadow-sm hover:bg-white/70 hover:-translate-y-1 backdrop-blur-md"
-            }`}
-          >
-            <div
-              className={`w-8 h-8 transition-colors duration-500 ${isCaja ? "bg-blue-600" : "bg-gray-500/80 saturate-50"}`}
-              style={{
-                maskImage: `url(${logoCaja})`,
-                WebkitMaskImage: `url(${logoCaja})`,
-                maskSize: "contain",
-                WebkitMaskSize: "contain",
-                maskRepeat: "no-repeat",
-                WebkitMaskRepeat: "no-repeat",
-                maskPosition: "center",
-                WebkitMaskPosition: "center",
-              }}
-            />
-            {isCaja && (
-              <span className="absolute -top-2 -right-2 flex items-center justify-center w-6 h-6 bg-green-500 text-white rounded-full text-xs shadow-md border-2 border-white">
-                ✓
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setBusinessType("pastel")}
-            className={`relative flex items-center justify-center w-16 h-16 rounded-full border-2 transition-all duration-500 ease-out overflow-visible ${
-              !isCaja
-                ? "bg-white border-rose-500 shadow-[0_8px_24px_-6px_rgba(244,63,94,0.6)] scale-110 z-10"
-                : "bg-white/40 border-white/50 shadow-sm hover:bg-white/70 hover:-translate-y-1 backdrop-blur-md"
-            }`}
-          >
-            <div
-              className={`w-9 h-9 transition-colors duration-500 ${!isCaja ? "bg-rose-500" : "bg-gray-500/80 saturate-50"}`}
-              style={{
-                maskImage: `url(${logoPastel})`,
-                WebkitMaskImage: `url(${logoPastel})`,
-                maskSize: "contain",
-                WebkitMaskSize: "contain",
-                maskRepeat: "no-repeat",
-                WebkitMaskRepeat: "no-repeat",
-                maskPosition: "center",
-                WebkitMaskPosition: "center",
-              }}
-            />
-            {!isCaja && (
-              <span className="absolute -top-2 -right-2 flex items-center justify-center w-6 h-6 bg-green-500 text-white rounded-full text-xs shadow-md border-2 border-white">
-                ✓
-              </span>
-            )}
-          </button>
-        </div>
-
-        {error && (
-          <div className="mb-4 p-3 rounded-md bg-red-100 border border-red-400 text-red-700 text-sm text-center font-medium">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label
-              htmlFor="username"
-              className={`block text-sm font-semibold mb-1 pointer-events-none transition-colors duration-300 ${labelClass}`}
-            >
-              Usuario
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <User
-                  className={`w-5 h-5 transition-colors duration-300 ${iconColorClass}`}
-                />
-              </div>
-              <input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className={inputClass}
-                required
-                placeholder="Ingresa tu usuario"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label
-              htmlFor="accessNumber"
-              className={`block text-sm font-semibold mb-1 pointer-events-none transition-colors duration-300 ${labelClass}`}
-            >
-              Contraseña
-            </label>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 left-0 pl-4 flex items-center z-20 hover:opacity-70 transition-opacity"
-                title={
-                  showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
-                }
-              >
-                {showPassword ? (
-                  <Unlock
-                    className={`w-5 h-5 transition-colors duration-300 ${iconColorClass}`}
-                  />
-                ) : (
-                  <Lock
-                    className={`w-5 h-5 transition-colors duration-300 ${iconColorClass}`}
-                  />
-                )}
-              </button>
-              <input
-                id="accessNumber"
-                type={showPassword ? "text" : "password"}
-                value={accessNumber}
-                onChange={(e) => setAccessNumber(e.target.value)}
-                className={inputClass}
-                required
-                placeholder="Ingresa tu contraseña"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className={submitButtonClass}
-          >
-            {loading ? "Cargando..." : "Ingresar"}
-          </button>
-        </form>
       </div>
 
+      {/* ════════════════════════════════════════════
+          PANEL DERECHO — Formulario sobre card blanco
+         ════════════════════════════════════════════ */}
       <div
-        className="hidden lg:block flex-1 relative bg-cover bg-center transition-all duration-700 ease-in-out"
-        style={{ backgroundImage: bgImage }}
+        className={`w-full lg:w-[520px] xl:w-[560px] shrink-0 flex items-center justify-center px-6 sm:px-10 py-10 transition-all duration-500 ${isFormLeft ? "order-last" : "order-first"
+          }`}
+        style={{
+          background: isCaja
+            ? "linear-gradient(135deg, #e8f0fe 0%, #f0f4f8 50%, #e2ecf5 100%)"
+            : "linear-gradient(135deg, #fce4ec 0%, #fdf2f8 50%, #fce4ec 100%)",
+        }}
       >
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-md transition-all duration-700"></div>
+        <div className="w-full max-w-[420px]">
+          {/* ── Logo / Business selector ── */}
+          <div className="flex justify-center gap-8 mb-6">
+            <button
+              type="button"
+              onClick={() => setBusinessType("caja")}
+              className={`relative flex items-center justify-center w-16 h-16 rounded-2xl border-2 transition-all duration-500 ease-out overflow-visible ${isCaja
+                  ? "bg-white border-blue-500 shadow-[0_8px_24px_-6px_rgba(59,130,246,0.5)] scale-110 z-10"
+                  : "bg-white/60 border-gray-200 shadow-sm hover:bg-white hover:-translate-y-0.5"
+                }`}
+            >
+              <div
+                className={`w-8 h-8 transition-colors duration-500 ${isCaja ? "bg-blue-600" : "bg-gray-400"}`}
+                style={{
+                  maskImage: `url(${logoCaja})`,
+                  WebkitMaskImage: `url(${logoCaja})`,
+                  maskSize: "contain",
+                  WebkitMaskSize: "contain",
+                  maskRepeat: "no-repeat",
+                  WebkitMaskRepeat: "no-repeat",
+                  maskPosition: "center",
+                  WebkitMaskPosition: "center",
+                }}
+              />
+              {isCaja && (
+                <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-5 h-5 bg-green-500 text-white rounded-full text-[10px] shadow-md border-2 border-white">
+                  ✓
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setBusinessType("pastel")}
+              className={`relative flex items-center justify-center w-16 h-16 rounded-2xl border-2 transition-all duration-500 ease-out overflow-visible ${!isCaja
+                  ? "bg-white border-rose-500 shadow-[0_8px_24px_-6px_rgba(244,63,94,0.5)] scale-110 z-10"
+                  : "bg-white/60 border-gray-200 shadow-sm hover:bg-white hover:-translate-y-0.5"
+                }`}
+            >
+              <div
+                className={`w-9 h-9 transition-colors duration-500 ${!isCaja ? "bg-rose-500" : "bg-gray-400"}`}
+                style={{
+                  maskImage: `url(${logoPastel})`,
+                  WebkitMaskImage: `url(${logoPastel})`,
+                  maskSize: "contain",
+                  WebkitMaskSize: "contain",
+                  maskRepeat: "no-repeat",
+                  WebkitMaskRepeat: "no-repeat",
+                  maskPosition: "center",
+                  WebkitMaskPosition: "center",
+                }}
+              />
+              {!isCaja && (
+                <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-5 h-5 bg-green-500 text-white rounded-full text-[10px] shadow-md border-2 border-white">
+                  ✓
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* ── Heading ── */}
+          <div className="text-center mb-8">
+            <h1
+              className={`font-bold transition-all duration-300 ${titleClass}`}
+            >
+              {isCaja ? "DISTRIBUIDORA M-H" : "La Tiendita del Repostero"}
+            </h1>
+            <h2
+              className={`text-3xl font-extrabold mt-2 transition-all duration-300 ${headingClass}`}
+            >
+              Iniciar Sesión
+            </h2>
+            <p
+              className={`mt-2 text-sm font-medium transition-colors duration-300 ${isCaja ? "text-gray-500" : "text-pink-700"}`}
+            >
+              Selecciona el área de trabajo
+            </p>
+          </div>
+
+          {/* ── White card ── */}
+          <div className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100">
+            {/* Error banner */}
+            {error && (
+              <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm text-center font-medium">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* ── Usuario ── */}
+              <div>
+                <label
+                  htmlFor="username"
+                  className={`block text-sm font-semibold mb-1.5 pointer-events-none transition-colors duration-300 ${labelClass}`}
+                >
+                  Usuario
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <User
+                      className={`w-5 h-5 transition-colors duration-300 ${iconColorClass}`}
+                    />
+                  </div>
+                  <input
+                    id="username"
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className={inputClass}
+                    required
+                    placeholder="Ingresa tu usuario"
+                  />
+                </div>
+              </div>
+
+              {/* ── Contraseña ── */}
+              <div>
+                <label
+                  htmlFor="accessNumber"
+                  className={`block text-sm font-semibold mb-1.5 pointer-events-none transition-colors duration-300 ${labelClass}`}
+                >
+                  Contraseña
+                </label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 left-0 pl-4 flex items-center z-20 hover:opacity-70 transition-opacity"
+                    title={
+                      showPassword
+                        ? "Ocultar contraseña"
+                        : "Mostrar contraseña"
+                    }
+                  >
+                    {showPassword ? (
+                      <Unlock
+                        className={`w-5 h-5 transition-colors duration-300 ${iconColorClass}`}
+                      />
+                    ) : (
+                      <Lock
+                        className={`w-5 h-5 transition-colors duration-300 ${iconColorClass}`}
+                      />
+                    )}
+                  </button>
+                  <input
+                    id="accessNumber"
+                    type={showPassword ? "text" : "password"}
+                    value={accessNumber}
+                    onChange={(e) => setAccessNumber(e.target.value)}
+                    className={inputClass}
+                    required
+                    placeholder="Ingresa tu contraseña"
+                  />
+                </div>
+              </div>
+
+              {/* ── Submit ── */}
+              <button
+                type="submit"
+                disabled={loading}
+                className={submitButtonClass}
+              >
+                {loading ? "Cargando..." : "Ingresar"}
+              </button>
+            </form>
+          </div>
+        </div>
       </div>
     </div>
   );
