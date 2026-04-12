@@ -1,3 +1,4 @@
+import { Q } from '@nozbe/watermelondb';
 import withObservables from '@nozbe/with-observables';
 import { AlertTriangle, Clock, DollarSign, Download, Package, Plus, Search } from 'lucide-react';
 import React, { useState } from 'react';
@@ -7,6 +8,7 @@ import ProductRow from '../../components/ui/ProductRow';
 import { database } from '../../src/services/DB/indexBD';
 import FamiliaModel from '../../src/services/DB/models/bases/familia';
 import ProductoModel from '../../src/services/DB/models/catalogo/producto';
+import { syncApp } from '../../src/sync';
 
 interface InventoryProps {
     productos: ProductoModel[];
@@ -20,10 +22,13 @@ function InventoryContent({ productos, familias }: InventoryProps) {
     const [filterFamilia, setFilterFamilia] = useState('');
 
     const handleDelete = async (producto: ProductoModel) => {
-        if (window.confirm('¿Seguro que deseas eliminar este producto?')) {
+        if (window.confirm('¿Seguro que deseas desactivar este producto? Podrás reactivarlo después.')) {
             await database.write(async () => {
-                await producto.markAsDeleted();
+                await producto.update((p) => {
+                    p.estado = false;
+                });
             });
+            syncApp().catch(console.error);
         }
     };
 
@@ -158,6 +163,8 @@ function InventoryContent({ productos, familias }: InventoryProps) {
 }
 
 export default withObservables([], () => ({
-    productos: database.collections.get<ProductoModel>('productos').query().observe(),
+    productos: database.collections.get<ProductoModel>('productos').query(
+        Q.where('estado', true)
+    ).observe(),
     familias: database.collections.get<FamiliaModel>('familias').query().observe(),
 }))(InventoryContent);

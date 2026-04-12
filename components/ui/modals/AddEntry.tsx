@@ -1,12 +1,25 @@
 import { Q } from "@nozbe/watermelondb";
 import withObservables from "@nozbe/with-observables";
-import { AlertTriangle, Calendar, Info, Package, DollarSign, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Barcode,
+  Calendar,
+  DollarSign,
+  Package,
+  TrendingUp,
+  X,
+} from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { database } from "../../../src/services/DB/indexBD";
+import { syncApp } from "../../../src/sync";
 import AlmacenModel from "../../../src/services/DB/models/bases/almacen";
 import FamiliaModel from "../../../src/services/DB/models/bases/familia";
+import ImpuestoModel from "../../../src/services/DB/models/bases/impuesto";
+import MargenModel from "../../../src/services/DB/models/bases/margen";
+import CodigoAlterno from "../../../src/services/DB/models/catalogo/codigoAlterno";
 import Lote from "../../../src/services/DB/models/catalogo/lote";
 import Producto from "../../../src/services/DB/models/catalogo/producto";
+import ProductoImpuesto from "../../../src/services/DB/models/catalogo/productoImpuesto";
 import MovimientoInventario from "../../../src/services/DB/models/registros/movimientoInventario";
 
 interface AddEntryInnerProps {
@@ -15,6 +28,8 @@ interface AddEntryInnerProps {
   productos: Producto[];
   almacenes: AlmacenModel[];
   familias: FamiliaModel[];
+  margenes: MargenModel[];
+  impuestos: ImpuestoModel[];
 }
 
 function AddEntryInner({
@@ -23,6 +38,8 @@ function AddEntryInner({
   productos,
   almacenes,
   familias,
+  margenes,
+  impuestos,
 }: AddEntryInnerProps) {
   const [productoId, setProductoId] = useState("");
   const [almacenId, setAlmacenId] = useState("");
@@ -31,24 +48,35 @@ function AddEntryInner({
   const [costo, setCosto] = useState("");
   const [unidad, setUnidad] = useState("pzas");
   const [caducidad, setCaducidad] = useState("");
+  const [codigoAlterno, setCodigoAlterno] = useState("");
 
   const [ultimoCosto, setUltimoCosto] = useState<number | null>(null);
+  const [productoMargen, setProductoMargen] = useState<MargenModel | null>(
+    null,
+  );
+  const [productoImpuestosTasas, setProductoImpuestosTasas] = useState<
+    ImpuestoModel[]
+  >([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Cada que cambia el producto, calculamos el último costo de lote
+  // Cada que cambia el producto, calculamos el último costo + margen + impuestos
   useEffect(() => {
     if (!productoId) {
       setUltimoCosto(null);
+      setProductoMargen(null);
+      setProductoImpuestosTasas([]);
       return;
     }
-    const fetchLatestCosto = async () => {
+
+    const fetchProductoData = async () => {
       try {
+        // 1. Fetch last lote cost
         const result = await database.collections
           .get<Lote>("lotes")
           .query(
             Q.where("producto_id", productoId),
             Q.sortBy("created_at", Q.desc),
-            Q.take(1)
+            Q.take(1),
           )
           .fetch();
         if (result && result.length > 0) {
@@ -56,12 +84,37 @@ function AddEntryInner({
         } else {
           setUltimoCosto(null);
         }
+
+        // 2. Fetch margen assigned to product
+        const producto = productos.find((p) => p.id === productoId);
+        if (producto) {
+          const rawMargenId = (producto as any)._raw?.margen_id;
+          if (rawMargenId) {
+            const margenObj = margenes.find((m) => m.id === rawMargenId);
+            setProductoMargen(margenObj || null);
+          } else {
+            setProductoMargen(null);
+          }
+        }
+
+        // 3. Fetch impuestos assigned to product
+        const piRecords = await database.collections
+          .get<ProductoImpuesto>("producto_impuestos")
+          .query(Q.where("producto_id", productoId))
+          .fetch();
+        const impIds = piRecords.map(
+          (pi) => (pi as any)._raw.impuesto_id as string,
+        );
+        const impuestosDelProducto = impuestos.filter((imp) =>
+          impIds.includes(imp.id),
+        );
+        setProductoImpuestosTasas(impuestosDelProducto);
       } catch (error) {
-        console.warn("No se pudo obtener el último lote", error);
+        console.warn("No se pudo obtener datos del producto", error);
       }
     };
-    fetchLatestCosto();
-  }, [productoId]);
+    fetchProductoData();
+  }, [productoId, margenes, impuestos, productos]);
 
   if (!isOpen) return null;
 
@@ -78,7 +131,10 @@ function AddEntryInner({
     setCosto("");
     setUnidad("pzas");
     setCaducidad("");
+    setCodigoAlterno("");
     setUltimoCosto(null);
+    setProductoMargen(null);
+    setProductoImpuestosTasas([]);
   };
 
   const handleSave = async () => {
@@ -112,7 +168,20 @@ function AddEntryInner({
             mi.tipo = "ENTRADA_COMPRA";
             mi.cantidad = parseInt(cantidad, 10);
           });
+
+        // 3. Create CodigoAlterno if provided
+        if (codigoAlterno.trim()) {
+          await database
+            .get<CodigoAlterno>("codigos_alternos")
+            .create((ca) => {
+              (ca as any)._raw.producto_id = productoId;
+              ca.codigoBarras = codigoAlterno.trim();
+            });
+        }
       });
+
+      // Sync to Supabase
+      syncApp().catch(console.error);
 
       setIsSaving(false);
       resetForm();
@@ -124,17 +193,39 @@ function AddEntryInner({
     }
   };
 
-  // Validación de advertencia de cambio de costo
+  // ── Validación de advertencia de cambio de costo ──
   const calcularDiferenciaCosto = () => {
     if (!costo || ultimoCosto === null || ultimoCosto === 0) return null;
     const current = parseFloat(costo);
     const diff = current - ultimoCosto;
     const perc = (diff / ultimoCosto) * 100;
-    return perc; // Puede ser negativo si bajó
+    return perc;
   };
 
   const diffPerc = calcularDiferenciaCosto();
   const showCostoAlerta = diffPerc !== null && Math.abs(diffPerc) >= 10;
+
+  // ── Calculadora de Lote ──
+  const costoNum = parseFloat(costo) || 0;
+  const cantidadNum = parseInt(cantidad, 10) || 0;
+  const margenPorcentaje = productoMargen?.porcentaje || 0;
+  const totalImpuestoPorcentaje = productoImpuestosTasas.reduce(
+    (sum, imp) => sum + imp.tasa,
+    0,
+  );
+
+  const precioBaseConMargen =
+    costoNum > 0 ? costoNum * (1 + margenPorcentaje / 100) : 0;
+  const precioFinalUnitario =
+    precioBaseConMargen > 0
+      ? precioBaseConMargen * (1 + totalImpuestoPorcentaje / 100)
+      : 0;
+  const utilidadPorUnidad = precioBaseConMargen - costoNum;
+  const utilidadTotalLote = utilidadPorUnidad * cantidadNum;
+  const inversionTotalLote = costoNum * cantidadNum;
+
+  const showCalculadoraLote =
+    costoNum > 0 && margenPorcentaje > 0 && cantidadNum > 0;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
@@ -143,7 +234,6 @@ function AddEntryInner({
         onClick={onClose}
       ></div>
       <div className="relative z-10 bg-slate-50 w-full max-w-4xl max-h-[95vh] flex flex-col rounded-3xl shadow-2xl overflow-hidden">
-        
         {/* Header */}
         <div className="bg-white px-8 py-5 flex items-center justify-between border-b border-slate-100 shrink-0">
           <div>
@@ -167,14 +257,15 @@ function AddEntryInner({
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
           <form className="flex flex-col gap-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
-              
               {/* Sección Principal */}
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5 flex flex-col">
                 <div className="flex items-center gap-2 mb-4 border-b border-slate-50 pb-3">
                   <Package className="w-5 h-5 text-blue-600" />
-                  <h3 className="text-base font-bold text-slate-700">Identificación</h3>
+                  <h3 className="text-base font-bold text-slate-700">
+                    Identificación
+                  </h3>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">
                     Producto *
@@ -242,44 +333,76 @@ function AddEntryInner({
                   </div>
                 </div>
 
-                {productoId && caducidad && (() => {
-                  const prod = productos.find(p => p.id === productoId);
-                  const fam = prod ? familias.find(f => f.id === (prod as any).familiaId) : null;
-                  if (!fam) return null;
-                  const today = new Date();
-                  const expDate = new Date(caducidad);
-                  const daysRemaining = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                  let levelColor = "emerald";
-                  let levelText = "OK — Verde";
-                  if (daysRemaining <= 0) {
-                    levelColor = "gray";
-                    levelText = "VENCIDO — Negro";
-                  } else if (daysRemaining <= fam.umbralAmarilloDias) {
-                    levelColor = "rose";
-                    levelText = `Urgente — Rojo (${daysRemaining} días)`;
-                  } else if (daysRemaining <= fam.umbralVerdeDias) {
-                    levelColor = "amber";
-                    levelText = `Precaución — Amarillo (${daysRemaining} días)`;
-                  } else {
-                    levelText = `OK — Verde (${daysRemaining} días)`;
-                  }
+                {/* Código Alterno */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5 flex items-center gap-2">
+                    <Barcode className="w-4 h-4 text-indigo-500" />
+                    Código Alterno (Barras)
+                  </label>
+                  <input
+                    type="text"
+                    className={inputClass}
+                    placeholder="Ej. 7501234567890"
+                    value={codigoAlterno}
+                    onChange={(e) => setCodigoAlterno(e.target.value)}
+                  />
+                  <p className="text-xs text-slate-400 mt-1">
+                    Código del proveedor o de barras para este lote
+                  </p>
+                </div>
 
-                  return (
-                    <div className={`mt-2 px-4 py-3 rounded-xl border ${daysRemaining <= 0 ? "bg-gray-900 border-gray-700" : `bg-${levelColor}-50 border-${levelColor}-200`}`}>
-                      <p className={`text-xs font-bold ${daysRemaining <= 0 ? "text-white" : `text-${levelColor}-700`}`}>
-                        ⚡ Aviso Caducidad: {levelText}
-                      </p>
-                    </div>
-                  );
-                })()}
+                {productoId &&
+                  caducidad &&
+                  (() => {
+                    const prod = productos.find((p) => p.id === productoId);
+                    const fam = prod
+                      ? familias.find(
+                          (f) => f.id === (prod as any)._raw?.familia_id,
+                        )
+                      : null;
+                    if (!fam) return null;
+                    const today = new Date();
+                    const expDate = new Date(caducidad);
+                    const daysRemaining = Math.ceil(
+                      (expDate.getTime() - today.getTime()) /
+                        (1000 * 60 * 60 * 24),
+                    );
+                    let levelColor = "emerald";
+                    let levelText = "OK — Verde";
+                    if (daysRemaining <= 0) {
+                      levelColor = "gray";
+                      levelText = "VENCIDO — Negro";
+                    } else if (daysRemaining <= fam.umbralAmarilloDias) {
+                      levelColor = "rose";
+                      levelText = `Urgente — Rojo (${daysRemaining} días)`;
+                    } else if (daysRemaining <= fam.umbralVerdeDias) {
+                      levelColor = "amber";
+                      levelText = `Precaución — Amarillo (${daysRemaining} días)`;
+                    } else {
+                      levelText = `OK — Verde (${daysRemaining} días)`;
+                    }
 
+                    return (
+                      <div
+                        className={`mt-2 px-4 py-3 rounded-xl border ${daysRemaining <= 0 ? "bg-gray-900 border-gray-700" : `bg-${levelColor}-50 border-${levelColor}-200`}`}
+                      >
+                        <p
+                          className={`text-xs font-bold ${daysRemaining <= 0 ? "text-white" : `text-${levelColor}-700`}`}
+                        >
+                          ⚡ Aviso Caducidad: {levelText}
+                        </p>
+                      </div>
+                    );
+                  })()}
               </div>
 
               {/* Operación y Costo */}
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5 flex flex-col">
                 <div className="flex items-center gap-2 mb-4 border-b border-slate-50 pb-3">
                   <DollarSign className="w-5 h-5 text-emerald-500" />
-                  <h3 className="text-base font-bold text-slate-700">Cantidades y Costo</h3>
+                  <h3 className="text-base font-bold text-slate-700">
+                    Cantidades y Costo
+                  </h3>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -335,7 +458,10 @@ function AddEntryInner({
                   </div>
                   {ultimoCosto !== null && (
                     <p className="text-xs text-slate-500 mt-1">
-                      Último costo registrado: <span className="font-semibold">${ultimoCosto.toFixed(2)}</span>
+                      Último costo registrado:{" "}
+                      <span className="font-semibold">
+                        ${ultimoCosto.toFixed(2)}
+                      </span>
                     </p>
                   )}
                 </div>
@@ -344,16 +470,115 @@ function AddEntryInner({
                   <div className="mt-2 flex items-start gap-3 px-4 py-3 bg-amber-50 rounded-xl border border-amber-200">
                     <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm font-bold text-amber-700">Alerta de Variación de Costo</p>
+                      <p className="text-sm font-bold text-amber-700">
+                        Alerta de Variación de Costo
+                      </p>
                       <p className="text-xs text-amber-600 mt-1">
-                        El costo ingresado (${costo}) difiere en un <span className="font-semibold">{Math.abs(diffPerc).toFixed(2)}%</span> del último costo registrado (${ultimoCosto?.toFixed(2)}). Verifica tu información de precios.
+                        El costo ingresado (${costo}) difiere en un{" "}
+                        <span className="font-semibold">
+                          {Math.abs(diffPerc!).toFixed(2)}%
+                        </span>{" "}
+                        del último costo registrado ($
+                        {ultimoCosto?.toFixed(2)}). Verifica tu información.
                       </p>
                     </div>
                   </div>
                 )}
-                
+
+                {/* Info del Margen asignado al producto */}
+                {productoId && (
+                  <div className="mt-1 px-4 py-3 bg-slate-50 rounded-xl border border-slate-200">
+                    <p className="text-xs text-slate-500">
+                      Margen asignado:{" "}
+                      <span className="font-bold text-slate-700">
+                        {productoMargen
+                          ? `${productoMargen.nombre} (${productoMargen.porcentaje}%)`
+                          : "Sin margen"}
+                      </span>
+                    </p>
+                    {productoImpuestosTasas.length > 0 && (
+                      <p className="text-xs text-slate-500 mt-1">
+                        Impuestos:{" "}
+                        <span className="font-bold text-slate-700">
+                          {productoImpuestosTasas
+                            .map((imp) => `${imp.nombre} (${imp.tasa}%)`)
+                            .join(", ")}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
+
+            {/* Calculadora de Lote (full width, below both columns) */}
+            {showCalculadoraLote && (
+              <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-2xl border border-indigo-200 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <TrendingUp className="w-5 h-5 text-indigo-600" />
+                  <h4 className="text-sm font-bold text-indigo-800">
+                    Proyección Financiera del Lote
+                  </h4>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div className="bg-white/80 rounded-xl p-4 text-center">
+                    <p className="text-xs text-slate-500 mb-1">
+                      Inversión Total
+                    </p>
+                    <p className="text-lg font-bold text-slate-800">
+                      ${inversionTotalLote.toFixed(2)}
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      {cantidadNum} × ${costoNum.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="bg-white/80 rounded-xl p-4 text-center">
+                    <p className="text-xs text-slate-500 mb-1">
+                      Utilidad x Unidad
+                    </p>
+                    <p className="text-lg font-bold text-emerald-700">
+                      ${utilidadPorUnidad.toFixed(2)}
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      Margen {margenPorcentaje}%
+                    </p>
+                  </div>
+                  <div className="bg-white/80 rounded-xl p-4 text-center">
+                    <p className="text-xs text-slate-500 mb-1">
+                      Precio Público
+                    </p>
+                    <p className="text-lg font-bold text-blue-700">
+                      ${precioFinalUnitario.toFixed(2)}
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      c/impuestos ({totalImpuestoPorcentaje}%)
+                    </p>
+                  </div>
+                  <div className="bg-white/80 rounded-xl p-4 text-center">
+                    <p className="text-xs text-slate-500 mb-1">
+                      Utilidad del Lote
+                    </p>
+                    <p className="text-lg font-bold text-emerald-700">
+                      ${utilidadTotalLote.toFixed(2)}
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      {cantidadNum} × ${utilidadPorUnidad.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="bg-indigo-600 rounded-xl p-4 text-center">
+                    <p className="text-xs text-indigo-100 mb-1">
+                      Ingreso Esperado
+                    </p>
+                    <p className="text-xl font-extrabold text-white">
+                      ${(precioFinalUnitario * cantidadNum).toFixed(2)}
+                    </p>
+                    <p className="text-[10px] text-indigo-200">
+                      Total del lote
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </form>
         </div>
 
@@ -376,16 +601,32 @@ function AddEntryInner({
             {isSaving ? "Guardando..." : "Registrar Entrada"}
           </button>
         </div>
-
       </div>
     </div>
   );
 }
 
 const enhance = withObservables([], () => ({
-  productos: database.collections.get<Producto>("productos").query().observe(),
-  almacenes: database.collections.get<AlmacenModel>("almacenes").query().observe(),
-  familias: database.collections.get<FamiliaModel>("familias").query().observe(),
+  productos: database.collections
+    .get<Producto>("productos")
+    .query()
+    .observe(),
+  almacenes: database.collections
+    .get<AlmacenModel>("almacenes")
+    .query()
+    .observe(),
+  familias: database.collections
+    .get<FamiliaModel>("familias")
+    .query()
+    .observe(),
+  margenes: database.collections
+    .get<MargenModel>("margenes")
+    .query()
+    .observe(),
+  impuestos: database.collections
+    .get<ImpuestoModel>("impuestos")
+    .query()
+    .observe(),
 }));
 
 const AddEntry = enhance(AddEntryInner);

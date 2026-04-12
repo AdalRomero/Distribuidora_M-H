@@ -3,19 +3,19 @@ import withObservables from "@nozbe/with-observables";
 import { decode } from "base64-arraybuffer";
 import * as ImagePicker from "expo-image-picker";
 import {
-    Calendar,
     Camera,
     DollarSign,
     ImagesIcon,
     Info,
-    Package,
+    Tag,
+    TrendingUp,
     X,
 } from "lucide-react";
 import React, { useState } from "react";
 import { Alert, Platform } from "react-native";
 import { supabase } from "../../../src/services/api/supabaseClient";
+import { syncApp } from "../../../src/sync";
 import { database } from "../../../src/services/DB/indexBD";
-import AlmacenModel from "../../../src/services/DB/models/bases/almacen";
 import FamiliaModel from "../../../src/services/DB/models/bases/familia";
 import ImpuestoModel from "../../../src/services/DB/models/bases/impuesto";
 import MargenModel from "../../../src/services/DB/models/bases/margen";
@@ -40,11 +40,15 @@ function AddInventoryInner({
   const [nombre, setNombre] = useState("");
   const [familiaId, setFamiliaId] = useState("");
   const [codigoInterno, setCodigoInterno] = useState("");
-  const [codigoAlterno, setCodigoAlterno] = useState("");
-  const [margen, setMargen] = useState("");
+  const [margenId, setMargenId] = useState("");
   const [costoPromedio, setCostoPromedio] = useState("");
   const [sat, setSat] = useState("");
   const [selectedImpuestos, setSelectedImpuestos] = useState<string[]>([]);
+
+  // Precios editables — inicialmente vacíos hasta que el usuario los defina
+  const [precioListaManual, setPrecioListaManual] = useState("");
+  const [precioMayoreoManual, setPrecioMayoreoManual] = useState("");
+  const [precioMenudeoManual, setPrecioMenudeoManual] = useState("");
 
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
@@ -68,12 +72,10 @@ function AddInventoryInner({
     try {
       const familia = familias.find((f) => f.id === selectedFamiliaId);
       if (!familia) return;
-      // Count existing products in this family
       const productosEnFamilia = await database.collections
         .get<Producto>("productos")
         .query(Q.where("familia_id", selectedFamiliaId))
         .fetchCount();
-      // Format: 2-digit family code + 3-digit sequential (e.g., 01021)
       const codigoFam = familia.codigoFamilia.padStart(2, "0");
       const siguiente = String(productosEnFamilia + 1).padStart(3, "0");
       setCodigoInterno(`${codigoFam}${siguiente}`);
@@ -86,6 +88,30 @@ function AddInventoryInner({
     setSelectedImpuestos((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
+  };
+
+  // ── Calculadora Fiscal (solo referencia) ──
+  const selectedMargenObj = margenes.find((m) => m.id === margenId);
+  const costoNum = parseFloat(costoPromedio) || 0;
+  const margenPorcentaje = selectedMargenObj?.porcentaje || 0;
+  const impuestosTasas = selectedImpuestos
+    .map((id) => impuestos.find((i) => i.id === id))
+    .filter(Boolean) as ImpuestoModel[];
+  const totalImpuestoPorcentaje = impuestosTasas.reduce(
+    (sum, imp) => sum + imp.tasa, 0,
+  );
+  const precioBaseConMargen = costoNum > 0 ? costoNum * (1 + margenPorcentaje / 100) : 0;
+  const precioSugerido = precioBaseConMargen > 0
+    ? precioBaseConMargen * (1 + totalImpuestoPorcentaje / 100) : 0;
+  const utilidadBruta = precioBaseConMargen - costoNum;
+  const showCalculadora = costoNum > 0 && margenPorcentaje > 0;
+
+  // Botón para aplicar precio sugerido a los 3 campos
+  const aplicarPrecioSugerido = () => {
+    const sugerido = precioSugerido.toFixed(2);
+    setPrecioListaManual(sugerido);
+    setPrecioMayoreoManual(sugerido);
+    setPrecioMenudeoManual(sugerido);
   };
 
   const chooseImageSource = () => {
@@ -143,11 +169,13 @@ function AddInventoryInner({
     setNombre("");
     setFamiliaId("");
     setCodigoInterno("");
-    setCodigoAlterno("");
-    setMargen("");
+    setMargenId("");
     setCostoPromedio("");
     setSat("");
     setSelectedImpuestos([]);
+    setPrecioListaManual("");
+    setPrecioMayoreoManual("");
+    setPrecioMenudeoManual("");
     setImageUri(null);
     setImageBase64(null);
   };
@@ -160,6 +188,17 @@ function AddInventoryInner({
         );
         return;
       }
+
+      // Usar los precios manuales que definió el usuario
+      const pLista = parseFloat(precioListaManual) || 0;
+      const pMayoreo = parseFloat(precioMayoreoManual) || 0;
+      const pMenudeo = parseFloat(precioMenudeoManual) || 0;
+
+      if (pLista <= 0) {
+        alert("Define al menos el Precio de Lista.");
+        return;
+      }
+
       setIsUploading(true);
       let publicUrl = null;
 
@@ -182,9 +221,7 @@ function AddInventoryInner({
 
       // Create all records in a single batch
       await database.write(async () => {
-        const precio = parseFloat(costoPromedio) || 0;
-
-        // 1. Create Producto
+        // 1. Create Producto with user-defined prices
         const nuevoProducto = await database
           .get<Producto>("productos")
           .create((p) => {
@@ -193,11 +230,14 @@ function AddInventoryInner({
             if (familiaId) {
               (p as any)._raw.familia_id = familiaId;
             }
+            if (margenId) {
+              (p as any)._raw.margen_id = margenId;
+            }
             p.estado = true;
             if (publicUrl) p.imagen = publicUrl;
-            p.precioLista = precio;
-            p.precioMayoreo = precio;
-            p.precioMenudeo = precio;
+            p.precioLista = pLista;
+            p.precioMayoreo = pMayoreo || pLista;
+            p.precioMenudeo = pMenudeo || pLista;
           });
 
         // 2. Create ProductoImpuesto junction records
@@ -210,6 +250,9 @@ function AddInventoryInner({
             });
         }
       });
+
+      // Sync to Supabase
+      syncApp().catch(console.error);
 
       setIsUploading(false);
       resetForm();
@@ -235,7 +278,7 @@ function AddInventoryInner({
               Agregar Nuevo Producto
             </h2>
             <p className="text-sm text-slate-500 mt-1">
-              Completa los datos para registrar un elemento en el stock
+              Define la identidad del producto en el catálogo
             </p>
           </div>
           <button
@@ -250,11 +293,11 @@ function AddInventoryInner({
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
           <form className="flex flex-col gap-8">
-            {/* ROW 1: Información General + Inventario y Lotes */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
-              {/* Información General */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5 flex flex-col">
-                <div className="flex items-center gap-2 mb-4 border-b border-slate-50 pb-3">
+            {/* ROW 1: Información General + Fotografía */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-stretch">
+              {/* Información General — 3 columns */}
+              <div className="lg:col-span-3 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5 flex flex-col">
+                <div className="flex items-center gap-2 mb-2 border-b border-slate-50 pb-3">
                   <Info className="w-5 h-5 text-blue-600" />
                   <h3 className="text-base font-bold text-slate-700">
                     Información General
@@ -304,62 +347,37 @@ function AddInventoryInner({
                       onChange={(e) => setCodigoInterno(e.target.value)}
                     />
                   </div>
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Código Alterno *
-                    </label>
-                    <input
-                      type="text"
-                      className={inputClass}
-                      placeholder="Ej. Codigo de Barras"
-                      value={codigoAlterno}
-                      onChange={(e) => setCodigoAlterno(e.target.value)}
-                    />
-                  </div>
                 </div>
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">
                     Categoría de Margen
                   </label>
-                  <div className="grid grid-cols-2 gap-3 mt-1">
+                  <select
+                    className={selectClass}
+                    value={margenId}
+                    onChange={(e) => setMargenId(e.target.value)}
+                  >
+                    <option value="">Sin margen asignado</option>
                     {margenes.filter(m => m.estado).map((m) => (
-                      <label
-                        key={m.id}
-                        className={`flex items-center gap-2 p-3 border rounded-xl cursor-pointer transition-colors ${margen === m.id ? "border-blue-500 bg-blue-50/50" : "border-slate-200 hover:bg-slate-50"}`}
-                      >
-                        <input
-                          type="radio"
-                          name="margen"
-                          value={m.id}
-                          checked={margen === m.id}
-                          onChange={(e) => setMargen(e.target.value)}
-                          className="text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-slate-600 font-medium">
-                          {m.nombre} ({m.porcentaje}%)
-                        </span>
-                      </label>
+                      <option key={m.id} value={m.id}>
+                        {m.nombre} ({m.porcentaje}%)
+                      </option>
                     ))}
-                  </div>
+                  </select>
                 </div>
               </div>
 
-
-            </div>
-
-            {/* ROW 2: Fotografía + Fiscal y Finanzas */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
-              {/* Fotografía */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
+              {/* Fotografía — 2 columns */}
+              <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
                 <div className="flex items-center gap-2 mb-4 border-b border-slate-50 pb-3">
                   <ImagesIcon className="w-5 h-5 text-teal-400" />
                   <h3 className="text-base font-bold text-slate-700">
-                    Fotografía del Producto
+                    Fotografía
                   </h3>
                 </div>
                 <div
                   onClick={chooseImageSource}
-                  className="border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:bg-slate-50 hover:border-blue-400 transition-all cursor-pointer group relative overflow-hidden flex-1"
+                  className="border-2 border-dashed border-slate-200 rounded-xl p-6 flex flex-col items-center justify-center text-center hover:bg-slate-50 hover:border-blue-400 transition-all cursor-pointer group relative overflow-hidden flex-1 min-h-[180px]"
                 >
                   {imageUri ? (
                     <img
@@ -373,7 +391,7 @@ function AddInventoryInner({
                         <Camera className="w-6 h-6" />
                       </div>
                       <p className="text-sm font-medium text-slate-700">
-                        Haz clic para tomar o subir imagen
+                        Haz clic para subir imagen
                       </p>
                       <p className="text-xs text-slate-400 mt-1">
                         PNG, JPG o WEBP (Max. 2MB)
@@ -394,76 +412,204 @@ function AddInventoryInner({
                   </button>
                 )}
               </div>
+            </div>
 
-              {/* Fiscal y Finanzas */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5 flex flex-col">
-                <div className="flex items-center gap-2 mb-4 border-b border-slate-50 pb-3">
-                  <DollarSign className="w-5 h-5 text-emerald-500" />
-                  <h3 className="text-base font-bold text-slate-700">
-                    Fiscal y Finanzas
-                  </h3>
+            {/* ROW 2: Fiscal y Finanzas (full width) */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5">
+              <div className="flex items-center gap-2 mb-2 border-b border-slate-50 pb-3">
+                <DollarSign className="w-5 h-5 text-emerald-500" />
+                <h3 className="text-base font-bold text-slate-700">
+                  Fiscal y Finanzas
+                </h3>
+              </div>
+
+              {/* Costo + SAT */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    Costo Base (Referencia) *
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span className="text-slate-400 sm:text-sm">$</span>
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400"
+                      placeholder="0.00"
+                      value={costoPromedio}
+                      onChange={(e) => setCostoPromedio(e.target.value)}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">Costo unitario del producto para calcular márgenes</p>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Costo Inicial *
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <span className="text-slate-400 sm:text-sm">$</span>
-                      </div>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400"
-                        placeholder="0.00"
-                        value={costoPromedio}
-                        onChange={(e) => setCostoPromedio(e.target.value)}
-                      />
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    Clave SAT
+                  </label>
+                  <input
+                    type="text"
+                    className={inputClass}
+                    placeholder="Ej. 50121500"
+                    value={sat}
+                    onChange={(e) => setSat(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Impuestos */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Impuestos Aplicables
+                </label>
+                <div className="flex flex-wrap gap-3 justify-center">
+                  {impuestos
+                    .filter((imp) => imp.activo)
+                    .map((imp) => (
+                      <label
+                        key={imp.id}
+                        className={`flex items-center gap-2 bg-slate-50 px-4 py-2.5 rounded-xl border cursor-pointer hover:border-blue-400 transition-colors ${selectedImpuestos.includes(imp.id) ? "border-blue-500 bg-blue-50/50" : "border-slate-200"}`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                          checked={selectedImpuestos.includes(imp.id)}
+                          onChange={() => toggleImpuesto(imp.id)}
+                        />
+                        <span className="text-sm font-medium text-slate-700">
+                          {imp.nombre} ({imp.tasa}%)
+                        </span>
+                      </label>
+                    ))}
+                  {impuestos.filter((imp) => imp.activo).length === 0 && (
+                    <p className="text-xs text-slate-400">
+                      No hay impuestos registrados. Créalos en Catálogos.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Calculadora Fiscal - SOLO REFERENCIA */}
+              {showCalculadora && (
+                <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-200 p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-emerald-600" />
+                      <h4 className="text-sm font-bold text-emerald-800">
+                        Vista Previa de Precio (Referencia)
+                      </h4>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={aplicarPrecioSugerido}
+                      className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition-colors"
+                    >
+                      Aplicar como Precio →
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-white/70 rounded-lg p-3 text-center">
+                      <p className="text-xs text-slate-500 mb-1">Costo Base</p>
+                      <p className="text-lg font-bold text-slate-800">
+                        ${costoNum.toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="bg-white/70 rounded-lg p-3 text-center">
+                      <p className="text-xs text-slate-500 mb-1">
+                        + Margen ({margenPorcentaje}%)
+                      </p>
+                      <p className="text-lg font-bold text-emerald-700">
+                        ${utilidadBruta.toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="bg-white/70 rounded-lg p-3 text-center">
+                      <p className="text-xs text-slate-500 mb-1">
+                        + Impuestos ({totalImpuestoPorcentaje}%)
+                      </p>
+                      <p className="text-lg font-bold text-amber-700">
+                        ${(precioSugerido - precioBaseConMargen).toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="bg-emerald-600 rounded-lg p-3 text-center">
+                      <p className="text-xs text-emerald-100 mb-1">
+                        Precio Sugerido
+                      </p>
+                      <p className="text-xl font-extrabold text-white">
+                        ${precioSugerido.toFixed(2)}
+                      </p>
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Clave SAT
-                    </label>
+                </div>
+              )}
+            </div>
+
+            {/* ROW 3: Precios de Venta (editables por el usuario) */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5">
+              <div className="flex items-center gap-2 mb-2 border-b border-slate-50 pb-3">
+                <Tag className="w-5 h-5 text-indigo-500" />
+                <h3 className="text-base font-bold text-slate-700">
+                  Precios de Venta
+                </h3>
+                <span className="text-xs text-slate-400 ml-auto">Definidos por ti — estos son los precios reales</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    Precio de Lista *
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span className="text-slate-400 sm:text-sm">$</span>
+                    </div>
                     <input
-                      type="text"
-                      className={inputClass}
-                      placeholder="Ej. 50121500"
-                      value={sat}
-                      onChange={(e) => setSat(e.target.value)}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
+                      placeholder="0.00"
+                      value={precioListaManual}
+                      onChange={(e) => setPrecioListaManual(e.target.value)}
                     />
                   </div>
                 </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Impuestos Aplicables
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    Precio Mayoreo
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {impuestos
-                      .filter((imp) => imp.activo)
-                      .map((imp) => (
-                        <label
-                          key={imp.id}
-                          className={`flex items-center gap-2 bg-slate-50 px-4 py-2.5 rounded-xl border cursor-pointer hover:border-blue-400 transition-colors ${selectedImpuestos.includes(imp.id) ? "border-blue-500 bg-blue-50/50" : "border-slate-200"}`}
-                        >
-                          <input
-                            type="checkbox"
-                            className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
-                            checked={selectedImpuestos.includes(imp.id)}
-                            onChange={() => toggleImpuesto(imp.id)}
-                          />
-                          <span className="text-sm font-medium text-slate-700">
-                            {imp.nombre} ({imp.tasa}%)
-                          </span>
-                        </label>
-                      ))}
-                    {impuestos.filter((imp) => imp.activo).length === 0 && (
-                      <p className="text-xs text-slate-400 col-span-2">
-                        No hay impuestos registrados. Créalos en Catálogos.
-                      </p>
-                    )}
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span className="text-slate-400 sm:text-sm">$</span>
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
+                      placeholder="Igual que Lista si vacío"
+                      value={precioMayoreoManual}
+                      onChange={(e) => setPrecioMayoreoManual(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    Precio Menudeo
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span className="text-slate-400 sm:text-sm">$</span>
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
+                      placeholder="Igual que Lista si vacío"
+                      value={precioMenudeoManual}
+                      onChange={(e) => setPrecioMenudeoManual(e.target.value)}
+                    />
                   </div>
                 </div>
               </div>

@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from "@nozbe/watermelondb";
 
 export const mySchema = appSchema({
-  version: 6,
+  version: 7,
   tables: [
     // ==================
     // 1. USUARIOS Y PERMISOS
@@ -123,6 +123,7 @@ export const mySchema = appSchema({
       name: "productos",
       columns: [
         { name: "familia_id", type: "string", isIndexed: true },
+        { name: "margen_id", type: "string", isOptional: true, isIndexed: true },
         { name: "codigo_interno", type: "string" },
         { name: "descripcion", type: "string" },
         { name: "precio_lista", type: "number" },

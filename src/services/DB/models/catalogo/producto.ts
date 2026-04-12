@@ -10,6 +10,7 @@ import {
 } from "@nozbe/watermelondb/decorators";
 import { map } from "rxjs/operators";
 import Familia from "../bases/familia";
+import Margen from "../bases/margen";
 import CodigoAlterno from "./codigoAlterno";
 import Lote from "./lote";
 import PrecioEspecialCliente from "./precioEspecialCliente";
@@ -20,7 +21,19 @@ import MovimientoInventario from "../registros/movimientoInventario";
 export default class Producto extends Model {
   static table = "productos";
 
+  static associations = {
+    familias: { type: 'belongs_to' as const, key: 'familia_id' },
+    margenes: { type: 'belongs_to' as const, key: 'margen_id' },
+    codigos_alternos: { type: 'has_many' as const, foreignKey: 'producto_id' },
+    lotes: { type: 'has_many' as const, foreignKey: 'producto_id' },
+    producto_impuestos: { type: 'has_many' as const, foreignKey: 'producto_id' },
+    proveedor_productos: { type: 'has_many' as const, foreignKey: 'producto_id' },
+    precios_especiales_clientes: { type: 'has_many' as const, foreignKey: 'producto_id' },
+    movimientos_inventario: { type: 'has_many' as const, foreignKey: 'producto_id' },
+  };
+
   @relation("familias", "familia_id") familia!: Relation<Familia>;
+  @relation("margenes", "margen_id") margen!: Relation<Margen>;
 
   @text("codigo_interno") codigoInterno!: string;
   @text("descripcion") descripcion!: string;
