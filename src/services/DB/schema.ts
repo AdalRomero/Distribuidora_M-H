@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from "@nozbe/watermelondb";
 
 export const mySchema = appSchema({
-  version: 10,
+  version: 11,
   tables: [
     // ==================
     // 1. USUARIOS Y PERMISOS
@@ -253,6 +253,19 @@ export const mySchema = appSchema({
         { name: "payload_json", type: "string", isOptional: true }, // Respaldo de los datos para no perderlos
         { name: "mensaje_error", type: "string" }, // Lo que falló (ej. "Código duplicado")
         { name: "estado", type: "string" }, // 'pendiente', 'resuelto', 'ignorado'
+        { name: "created_at", type: "number" },
+        { name: "updated_at", type: "number" },
+      ],
+    }),
+    // ==================
+    // 6. CONFIGURACIONES
+    // ==================
+    tableSchema({
+      name: "invoice_templates",
+      columns: [
+        { name: "name", type: "string" },
+        { name: "layout_json", type: "string" },
+        { name: "is_default", type: "boolean" },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
