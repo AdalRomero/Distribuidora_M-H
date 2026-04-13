@@ -2,6 +2,7 @@ import { Q } from "@nozbe/watermelondb";
 import withObservables from "@nozbe/with-observables";
 import { decode } from "base64-arraybuffer";
 import * as ImagePicker from "expo-image-picker";
+import * as Crypto from "expo-crypto";
 import {
     Camera,
     DollarSign,
@@ -28,6 +29,8 @@ interface AddInventoryInnerProps {
   familias: FamiliaModel[];
   margenes: MargenModel[];
   impuestos: ImpuestoModel[];
+  recoverData?: { tabla: string, data: any } | null;
+  editProduct?: Producto | null;
 }
 
 function AddInventoryInner({
@@ -36,6 +39,8 @@ function AddInventoryInner({
   familias,
   margenes,
   impuestos,
+  recoverData,
+  editProduct,
 }: AddInventoryInnerProps) {
   const [nombre, setNombre] = useState("");
   const [familiaId, setFamiliaId] = useState("");
@@ -54,6 +59,39 @@ function AddInventoryInner({
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [imageExt, setImageExt] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  React.useEffect(() => {
+    if (isOpen && recoverData?.data) {
+      const data = recoverData.data;
+      setNombre(data.descripcion || "");
+      setFamiliaId(data.familia_id || "");
+      setCodigoInterno(data.codigo_interno || "");
+      setMargenId(data.margen_id || "");
+      if (data.precio_lista !== undefined) setPrecioListaManual(String(data.precio_lista));
+      if (data.precio_mayoreo !== undefined) setPrecioMayoreoManual(String(data.precio_mayoreo));
+      if (data.precio_menudeo !== undefined) setPrecioMenudeoManual(String(data.precio_menudeo));
+      if (data.imagen) setImageUri(data.imagen);
+    } else if (isOpen && editProduct) {
+      const pRaw: any = editProduct._raw;
+      setNombre(editProduct.descripcion || "");
+      setFamiliaId(pRaw.familia_id || "");
+      setCodigoInterno(editProduct.codigoInterno || "");
+      setSat((editProduct as any).claveSat || "");
+      setMargenId(pRaw.margen_id || "");
+      setPrecioListaManual(String(editProduct.precioLista || ""));
+      setPrecioMayoreoManual(String(editProduct.precioMayoreo || ""));
+      setPrecioMenudeoManual(String(editProduct.precioMenudeo || ""));
+      if (editProduct.imagen) setImageUri(editProduct.imagen);
+      
+      const loadImpuestos = async () => {
+          const links = await editProduct.impuestosMultiples.fetch();
+          setSelectedImpuestos(links.map((link: any) => link._raw.impuesto_id));
+      };
+      loadImpuestos();
+    } else if (!isOpen) {
+      resetForm();
+    }
+  }, [isOpen, recoverData, editProduct]);
 
   if (!isOpen) return null;
 
@@ -165,7 +203,7 @@ function AddInventoryInner({
     }
   };
 
-  const resetForm = () => {
+  function resetForm() {
     setNombre("");
     setFamiliaId("");
     setCodigoInterno("");
@@ -178,7 +216,7 @@ function AddInventoryInner({
     setPrecioMenudeoManual("");
     setImageUri(null);
     setImageBase64(null);
-  };
+  }
 
   const handleSave = async () => {
     try {
@@ -219,33 +257,63 @@ function AddInventoryInner({
         publicUrl = data.publicUrl;
       }
 
-      // Create all records in a single batch
+      // Create or update all records in a single batch
       await database.write(async () => {
-        // 1. Create Producto with user-defined prices
-        const nuevoProducto = await database
-          .get<Producto>("productos")
-          .create((p) => {
-            p.descripcion = nombre;
-            p.codigoInterno = codigoInterno;
-            if (familiaId) {
-              (p as any)._raw.familia_id = familiaId;
+        let savedProductoId: string;
+        
+        if (editProduct) {
+            await editProduct.update((p) => {
+              p.descripcion = nombre;
+              p.codigoInterno = codigoInterno;
+              if (familiaId) {
+                (p as any)._raw.familia_id = familiaId;
+              }
+              if (margenId) {
+                (p as any)._raw.margen_id = margenId;
+              }
+              if (publicUrl) p.imagen = publicUrl;
+              (p as any).claveSat = sat;
+              p.precioLista = pLista;
+              p.precioMayoreo = pMayoreo || pLista;
+              p.precioMenudeo = pMenudeo || pLista;
+            });
+            savedProductoId = editProduct.id;
+            
+            // Re-create impuestos: first delete old ones, then create new ones
+            const existingImpuestos = await editProduct.impuestosMultiples.fetch();
+            for (const imp of existingImpuestos) {
+                await imp.markAsDeleted();
             }
-            if (margenId) {
-              (p as any)._raw.margen_id = margenId;
-            }
-            p.estado = true;
-            if (publicUrl) p.imagen = publicUrl;
-            p.precioLista = pLista;
-            p.precioMayoreo = pMayoreo || pLista;
-            p.precioMenudeo = pMenudeo || pLista;
-          });
+        } else {
+            const nuevoProducto = await database
+              .get<Producto>("productos")
+              .create((p) => {
+                (p as any)._raw.id = Crypto.randomUUID();
+                p.descripcion = nombre;
+                p.codigoInterno = codigoInterno;
+                if (familiaId) {
+                  (p as any)._raw.familia_id = familiaId;
+                }
+                if (margenId) {
+                  (p as any)._raw.margen_id = margenId;
+                }
+                p.estado = true;
+                if (publicUrl) p.imagen = publicUrl;
+                (p as any).claveSat = sat;
+                p.precioLista = pLista;
+                p.precioMayoreo = pMayoreo || pLista;
+                p.precioMenudeo = pMenudeo || pLista;
+              });
+            savedProductoId = nuevoProducto.id;
+        }
 
-        // 2. Create ProductoImpuesto junction records
+        // Create ProductoImpuesto junction records
         for (const impId of selectedImpuestos) {
           await database
             .get<ProductoImpuesto>("producto_impuestos")
             .create((pi) => {
-              (pi as any)._raw.producto_id = nuevoProducto.id;
+              (pi as any)._raw.id = Crypto.randomUUID();
+              (pi as any)._raw.producto_id = savedProductoId;
               (pi as any)._raw.impuesto_id = impId;
             });
         }
@@ -275,7 +343,7 @@ function AddInventoryInner({
         <div className="bg-white px-8 py-5 flex items-center justify-between border-b border-slate-100 shrink-0">
           <div>
             <h2 className="text-2xl font-bold text-slate-800">
-              Agregar Nuevo Producto
+              {editProduct ? "Editar Producto" : "Agregar Nuevo Producto"}
             </h2>
             <p className="text-sm text-slate-500 mt-1">
               Define la identidad del producto en el catálogo
@@ -414,202 +482,207 @@ function AddInventoryInner({
               </div>
             </div>
 
-            {/* ROW 2: Fiscal y Finanzas (full width) */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5">
-              <div className="flex items-center gap-2 mb-2 border-b border-slate-50 pb-3">
-                <DollarSign className="w-5 h-5 text-emerald-500" />
-                <h3 className="text-base font-bold text-slate-700">
-                  Fiscal y Finanzas
-                </h3>
-              </div>
+            {/* ROW 2: Fiscal y Finanzas + Precios de Venta */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+              {/* Fiscal y Finanzas */}
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5 flex flex-col">
+                <div className="flex items-center gap-2 mb-2 border-b border-slate-50 pb-3">
+                  <DollarSign className="w-5 h-5 text-emerald-500" />
+                  <h3 className="text-base font-bold text-slate-700">
+                    Fiscal y Finanzas
+                  </h3>
+                </div>
 
-              {/* Costo + SAT */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Costo Base (Referencia) *
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-slate-400 sm:text-sm">$</span>
+                {/* Costo + SAT */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      Costo Base (Referencia) *
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <span className="text-slate-400 sm:text-sm">$</span>
+                      </div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400"
+                        placeholder="0.00"
+                        value={costoPromedio}
+                        onChange={(e) => setCostoPromedio(e.target.value)}
+                      />
                     </div>
+                    <p className="text-xs text-slate-400 mt-1">Costo unitario del producto para calcular márgenes</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      Clave SAT
+                    </label>
                     <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400"
-                      placeholder="0.00"
-                      value={costoPromedio}
-                      onChange={(e) => setCostoPromedio(e.target.value)}
-                    />
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1">Costo unitario del producto para calcular márgenes</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Clave SAT
-                  </label>
-                  <input
-                    type="text"
-                    className={inputClass}
-                    placeholder="Ej. 50121500"
-                    value={sat}
-                    onChange={(e) => setSat(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Impuestos */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Impuestos Aplicables
-                </label>
-                <div className="flex flex-wrap gap-3 justify-center">
-                  {impuestos
-                    .filter((imp) => imp.activo)
-                    .map((imp) => (
-                      <label
-                        key={imp.id}
-                        className={`flex items-center gap-2 bg-slate-50 px-4 py-2.5 rounded-xl border cursor-pointer hover:border-blue-400 transition-colors ${selectedImpuestos.includes(imp.id) ? "border-blue-500 bg-blue-50/50" : "border-slate-200"}`}
-                      >
-                        <input
-                          type="checkbox"
-                          className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
-                          checked={selectedImpuestos.includes(imp.id)}
-                          onChange={() => toggleImpuesto(imp.id)}
-                        />
-                        <span className="text-sm font-medium text-slate-700">
-                          {imp.nombre} ({imp.tasa}%)
-                        </span>
-                      </label>
-                    ))}
-                  {impuestos.filter((imp) => imp.activo).length === 0 && (
-                    <p className="text-xs text-slate-400">
-                      No hay impuestos registrados. Créalos en Catálogos.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Calculadora Fiscal - SOLO REFERENCIA */}
-              {showCalculadora && (
-                <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-200 p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="w-5 h-5 text-emerald-600" />
-                      <h4 className="text-sm font-bold text-emerald-800">
-                        Vista Previa de Precio (Referencia)
-                      </h4>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={aplicarPrecioSugerido}
-                      className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition-colors"
-                    >
-                      Aplicar como Precio →
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-white/70 rounded-lg p-3 text-center">
-                      <p className="text-xs text-slate-500 mb-1">Costo Base</p>
-                      <p className="text-lg font-bold text-slate-800">
-                        ${costoNum.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="bg-white/70 rounded-lg p-3 text-center">
-                      <p className="text-xs text-slate-500 mb-1">
-                        + Margen ({margenPorcentaje}%)
-                      </p>
-                      <p className="text-lg font-bold text-emerald-700">
-                        ${utilidadBruta.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="bg-white/70 rounded-lg p-3 text-center">
-                      <p className="text-xs text-slate-500 mb-1">
-                        + Impuestos ({totalImpuestoPorcentaje}%)
-                      </p>
-                      <p className="text-lg font-bold text-amber-700">
-                        ${(precioSugerido - precioBaseConMargen).toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="bg-emerald-600 rounded-lg p-3 text-center">
-                      <p className="text-xs text-emerald-100 mb-1">
-                        Precio Sugerido
-                      </p>
-                      <p className="text-xl font-extrabold text-white">
-                        ${precioSugerido.toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* ROW 3: Precios de Venta (editables por el usuario) */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5">
-              <div className="flex items-center gap-2 mb-2 border-b border-slate-50 pb-3">
-                <Tag className="w-5 h-5 text-indigo-500" />
-                <h3 className="text-base font-bold text-slate-700">
-                  Precios de Venta
-                </h3>
-                <span className="text-xs text-slate-400 ml-auto">Definidos por ti — estos son los precios reales</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Precio de Lista *
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-slate-400 sm:text-sm">$</span>
-                    </div>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
-                      placeholder="0.00"
-                      value={precioListaManual}
-                      onChange={(e) => setPrecioListaManual(e.target.value)}
+                      type="text"
+                      className={inputClass}
+                      placeholder="Ej. 50121500"
+                      value={sat}
+                      onChange={(e) => setSat(e.target.value)}
                     />
                   </div>
                 </div>
+
+                {/* Impuestos */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Precio Mayoreo
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Impuestos Aplicables
                   </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-slate-400 sm:text-sm">$</span>
-                    </div>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
-                      placeholder="Igual que Lista si vacío"
-                      value={precioMayoreoManual}
-                      onChange={(e) => setPrecioMayoreoManual(e.target.value)}
-                    />
+                  <div className="flex flex-wrap gap-3 justify-center">
+                    {impuestos
+                      .filter((imp) => imp.activo)
+                      .map((imp) => (
+                        <label
+                          key={imp.id}
+                          className={`flex items-center gap-2 bg-slate-50 px-4 py-2.5 rounded-xl border cursor-pointer hover:border-blue-400 transition-colors ${selectedImpuestos.includes(imp.id) ? "border-blue-500 bg-blue-50/50" : "border-slate-200"}`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                            checked={selectedImpuestos.includes(imp.id)}
+                            onChange={() => toggleImpuesto(imp.id)}
+                          />
+                          <span className="text-sm font-medium text-slate-700">
+                            {imp.nombre} ({imp.tasa}%)
+                          </span>
+                        </label>
+                      ))}
+                    {impuestos.filter((imp) => imp.activo).length === 0 && (
+                      <p className="text-xs text-slate-400">
+                        No hay impuestos registrados. Créalos en Catálogos.
+                      </p>
+                    )}
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Precio Menudeo
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-slate-400 sm:text-sm">$</span>
+
+                {/* Calculadora Fiscal - SOLO REFERENCIA */}
+                {showCalculadora && (
+                  <div className="mt-auto pt-4">
+                    <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-200 p-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="w-5 h-5 text-emerald-600" />
+                          <h4 className="text-sm font-bold text-emerald-800">
+                            Vista Previa de Precio (Referencia)
+                          </h4>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={aplicarPrecioSugerido}
+                          className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition-colors"
+                        >
+                          Aplicar como Precio →
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-white/70 rounded-lg p-3 text-center">
+                          <p className="text-xs text-slate-500 mb-1">Costo Base</p>
+                          <p className="text-lg font-bold text-slate-800">
+                            ${costoNum.toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="bg-white/70 rounded-lg p-3 text-center">
+                          <p className="text-xs text-slate-500 mb-1">
+                            + Margen ({margenPorcentaje}%)
+                          </p>
+                          <p className="text-lg font-bold text-emerald-700">
+                            ${utilidadBruta.toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="bg-white/70 rounded-lg p-3 text-center">
+                          <p className="text-xs text-slate-500 mb-1">
+                            + Impuestos ({totalImpuestoPorcentaje}%)
+                          </p>
+                          <p className="text-lg font-bold text-amber-700">
+                            ${(precioSugerido - precioBaseConMargen).toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="bg-emerald-600 rounded-lg p-3 text-center">
+                          <p className="text-xs text-emerald-100 mb-1">
+                            Precio Sugerido
+                          </p>
+                          <p className="text-xl font-extrabold text-white">
+                            ${precioSugerido.toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
-                      placeholder="Igual que Lista si vacío"
-                      value={precioMenudeoManual}
-                      onChange={(e) => setPrecioMenudeoManual(e.target.value)}
-                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Precios de Venta (editables por el usuario) */}
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5 flex flex-col">
+                <div className="flex items-center gap-2 mb-2 border-b border-slate-50 pb-3">
+                  <Tag className="w-5 h-5 text-indigo-500" />
+                  <h3 className="text-base font-bold text-slate-700">
+                    Precios de Venta
+                  </h3>
+                  <span className="text-xs text-slate-400 ml-auto">Definidos por ti — precios reales</span>
+                </div>
+                <div className="grid grid-cols-1 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      Precio de Lista *
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <span className="text-slate-400 sm:text-sm">$</span>
+                      </div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
+                        placeholder="0.00"
+                        value={precioListaManual}
+                        onChange={(e) => setPrecioListaManual(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      Precio Mayoreo
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <span className="text-slate-400 sm:text-sm">$</span>
+                      </div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
+                        placeholder="Igual que Lista si vacío"
+                        value={precioMayoreoManual}
+                        onChange={(e) => setPrecioMayoreoManual(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      Precio Menudeo
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <span className="text-slate-400 sm:text-sm">$</span>
+                      </div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
+                        placeholder="Igual que Lista si vacío"
+                        value={precioMenudeoManual}
+                        onChange={(e) => setPrecioMenudeoManual(e.target.value)}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

@@ -64,9 +64,10 @@ interface ProductRowProps {
     impuestosLinks: ProductoImpuestoModel[];
     stockGlobal: number;
     onDelete: (p: ProductoModel) => void;
+    onEdit: (p: ProductoModel) => void;
 }
 
-function ProductRowInner({ producto, familia, lotes, impuestosLinks, stockGlobal, onDelete }: ProductRowProps) {
+function ProductRowInner({ producto, familia, lotes, impuestosLinks, stockGlobal, onDelete, onEdit }: ProductRowProps) {
     const [impuestoNames, setImpuestoNames] = useState<string[]>([]);
 
     // Fetch actual impuesto names from junction records
@@ -213,7 +214,7 @@ function ProductRowInner({ producto, familia, lotes, impuestosLinks, stockGlobal
             {/* Acciones */}
             <td className="px-6 py-4 text-center">
                 <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
+                    <button onClick={() => onEdit(producto)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
                     <button onClick={() => onDelete(producto)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
                 </div>
             </td>
@@ -222,7 +223,7 @@ function ProductRowInner({ producto, familia, lotes, impuestosLinks, stockGlobal
 }
 
 // ─── withObservables Wrapper ────────────────────────────────
-const enhance = withObservables(['producto'], ({ producto }: { producto: ProductoModel; onDelete: (p: ProductoModel) => void }) => ({
+const enhance = withObservables(['producto'], ({ producto }: { producto: ProductoModel; onDelete: (p: ProductoModel) => void, onEdit: (p: ProductoModel) => void }) => ({
     producto: producto.observe(),
     familia: producto.familia.observe().pipe(
         switchMap(f => f ? of(f) : of(null))

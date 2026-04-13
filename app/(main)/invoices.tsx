@@ -1,6 +1,8 @@
 import { Clock, Eye, FileCheck, FileCode, FileMinus, FileText, Plus, Search, TrendingUp } from 'lucide-react';
-import { Fragment, useState } from 'react';
+import { Fragment, useState, useMemo, useEffect } from 'react';
 import AddInvoice from '../../components/ui/modals/AddInvoice';
+import SyncErrorBanner, { SyncError } from "../../components/ui/SyncErrorBanner";
+import { useSyncErrors } from "../../src/hooks/useSyncErrors";
 
 interface Partida { id: string; producto: string; cantidad: number; precioUnitario: number; descuentoAplicado: number; }
 interface Invoice {
@@ -45,6 +47,23 @@ const mockInvoices: Invoice[] = [
 export default function Invoices() {
     const [searchTerm, setSearchTerm] = useState('');
     const [showAddInvoice, setShowAddInvoice] = useState(false);
+    const [recoverData, setRecoverData] = useState<any>(null);
+
+    const tablesToWatch = useMemo(() => ["documentos", "documentos_detalles"], []);
+    const { syncErrors, handleDismissError } = useSyncErrors(tablesToWatch);
+
+    useEffect(() => {
+        const autoRecoverId = new URLSearchParams(window.location.search).get("recoverErrorId");
+        if (autoRecoverId && syncErrors.length > 0) {
+          const err = syncErrors.find(e => e.id === autoRecoverId);
+          if (err) triggerRecoveryWrapper(err);
+        }
+    }, [syncErrors]);
+
+    const triggerRecoveryWrapper = (err: SyncError) => {
+        setRecoverData(err.datosAtrapados);
+        setShowAddInvoice(true);
+    };
 
     const filteredInvoices = mockInvoices.filter(inv =>
         inv.folio.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -85,6 +104,14 @@ export default function Invoices() {
                             <Plus className="w-4 h-4" /><span>Nueva Factura</span>
                         </button>
                     </div>
+
+                    <SyncErrorBanner 
+                        errors={syncErrors} 
+                        onRecover={triggerRecoveryWrapper} 
+                        onDismiss={handleDismissError} 
+                        contextName="Factura" 
+                        isHighPriority={true} 
+                    />
 
                     {/* KPI Cards */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -181,7 +208,7 @@ export default function Invoices() {
                     </div>
                 </div>
             </div>
-            <AddInvoice isOpen={showAddInvoice} onClose={() => setShowAddInvoice(false)} />
+            <AddInvoice isOpen={showAddInvoice} onClose={() => { setShowAddInvoice(false); setRecoverData(null); }} recoverData={recoverData} />
         </Fragment>
     );
 }

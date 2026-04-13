@@ -9,6 +9,8 @@ import WarningModal from '../../components/ui/modals/WarningModal';
 
 import { database } from '../../src/services/DB/indexBD';
 import { syncApp } from '../../src/sync';
+import SyncErrorBanner, { SyncError } from "../../components/ui/SyncErrorBanner";
+import { useSyncErrors } from "../../src/hooks/useSyncErrors";
 
 interface ClientItem {
     id: string;
@@ -55,6 +57,38 @@ export default function Clients() {
     useEffect(() => {
         loadClients();
     }, []);
+
+    const tablesToWatch = useMemo(() => ["clientes", "proveedores"], []);
+    const { syncErrors, handleDismissError } = useSyncErrors(tablesToWatch);
+
+    useEffect(() => {
+        const autoRecoverId = new URLSearchParams(window.location.search).get("recoverErrorId");
+        if (autoRecoverId && syncErrors.length > 0) {
+          const err = syncErrors.find(e => e.id === autoRecoverId);
+          if (err) handleRecoverWrapper(err);
+        }
+    }, [syncErrors]);
+
+    const handleRecoverWrapper = (err: SyncError) => {
+        // Mapear los datos atrapados al modal de edición
+        const d = err.datosAtrapados;
+        setEditData({
+            nombre: d.nombre || "",
+            rfc: d.rfc || "",
+            categoria: d.categoria || "General",
+            listaPrecios: d.listaPrecioBase || "lista",
+            descuentoGlobal: String(d.descuentoGlobal || 0),
+            contacto: d.contacto || "",
+            estado: d.estado !== false ? "Activo" : "Inactivo",
+            calle: d.calle || "",
+            colonia: d.colonia || "",
+            cp: d.cp || "",
+            ciudad: d.ciudad || ""
+        });
+        setEditingClientId(d.id || null);
+        setIsClientModalOpen(true);
+        setMessage({ type: 'success', text: 'Datos rescatados listos para corregirse y reenviarse.' });
+    };
 
     useEffect(() => {
         if (message?.type === 'success') {
@@ -322,6 +356,15 @@ export default function Clients() {
                 </div>
 
                 {/* BARRA DE BÚSQUEDA */}
+                
+                <SyncErrorBanner 
+                    errors={syncErrors} 
+                    onRecover={handleRecoverWrapper} 
+                    onDismiss={handleDismissError} 
+                    contextName="Cliente" 
+                    isHighPriority={false} 
+                />
+
                 <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
                     <div className="relative flex-1">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Search className="w-5 h-5 text-slate-400" /></div>

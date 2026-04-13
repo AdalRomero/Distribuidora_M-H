@@ -16,6 +16,7 @@ export async function syncApp() {
         return { changes: data.changes, timestamp: data.timestamp };
       },
 
+
       pushChanges: async ({ changes }) => {
         // Enviamos los cambios a Supabase
         const { data, error } = await supabase.rpc("push_changes", {

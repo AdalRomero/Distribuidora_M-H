@@ -20,6 +20,8 @@ import { useEffect, useMemo, useState } from "react";
 import ErrorModal from "../../components/ui/modals/ErrorModal";
 import SuccessModal from "../../components/ui/modals/SuccessModal";
 import WarningModal from "../../components/ui/modals/WarningModal";
+import SyncErrorBanner, { SyncError } from "../../components/ui/SyncErrorBanner";
+import { useSyncErrors } from "../../src/hooks/useSyncErrors";
 
 import { supabase } from "../../src/services/api/supabaseClient";
 import { database } from "../../src/services/DB/indexBD";
@@ -60,12 +62,7 @@ interface UserItem {
   permissions: string[];
 }
 
-interface UserSyncError {
-  id: string;
-  accion: string;
-  mensaje: string;
-  datosAtrapados: any;
-}
+
 
 export default function Users() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -78,10 +75,21 @@ export default function Users() {
   } | null>(null);
 
   // Estados de Bitácora y Modales Genéricos
-  const [syncErrors, setSyncErrors] = useState<UserSyncError[]>([]);
-  const [errorToRecover, setErrorToRecover] = useState<UserSyncError | null>(
-    null,
-  );
+  const tablesToWatch = useMemo(() => ["perfiles", "informacion_perfil", "permisos"], []);
+  const { syncErrors, handleDismissError, loadSyncErrors } = useSyncErrors(tablesToWatch);
+  const [errorToRecover, setErrorToRecover] = useState<SyncError | null>(null);
+
+  // Catch automatic recover from URL query
+  useEffect(() => {
+    // If syncErrors loads and there's a recoverErrorId in the URL, trigger it once
+    const autoRecoverId = new URLSearchParams(window.location.search).get("recoverErrorId");
+    if (autoRecoverId && syncErrors.length > 0) {
+      const error = syncErrors.find(e => e.id === autoRecoverId);
+      if (error && !errorToRecover) {
+        triggerRecovery(error);
+      }
+    }
+  }, [syncErrors]);
 
   const [warningModalConfig, setWarningModalConfig] = useState<{
     isOpen: boolean;
@@ -133,7 +141,6 @@ export default function Users() {
 
   useEffect(() => {
     loadUsers();
-    loadSyncErrors();
   }, []);
 
   const loadUsers = async () => {
@@ -186,56 +193,12 @@ export default function Users() {
     }
   };
 
-  const loadSyncErrors = async () => {
-    try {
-      const bitacoraDb = database.collections.get("bitacora_errores");
-      const todosLosErrores = (await bitacoraDb.query().fetch()) as any[];
 
-      const erroresDeUsuarios = todosLosErrores
-        .filter((e) =>
-          ["perfiles", "informacion_perfil", "permisos"].includes(
-            e.tablaOrigen,
-          ),
-        )
-        .map((e) => ({
-          id: e.id,
-          accion: e.accion,
-          mensaje: e.mensajeError,
-          datosAtrapados: e.payloadJson ? JSON.parse(e.payloadJson) : {},
-        }));
-
-      const erroresUnicos = Array.from(
-        new Map(
-          erroresDeUsuarios.map((item) => [
-            item.datosAtrapados.id || item.id,
-            item,
-          ]),
-        ).values(),
-      );
-
-      setSyncErrors(erroresUnicos);
-    } catch (error) {
-      console.error("No se pudieron cargar los errores de sincronización");
-    }
-  };
-
-  const handleDismissError = async (errorId: string) => {
-    try {
-      const bitacoraDb = database.collections.get("bitacora_errores");
-      const record = (await bitacoraDb.find(errorId)) as any;
-      await database.write(async () => {
-        await record.destroyPermanently();
-      });
-      loadSyncErrors();
-    } catch (error) {
-      console.error("Error al descartar la notificación", error);
-    }
-  };
 
   // ==========================================
   // ✨ LÓGICA DE RECUPERACIÓN DE DATOS
   // ==========================================
-  const triggerRecovery = (err: UserSyncError) => {
+  const triggerRecovery = (err: SyncError) => {
     setErrorToRecover(err);
     setWarningModalConfig({
       isOpen: true,
@@ -278,16 +241,7 @@ export default function Users() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const traducirErrorPostgres = (msgOriginal: string) => {
-    const msg = msgOriginal.toLowerCase();
-    if (msg.includes("unique constraint") || msg.includes("duplicate key")) {
-      return "El Correo Electrónico o Nickname ya fue ocupado por otra persona.";
-    }
-    if (msg.includes("foreign key") || msg.includes("auth.users")) {
-      return "Hubo un problema de vinculación con la nube al intentar registrarlo.";
-    }
-    return "La nube rechazó la información. Verifica que todos los campos sean correctos.";
-  };
+
 
   useEffect(() => {
     if (message?.type === "success") {
@@ -705,68 +659,13 @@ export default function Users() {
         </div>
 
         {/* ✨ BANNER DE ERRORES DE SINCRONIZACIÓN */}
-        {syncErrors.length > 0 && (
-          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm">
-            <h3 className="text-amber-800 font-bold flex items-center gap-2 mb-3">
-              <AlertTriangle className="w-5 h-5" />
-              Problemas detectados al sincronizar
-            </h3>
-            <p className="text-sm text-amber-700 mb-4">
-              Los siguientes usuarios fueron creados o editados offline, pero
-              fueron rechazados por la nube. No te preocupes, rescatamos la
-              información. Haz clic en "Recuperar y Corregir" para cargarlos al
-              formulario.
-            </p>
-            <div className="space-y-3">
-              {syncErrors.map((err) => {
-                const targetUser =
-                  err.datosAtrapados?.usuario ||
-                  err.datosAtrapados?.correo ||
-                  err.datosAtrapados?.nombres ||
-                  "Usuario Desconocido";
-                const accionText =
-                  err.accion === "created" ? "crear" : "modificar";
-
-                return (
-                  <div
-                    key={err.id}
-                    className="flex flex-col md:flex-row justify-between md:items-center bg-white p-4 rounded-xl border border-amber-100 gap-4 shadow-sm"
-                  >
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800">
-                        Error al intentar {accionText} al usuario:{" "}
-                        <span className="text-amber-600">{targetUser}</span>
-                      </p>
-                      <p className="text-xs text-slate-600 mt-1">
-                        <span className="font-bold">Motivo:</span>{" "}
-                        {traducirErrorPostgres(err.mensaje)}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
-                      <button
-                        onClick={() => triggerRecovery(err)}
-                        className="flex items-center gap-1.5 px-4 py-2 text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-lg text-sm font-bold transition-colors shadow-sm"
-                        title="Cargar estos datos rescatados en el formulario"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                        Recuperar y Corregir
-                      </button>
-                      <button
-                        onClick={() => handleDismissError(err.id)}
-                        className="flex items-center gap-1.5 px-4 py-2 text-slate-500 bg-slate-100 hover:bg-slate-200 hover:text-slate-700 rounded-lg text-sm font-bold transition-colors"
-                        title="Eliminar esta notificación (se perderá la información rescatada)"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Descartar
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        <SyncErrorBanner 
+           errors={syncErrors} 
+           onRecover={triggerRecovery} 
+           onDismiss={handleDismissError} 
+           contextName="Usuario" 
+           isHighPriority={false} 
+        />
 
         <div className="flex flex-col xl:flex-row gap-6">
           {/* Panel Izquierdo: Lista de Usuarios */}

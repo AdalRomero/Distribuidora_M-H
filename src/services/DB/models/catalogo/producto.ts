@@ -36,6 +36,7 @@ export default class Producto extends Model {
   @relation("margenes", "margen_id") margen!: Relation<Margen>;
 
   @text("codigo_interno") codigoInterno!: string;
+  @text("clave_sat") claveSat!: string;
   @text("descripcion") descripcion!: string;
   @field("precio_lista") precioLista!: number;
   @field("precio_mayoreo") precioMayoreo!: number;

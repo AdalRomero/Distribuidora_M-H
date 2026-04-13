@@ -1,3 +1,4 @@
+import * as Crypto from "expo-crypto";
 import withObservables from "@nozbe/with-observables";
 import {
   Check,
@@ -27,6 +28,9 @@ import FamiliaModel from "../../src/services/DB/models/bases/familia";
 import ImpuestoModel from "../../src/services/DB/models/bases/impuesto";
 import MargenModel from "../../src/services/DB/models/bases/margen";
 import { syncApp } from "../../src/sync";
+import SyncErrorBanner, { SyncError } from "../../components/ui/SyncErrorBanner";
+import { useSyncErrors } from "../../src/hooks/useSyncErrors";
+import { useMemo, useEffect } from "react";
 
 // ─── Types ──────────────────────────────────────────────────
 type ActiveTab = "familias" | "almacenes" | "impuestos" | "margenes";
@@ -57,6 +61,30 @@ function CatalogsContent({ familias, almacenes, impuestos, margenes }: CatalogsP
   const [tab, setTab] = useState<ActiveTab>("familias");
   const [modal, setModal] = useState<ModalState>(initialModalState);
   const [syncing, setSyncing] = useState(false);
+
+  // Error Sync Logics
+  const tablesToWatch = useMemo(() => ["familias", "almacenes", "impuestos", "margenes"], []);
+  const { syncErrors, handleDismissError } = useSyncErrors(tablesToWatch);
+  const [recoverData, setRecoverData] = useState<{ tabla: string, data: any } | null>(null);
+
+  // Automatic Recover from URL
+  useEffect(() => {
+    const autoRecoverId = new URLSearchParams(window.location.search).get("recoverErrorId");
+    if (autoRecoverId && syncErrors.length > 0) {
+      const err = syncErrors.find(e => e.id === autoRecoverId);
+      if (err) handleRecoverWrapper(err);
+    }
+  }, [syncErrors]);
+
+  const handleRecoverWrapper = (err: SyncError) => {
+     const tabla = err.tabla_origen as ActiveTab;
+     if (['familias', 'almacenes', 'impuestos', 'margenes'].includes(tabla)) {
+        setTab(tabla);
+        setRecoverData({ tabla, data: err.datosAtrapados });
+        showSuccess("Datos Recuperados", "Revisa el formulario para editar y re-enviar.");
+        // We do not delete the error yet, user must hit 'Guardar' on the form wait... 
+     }
+  };
 
   const showSuccess = (title: string, message: string) =>
     setModal((m) => ({ ...m, success: { open: true, title, message } }));
@@ -138,6 +166,15 @@ function CatalogsContent({ familias, almacenes, impuestos, margenes }: CatalogsP
           )}
         </div>
 
+        {/* Sync Errors */}
+        <SyncErrorBanner 
+           errors={syncErrors} 
+           onRecover={handleRecoverWrapper} 
+           onDismiss={handleDismissError} 
+           contextName="Catálogo" 
+           isHighPriority={false} 
+        />
+
         {/* Tabs */}
         <div className="flex gap-1 mb-6 bg-slate-100 p-1 rounded-xl w-fit">
           {tabs.map((t) => (
@@ -164,10 +201,10 @@ function CatalogsContent({ familias, almacenes, impuestos, margenes }: CatalogsP
         </div>
 
         {/* Tab Content */}
-        {tab === "familias" && <FamiliasTab familias={familias} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} />}
-        {tab === "almacenes" && <AlmacenesTab almacenes={almacenes} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} />}
-        {tab === "impuestos" && <ImpuestosTab impuestos={impuestos} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} />}
-        {tab === "margenes" && <MargenesTab margenes={margenes} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} />}
+        {tab === "familias" && <FamiliasTab familias={familias} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} recoverData={recoverData} />}
+        {tab === "almacenes" && <AlmacenesTab almacenes={almacenes} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} recoverData={recoverData} />}
+        {tab === "impuestos" && <ImpuestosTab impuestos={impuestos} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} recoverData={recoverData} />}
+        {tab === "margenes" && <MargenesTab margenes={margenes} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} recoverData={recoverData} />}
       </div>
     </div>
   );
@@ -181,12 +218,13 @@ interface TabCallbacks {
   showError: (title: string, message: string) => void;
   showWarning: (title: string, message: string, onConfirm: () => void) => void;
   syncAfterOp: () => Promise<void>;
+  recoverData?: { tabla: string, data: any } | null;
 }
 
 // ═══════════════════════════════════════════════════════════
 // FAMILIAS TAB (with alert threshold configuration)
 // ═══════════════════════════════════════════════════════════
-function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterOp }: { familias: FamiliaModel[] } & TabCallbacks) {
+function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterOp, recoverData }: { familias: FamiliaModel[] } & TabCallbacks) {
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
 
@@ -201,6 +239,18 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
   const [editCodigo, setEditCodigo] = useState("");
   const [editUmbralVerde, setEditUmbralVerde] = useState("");
   const [editUmbralAmarillo, setEditUmbralAmarillo] = useState("");
+
+  useEffect(() => {
+    if (recoverData?.tabla === "familias") {
+       const fd = recoverData.data;
+       setShowAdd(true);
+       setCodigo(fd.codigoFamilia || fd.codigo_familia || "");
+       setNombre(fd.nombre || "");
+       setUmbralVerde(fd.umbralVerdeDias ? String(fd.umbralVerdeDias) : "90");
+       setUmbralAmarillo(fd.umbralAmarilloDias ? String(fd.umbralAmarilloDias) : "30");
+       window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [recoverData]);
 
   const handleAdd = async () => {
     if (!codigo || !nombre) {
@@ -218,6 +268,7 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
     try {
       await database.write(async () => {
         await database.get<FamiliaModel>("familias").create((f) => {
+          f._raw.id = Crypto.randomUUID();
           f.codigoFamilia = codigo.trim();
           f.nombre = nombre.trim();
           f.estado = true;
@@ -624,11 +675,19 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
 // ═══════════════════════════════════════════════════════════
 // ALMACENES TAB
 // ═══════════════════════════════════════════════════════════
-function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfterOp }: { almacenes: AlmacenModel[] } & TabCallbacks) {
+function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfterOp, recoverData }: { almacenes: AlmacenModel[] } & TabCallbacks) {
   const [showAdd, setShowAdd] = useState(false);
   const [nombre, setNombre] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [editNombre, setEditNombre] = useState("");
+
+  useEffect(() => {
+     if (recoverData?.tabla === "almacenes") {
+        setShowAdd(true);
+        setNombre(recoverData.data?.nombre || "");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+     }
+  }, [recoverData]);
 
   const handleAdd = async () => {
     if (!nombre) {
@@ -645,6 +704,7 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
     try {
       await database.write(async () => {
         await database.get<AlmacenModel>("almacenes").create((a) => {
+          a._raw.id = Crypto.randomUUID();
           a.nombre = nombre;
           a.estado = true;
         });
@@ -880,13 +940,22 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
 // ═══════════════════════════════════════════════════════════
 // IMPUESTOS TAB
 // ═══════════════════════════════════════════════════════════
-function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfterOp }: { impuestos: ImpuestoModel[] } & TabCallbacks) {
+function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfterOp, recoverData }: { impuestos: ImpuestoModel[] } & TabCallbacks) {
   const [showAdd, setShowAdd] = useState(false);
   const [nombre, setNombre] = useState("");
   const [tasa, setTasa] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [editNombre, setEditNombre] = useState("");
   const [editTasa, setEditTasa] = useState("");
+
+  useEffect(() => {
+     if (recoverData?.tabla === "impuestos") {
+        setShowAdd(true);
+        setNombre(recoverData.data?.nombre || "");
+        setTasa(recoverData.data?.tasa_porcentaje ? String(recoverData.data?.tasa_porcentaje) : "");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+     }
+  }, [recoverData]);
 
   const handleAdd = async () => {
     if (!nombre || !tasa) {
@@ -903,6 +972,7 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
     try {
       await database.write(async () => {
         await database.get<ImpuestoModel>("impuestos").create((i) => {
+          i._raw.id = Crypto.randomUUID();
           i.nombre = nombre;
           i.tasa = parseFloat(tasa);
           i.activo = true;
@@ -1173,13 +1243,22 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
 // ═══════════════════════════════════════════════════════════
 // MARGENES TAB
 // ═══════════════════════════════════════════════════════════
-function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterOp }: { margenes: MargenModel[] } & TabCallbacks) {
+function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterOp, recoverData }: { margenes: MargenModel[] } & TabCallbacks) {
   const [showAdd, setShowAdd] = useState(false);
   const [nombre, setNombre] = useState("");
   const [porcentaje, setPorcentaje] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [editNombre, setEditNombre] = useState("");
   const [editPorcentaje, setEditPorcentaje] = useState("");
+
+  useEffect(() => {
+     if (recoverData?.tabla === "margenes") {
+        setShowAdd(true);
+        setNombre(recoverData.data?.nombre || "");
+        setPorcentaje(recoverData.data?.porcentaje_multiplicador ? String((recoverData.data?.porcentaje_multiplicador - 1) * 100) : "");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+     }
+  }, [recoverData]);
 
   const handleAdd = async () => {
     if (!nombre || !porcentaje) {
@@ -1196,6 +1275,7 @@ function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterO
     try {
       await database.write(async () => {
         await database.get<MargenModel>("margenes").create((m) => {
+          m._raw.id = Crypto.randomUUID();
           m.nombre = nombre;
           m.porcentaje = parseFloat(porcentaje);
           m.estado = true;

@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from "@nozbe/watermelondb";
 
 export const mySchema = appSchema({
-  version: 7,
+  version: 10,
   tables: [
     // ==================
     // 1. USUARIOS Y PERMISOS
@@ -12,6 +12,7 @@ export const mySchema = appSchema({
         { name: "usuario", type: "string", isOptional: true },
         { name: "estado", type: "boolean" },
         { name: "hash_local", type: "string", isOptional: true },
+        { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
     }),
@@ -23,6 +24,7 @@ export const mySchema = appSchema({
         { name: "ape_materno", type: "string", isOptional: true },
         { name: "correo", type: "string" },
         { name: "rol", type: "string" },
+        { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
     }),
@@ -35,6 +37,7 @@ export const mySchema = appSchema({
         { name: "precios", type: "boolean" },
         { name: "usuarios", type: "boolean" },
         { name: "configuraciones", type: "boolean" },
+        { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
     }),
@@ -123,12 +126,18 @@ export const mySchema = appSchema({
       name: "productos",
       columns: [
         { name: "familia_id", type: "string", isIndexed: true },
-        { name: "margen_id", type: "string", isOptional: true, isIndexed: true },
+        {
+          name: "margen_id",
+          type: "string",
+          isOptional: true,
+          isIndexed: true,
+        },
         { name: "codigo_interno", type: "string" },
         { name: "descripcion", type: "string" },
         { name: "precio_lista", type: "number" },
         { name: "precio_mayoreo", type: "number" },
         { name: "precio_menudeo", type: "number" },
+        { name: "clave_sat", type: "string", isOptional: true },
         { name: "imagen", type: "string", isOptional: true },
         { name: "estado", type: "boolean" }, // BORRADO LÓGICO
         { name: "created_at", type: "number" },

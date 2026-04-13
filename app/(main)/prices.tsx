@@ -1,6 +1,8 @@
 import { Calculator, DollarSign, Edit2, PackageOpen, Percent, Plus, Search, Users } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import AddPrices from '../../components/ui/modals/AddPrices';
+import SyncErrorBanner, { SyncError } from "../../components/ui/SyncErrorBanner";
+import { useSyncErrors } from "../../src/hooks/useSyncErrors";
 
 interface PriceList {
     id: string; name: string; currency: 'MXN - Pesos Mexicanos' | 'USD - Dólares'; rule: string; activeClients: number;
@@ -16,6 +18,23 @@ const mockPrices: PriceList[] = [
 export default function Prices() {
     const [searchTerm, setSearchTerm] = useState('');
     const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
+    const [recoverData, setRecoverData] = useState<any>(null);
+
+    const tablesToWatch = useMemo(() => ["listas_precios", "precios_especiales"], []);
+    const { syncErrors, handleDismissError } = useSyncErrors(tablesToWatch);
+
+    useEffect(() => {
+        const autoRecoverId = new URLSearchParams(window.location.search).get("recoverErrorId");
+        if (autoRecoverId && syncErrors.length > 0) {
+          const err = syncErrors.find(e => e.id === autoRecoverId);
+          if (err) triggerRecoveryWrapper(err);
+        }
+    }, [syncErrors]);
+
+    const triggerRecoveryWrapper = (err: SyncError) => {
+        setRecoverData(err.datosAtrapados);
+        setIsPriceModalOpen(true);
+    };
 
     const filteredPrices = mockPrices.filter(p =>
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -60,6 +79,14 @@ export default function Prices() {
                     </div>
                 </div>
 
+                <SyncErrorBanner 
+                    errors={syncErrors} 
+                    onRecover={triggerRecoveryWrapper} 
+                    onDismiss={handleDismissError} 
+                    contextName="Lista de Precios" 
+                    isHighPriority={false} 
+                />
+
                 {/* Table */}
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                     <div className="overflow-x-auto">
@@ -101,7 +128,7 @@ export default function Prices() {
                         </table>
                     </div>
                 </div>
-                <AddPrices isOpen={isPriceModalOpen} onClose={() => setIsPriceModalOpen(false)} />
+                <AddPrices isOpen={isPriceModalOpen} onClose={() => { setIsPriceModalOpen(false); setRecoverData(null); }} recoverData={recoverData} />
             </div>
         </div>
     );

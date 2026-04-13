@@ -4,11 +4,15 @@ import { AlertTriangle, Clock, DollarSign, Download, Package, Plus, Search } fro
 import React, { useState } from 'react';
 import AddEntry from '../../components/ui/modals/AddEntry';
 import AddInventory from '../../components/ui/modals/AddInventory';
+import WarningModal from '../../components/ui/modals/WarningModal';
 import ProductRow from '../../components/ui/ProductRow';
 import { database } from '../../src/services/DB/indexBD';
 import FamiliaModel from '../../src/services/DB/models/bases/familia';
 import ProductoModel from '../../src/services/DB/models/catalogo/producto';
 import { syncApp } from '../../src/sync';
+import SyncErrorBanner, { SyncError } from "../../components/ui/SyncErrorBanner";
+import { useSyncErrors } from "../../src/hooks/useSyncErrors";
+import { useMemo, useEffect } from 'react';
 
 interface InventoryProps {
     productos: ProductoModel[];
@@ -20,16 +24,22 @@ function InventoryContent({ productos, familias }: InventoryProps) {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isAddEntryOpen, setIsAddEntryOpen] = useState(false);
     const [filterFamilia, setFilterFamilia] = useState('');
+    const [editProduct, setEditProduct] = useState<ProductoModel | null>(null);
+    const [deleteProduct, setDeleteProduct] = useState<ProductoModel | null>(null);
 
-    const handleDelete = async (producto: ProductoModel) => {
-        if (window.confirm('¿Seguro que deseas desactivar este producto? Podrás reactivarlo después.')) {
-            await database.write(async () => {
-                await producto.update((p) => {
-                    p.estado = false;
-                });
+    const handleDelete = (producto: ProductoModel) => {
+        setDeleteProduct(producto);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteProduct) return;
+        await database.write(async () => {
+            await deleteProduct.update((p) => {
+                p.estado = false;
             });
-            syncApp().catch(console.error);
-        }
+        });
+        setDeleteProduct(null);
+        syncApp().catch(console.error);
     };
 
     const filteredProductos = productos.filter(p => {
@@ -38,6 +48,27 @@ function InventoryContent({ productos, familias }: InventoryProps) {
         const matchesFamilia = !filterFamilia || (p as any).familiaId === filterFamilia;
         return matchesSearch && matchesFamilia;
     });
+
+    const tablesToWatch = useMemo(() => ['productos', 'lotes', 'producto_impuestos', 'codigos_alternos', 'proveedor_productos', 'movimientos_inventario'], []);
+    const { syncErrors, handleDismissError } = useSyncErrors(tablesToWatch);
+    const [recoverData, setRecoverData] = useState<{ tabla: string, data: any } | null>(null);
+
+    useEffect(() => {
+        const autoRecoverId = new URLSearchParams(window.location.search).get("recoverErrorId");
+        if (autoRecoverId && syncErrors.length > 0) {
+          const err = syncErrors.find(e => e.id === autoRecoverId);
+          if (err) triggerRecoveryWrapper(err);
+        }
+    }, [syncErrors]);
+
+    const triggerRecoveryWrapper = (err: SyncError) => {
+        setRecoverData({ tabla: err.tabla_origen || "", data: err.datosAtrapados });
+        if (err.tabla_origen === 'productos') {
+            setIsAddModalOpen(true);
+        } else if (err.tabla_origen === 'lotes' || err.tabla_origen === 'movimientos_inventario') {
+            setIsAddEntryOpen(true);
+        }
+    };
 
     return (
         <div className="p-8 bg-slate-50 min-h-screen font-sans">
@@ -60,6 +91,14 @@ function InventoryContent({ productos, familias }: InventoryProps) {
                         </button>
                     </div>
                 </div>
+
+                <SyncErrorBanner 
+                    errors={syncErrors} 
+                    onRecover={triggerRecoveryWrapper} 
+                    onDismiss={handleDismissError} 
+                    contextName="Inventario/Producto" 
+                    isHighPriority={true} 
+                />
 
                 {/* KPIs */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -148,15 +187,16 @@ function InventoryContent({ productos, familias }: InventoryProps) {
                                         </td>
                                     </tr>
                                 ) : filteredProductos.map((item) => (
-                                    <ProductRow key={item.id} producto={item} onDelete={handleDelete} />
+                                    <ProductRow key={item.id} producto={item} onDelete={handleDelete} onEdit={(p: ProductoModel) => { setEditProduct(p); setIsAddModalOpen(true); }} />
                                 ))}
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                <AddInventory isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
-                <AddEntry isOpen={isAddEntryOpen} onClose={() => setIsAddEntryOpen(false)} />
+                <AddInventory isOpen={isAddModalOpen} onClose={() => { setIsAddModalOpen(false); setEditProduct(null); }} recoverData={recoverData} editProduct={editProduct} />
+                <AddEntry isOpen={isAddEntryOpen} onClose={() => setIsAddEntryOpen(false)} recoverData={recoverData} />
+                <WarningModal isOpen={!!deleteProduct} onClose={() => setDeleteProduct(null)} onConfirm={confirmDelete} title="Desactivar Producto" message="¿Estás seguro de que deseas desactivar este producto? Podrás reactivarlo más adelante si lo necesitas." />
             </div>
         </div>
     );

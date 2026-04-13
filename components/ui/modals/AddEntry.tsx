@@ -9,6 +9,7 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
+import * as Crypto from "expo-crypto";
 import React, { useEffect, useState } from "react";
 import { database } from "../../../src/services/DB/indexBD";
 import { syncApp } from "../../../src/sync";
@@ -30,6 +31,7 @@ interface AddEntryInnerProps {
   familias: FamiliaModel[];
   margenes: MargenModel[];
   impuestos: ImpuestoModel[];
+  recoverData?: { tabla: string, data: any } | null;
 }
 
 function AddEntryInner({
@@ -40,6 +42,7 @@ function AddEntryInner({
   familias,
   margenes,
   impuestos,
+  recoverData,
 }: AddEntryInnerProps) {
   const [productoId, setProductoId] = useState("");
   const [almacenId, setAlmacenId] = useState("");
@@ -58,6 +61,31 @@ function AddEntryInner({
     ImpuestoModel[]
   >([]);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Auto-fill from recoverData
+  useEffect(() => {
+    if (isOpen && recoverData?.data) {
+      const data = recoverData.data;
+      if (recoverData.tabla === 'lotes') {
+        setProductoId(data.producto_id || "");
+        setLote(data.identificador_lote || "");
+        setUnidad(data.unidad_medida || "pzas");
+        if (data.costo_adquisicion !== undefined) setCosto(String(data.costo_adquisicion));
+        if (data.fecha_caducidad) {
+          try {
+            const dateStr = new Date(Number(data.fecha_caducidad)).toISOString().split("T")[0];
+            setCaducidad(dateStr || "");
+          } catch(e) {}
+        }
+      } else if (recoverData.tabla === 'movimientos_inventario') {
+         setProductoId(data.producto_id || "");
+         setAlmacenId(data.almacen_id || "");
+         if (data.cantidad) setCantidad(String(data.cantidad));
+      }
+    } else if (!isOpen) {
+      resetForm();
+    }
+  }, [isOpen, recoverData]);
 
   // Cada que cambia el producto, calculamos el último costo + margen + impuestos
   useEffect(() => {
@@ -123,7 +151,7 @@ function AddEntryInner({
   const selectClass =
     "w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-slate-600";
 
-  const resetForm = () => {
+  function resetForm() {
     setProductoId("");
     setAlmacenId("");
     setLote("");
@@ -135,7 +163,7 @@ function AddEntryInner({
     setUltimoCosto(null);
     setProductoMargen(null);
     setProductoImpuestosTasas([]);
-  };
+  }
 
   const handleSave = async () => {
     try {
@@ -148,6 +176,7 @@ function AddEntryInner({
       await database.write(async () => {
         // 1. Create Lote
         const nuevoLote = await database.get<Lote>("lotes").create((l) => {
+          (l as any)._raw.id = Crypto.randomUUID();
           (l as any)._raw.producto_id = productoId;
           l.identificadorLote = lote;
           l.unidadMedida = unidad;
@@ -161,6 +190,7 @@ function AddEntryInner({
         await database
           .get<MovimientoInventario>("movimientos_inventario")
           .create((mi) => {
+            (mi as any)._raw.id = Crypto.randomUUID();
             (mi as any)._raw.almacen_id = almacenId;
             (mi as any)._raw.producto_id = productoId;
             (mi as any)._raw.lote_id = nuevoLote.id;
@@ -174,6 +204,7 @@ function AddEntryInner({
           await database
             .get<CodigoAlterno>("codigos_alternos")
             .create((ca) => {
+              (ca as any)._raw.id = Crypto.randomUUID();
               (ca as any)._raw.producto_id = productoId;
               ca.codigoBarras = codigoAlterno.trim();
             });

@@ -72,10 +72,11 @@ export const SideBarMenu: React.FC = () => {
         <div className="shrink-0 mr-4">
           <Link href="/(dev)/devpanel" asChild>
             <a
-              className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors border ${isActive("/(dev)/devpanel")
-                ? "bg-white/20 border-white/30 text-white"
-                : "bg-[#15335c] border-transparent hover:bg-white/10 text-slate-300"
-                }`}
+              className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors border ${
+                isActive("/(dev)/devpanel")
+                  ? "bg-white/20 border-white/30 text-white"
+                  : "bg-[#15335c] border-transparent hover:bg-white/10 text-slate-300"
+              }`}
               title="Dev Panel"
             >
               <Wrench size={18} />
@@ -88,10 +89,11 @@ export const SideBarMenu: React.FC = () => {
       <div className="flex items-center bg-white p-1 rounded-full shrink-0 mr-4 shadow-sm border border-slate-200">
         <Link href="/home" asChild>
           <a
-            className={`flex items-center gap-1.5 px-5 py-2 rounded-full font-semibold transition-all duration-200 text-sm ${isActive("/home")
-              ? "bg-[#15335c] text-white shadow-sm"
-              : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-              }`}
+            className={`flex items-center gap-1.5 px-5 py-2 rounded-full font-semibold transition-all duration-200 text-sm ${
+              isActive("/home")
+                ? "bg-[#15335c] text-white shadow-sm"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+            }`}
           >
             <LayoutDashboard size={16} />
             Inicio
@@ -99,10 +101,11 @@ export const SideBarMenu: React.FC = () => {
         </Link>
         <Link href="/inventory" asChild>
           <a
-            className={`flex items-center gap-1.5 px-5 py-2 rounded-full font-semibold transition-all duration-200 text-sm ${isActive("/inventory")
-              ? "bg-[#15335c] text-white shadow-sm"
-              : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-              }`}
+            className={`flex items-center gap-1.5 px-5 py-2 rounded-full font-semibold transition-all duration-200 text-sm ${
+              isActive("/inventory")
+                ? "bg-[#15335c] text-white shadow-sm"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+            }`}
           >
             <ShelvingUnitIcon size={16} />
             Inventario
@@ -110,10 +113,11 @@ export const SideBarMenu: React.FC = () => {
         </Link>
         <Link href="/invoices" asChild>
           <a
-            className={`flex items-center gap-1.5 px-5 py-2 rounded-full font-semibold transition-all duration-200 text-sm ${isActive("/invoices")
-              ? "bg-[#15335c] text-white shadow-sm"
-              : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-              }`}
+            className={`flex items-center gap-1.5 px-5 py-2 rounded-full font-semibold transition-all duration-200 text-sm ${
+              isActive("/invoices")
+                ? "bg-[#15335c] text-white shadow-sm"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+            }`}
           >
             <FileText size={16} />
             Facturas
@@ -125,10 +129,11 @@ export const SideBarMenu: React.FC = () => {
       <div className="flex items-center gap-2 shrink-0">
         <Link href="/clients" asChild>
           <a
-            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${isActive("/clients")
-              ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
-              : "bg-[#15335c] border-transparent hover:bg-white/10 text-slate-300 hover:text-white"
-              }`}
+            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${
+              isActive("/clients")
+                ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
+                : "bg-[#15335c] border-transparent hover:bg-white/10 text-slate-300 hover:text-white"
+            }`}
             title="Clientes"
           >
             <Users size={18} />
@@ -136,10 +141,11 @@ export const SideBarMenu: React.FC = () => {
         </Link>
         <Link href="/prices" asChild>
           <a
-            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${isActive("/prices")
-              ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
-              : "bg-[#15335c] border-transparent hover:bg-white/10 text-slate-300 hover:text-white"
-              }`}
+            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${
+              isActive("/prices")
+                ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
+                : "bg-[#15335c] border-transparent hover:bg-white/10 text-slate-300 hover:text-white"
+            }`}
             title="Precios"
           >
             <DollarSignIcon size={18} />
@@ -147,10 +153,11 @@ export const SideBarMenu: React.FC = () => {
         </Link>
         <Link href="/users" asChild>
           <a
-            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${isActive("/users")
-              ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
-              : "bg-[#15335c] border-transparent hover:bg-white/10 text-slate-300 hover:text-white"
-              }`}
+            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${
+              isActive("/users")
+                ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
+                : "bg-[#15335c] border-transparent hover:bg-white/10 text-slate-300 hover:text-white"
+            }`}
             title="Usuarios"
           >
             <User size={18} />
@@ -158,10 +165,11 @@ export const SideBarMenu: React.FC = () => {
         </Link>
         <Link href="/catalogs" asChild>
           <a
-            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${isActive("/catalogs")
-              ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
-              : "bg-[#15335c] border-transparent hover:bg-white/10 text-slate-300 hover:text-white"
-              }`}
+            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${
+              isActive("/catalogs")
+                ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
+                : "bg-[#15335c] border-transparent hover:bg-white/10 text-slate-300 hover:text-white"
+            }`}
             title="Catálogos"
           >
             <BookOpen size={18} />
@@ -178,10 +186,11 @@ export const SideBarMenu: React.FC = () => {
 
         <Link href="/settings" asChild>
           <a
-            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${isActive("/settings")
-              ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
-              : "bg-[#15335c] border-transparent hover:bg-white/10 text-slate-300 hover:text-white"
-              }`}
+            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${
+              isActive("/settings")
+                ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
+                : "bg-[#15335c] border-transparent hover:bg-white/10 text-slate-300 hover:text-white"
+            }`}
             title="Configuraciones"
           >
             <Settings size={18} />
@@ -195,10 +204,11 @@ export const SideBarMenu: React.FC = () => {
         <div className="relative">
           <button
             onClick={() => setShowProfile(!showProfile)}
-            className={`w-10 h-10 rounded-full overflow-hidden border-2 transition-all shadow-sm focus:outline-none ${showProfile
-              ? "border-[#abf62d] ring-2 ring-[#abf62d]/30"
-              : "border-[#abf62d]"
-              }`}
+            className={`w-10 h-10 rounded-full overflow-hidden border-2 transition-all shadow-sm focus:outline-none ${
+              showProfile
+                ? "border-[#abf62d] ring-2 ring-[#abf62d]/30"
+                : "border-[#abf62d]"
+            }`}
           >
             <img
               src={`https://ui-avatars.com/api/?name=${encodeURIComponent(

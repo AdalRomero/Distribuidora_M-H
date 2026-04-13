@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, FileText, User, ShoppingCart, Plus, Trash2 } from 'lucide-react';
 
-interface AddInvoiceProps { isOpen: boolean; onClose: () => void; }
+interface AddInvoiceProps { isOpen: boolean; onClose: () => void; recoverData?: any; }
 interface Concepto { id: string; cantidad: string; unidadSat: string; claveSat: string; concepto: string; valorUnitario: string; descuento: string; porcImpuesto: string; }
 interface InvoiceForm { serie: string; folio: string; fecha: string; hora: string; tipoComprobante: string; lugarExpedicion: string; metodoPago: string; formaPago: string; moneda: string; codigoCliente: string; nombre: string; rfc: string; domicilio: string; agente: string; usoCFDI: string; observaciones: string; conceptos: Concepto[]; }
 
@@ -21,8 +21,42 @@ const FAKE_CERT_EMISOR = '30001000000500003416';
 const FAKE_CERT_SAT = '20001000000300022323';
 const FAKE_CADENA = '||4.0|A|1|2026-03-21|Puerto Peñasco|I|PPD|99|MXN|XAXX010101000|S01|...MICO1234567890||';
 
-export default function AddInvoice({ isOpen, onClose }: AddInvoiceProps) {
+export default function AddInvoice({ isOpen, onClose, recoverData }: AddInvoiceProps) {
     const [form, setForm] = useState<InvoiceForm>(initialForm);
+
+    useEffect(() => {
+        if (recoverData) {
+            setForm({
+                serie: recoverData.serie || 'A',
+                folio: recoverData.folio || '1',
+                fecha: recoverData.fecha ? new Date(recoverData.fecha).toISOString().split('T')[0] : initialForm.fecha,
+                hora: initialForm.hora,
+                tipoComprobante: recoverData.tipoComprobante || 'I',
+                lugarExpedicion: recoverData.lugarExpedicion || '83554',
+                metodoPago: recoverData.metodoPago || 'PPD',
+                formaPago: recoverData.formaPago || '99',
+                moneda: recoverData.moneda || 'MXN',
+                codigoCliente: recoverData.codigoCliente || '',
+                nombre: recoverData.nombre || '',
+                rfc: recoverData.rfc || 'XAXX010101000',
+                domicilio: recoverData.domicilio || '',
+                agente: recoverData.agente || '',
+                usoCFDI: recoverData.usoCFDI || 'S01',
+                observaciones: recoverData.observaciones || '',
+                conceptos: recoverData.conceptos?.length ? recoverData.conceptos.map((c: any) => ({
+                    id: Math.random().toString(36).slice(2),
+                    cantidad: c.cantidad ? String(c.cantidad) : '',
+                    unidadSat: c.unidadSat || '',
+                    claveSat: c.claveSat || '',
+                    concepto: c.concepto || '',
+                    valorUnitario: c.valorUnitario ? String(c.valorUnitario) : '',
+                    descuento: c.descuento ? String(c.descuento) : '',
+                    porcImpuesto: c.porcImpuesto ? String(c.porcImpuesto) : '16'
+                })) : [newConcepto()]
+            });
+        }
+    }, [recoverData]);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => { const { name, value } = e.target; setForm(prev => ({ ...prev, [name]: value })); };
     const handleClose = () => { setForm(initialForm); onClose(); };
     const updateConcepto = (id: string, field: keyof Concepto, value: string) => { setForm(prev => ({ ...prev, conceptos: prev.conceptos.map(c => c.id === id ? { ...c, [field]: value } : c) })); };
