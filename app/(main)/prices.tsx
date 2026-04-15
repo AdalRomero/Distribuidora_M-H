@@ -42,13 +42,13 @@ export default function Prices() {
     );
 
     return (
-        <div className="p-4 sm:p-8 bg-slate-50 min-h-screen font-sans">
+        <div className="p-4 sm:p-8 bg-slate-50 dark:bg-slate-900 min-h-screen font-sans">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-mh-blue-dark tracking-tight">Listas de Precios y Tarifas</h1>
-                        <p className="text-slate-500 text-sm mt-1">Configura las reglas de precios y monedas para tus clientes.</p>
+                        <h1 className="text-2xl font-bold text-mh-blue-dark dark:text-white tracking-tight">Listas de Precios y Tarifas</h1>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Configura las reglas de precios y monedas para tus clientes.</p>
                     </div>
                     <button onClick={() => setIsPriceModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm shadow-sm">
                         <Plus className="w-4 h-4" /><span>Nueva Lista</span>
@@ -57,25 +57,25 @@ export default function Prices() {
 
                 {/* KPI Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-mh-blue"><Calculator className="w-6 h-6" /></div>
-                        <div><p className="text-sm font-medium text-slate-500">Total de Listas</p><p className="text-2xl font-bold text-mh-blue-dark">{mockPrices.length}</p></div>
+                    <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-mh-blue dark:text-blue-400"><Calculator className="w-6 h-6" /></div>
+                        <div><p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total de Listas</p><p className="text-2xl font-bold text-mh-blue-dark dark:text-white">{mockPrices.length}</p></div>
                     </div>
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600"><DollarSign className="w-6 h-6" /></div>
-                        <div><p className="text-sm font-medium text-slate-500">Moneda Principal</p><p className="text-2xl font-bold text-mh-blue-dark">MXN</p></div>
+                    <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400"><DollarSign className="w-6 h-6" /></div>
+                        <div><p className="text-sm font-medium text-slate-500 dark:text-slate-400">Moneda Principal</p><p className="text-2xl font-bold text-mh-blue-dark dark:text-white">MXN</p></div>
                     </div>
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-mh-pink/10 flex items-center justify-center text-mh-pink"><Users className="w-6 h-6" /></div>
-                        <div><p className="text-sm font-medium text-slate-500">Clientes Asignados</p><p className="text-2xl font-bold text-mh-blue-dark">{mockPrices.reduce((acc, curr) => acc + curr.activeClients, 0)}</p></div>
+                    <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-mh-pink/10 dark:bg-rose-900/30 flex items-center justify-center text-mh-pink dark:text-rose-400"><Users className="w-6 h-6" /></div>
+                        <div><p className="text-sm font-medium text-slate-500 dark:text-slate-400">Clientes Asignados</p><p className="text-2xl font-bold text-mh-blue-dark dark:text-white">{mockPrices.reduce((acc, curr) => acc + curr.activeClients, 0)}</p></div>
                     </div>
                 </div>
 
                 {/* Search Bar */}
-                <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
                     <div className="relative flex-1">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Search className="w-5 h-5 text-slate-400" /></div>
-                        <input type="text" className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400" placeholder="Buscar por nombre de lista o moneda..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                        <input type="text" className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400" placeholder="Buscar por nombre de lista o moneda..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                     </div>
                 </div>
 
@@ -88,10 +88,10 @@ export default function Prices() {
                 />
 
                 {/* Table */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm whitespace-nowrap">
-                            <thead className="bg-slate-50/80 text-slate-500 border-b border-slate-100 text-xs uppercase tracking-wider font-bold">
+                            <thead className="bg-slate-50 dark:bg-slate-900/80 text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-700 text-xs uppercase tracking-wider font-bold">
                                 <tr>
                                     <th className="px-6 py-4">Nombre de la Lista</th>
                                     <th className="px-6 py-4">Moneda</th>
@@ -102,21 +102,21 @@ export default function Prices() {
                             </thead>
                             <tbody className="divide-y divide-slate-50">
                                 {filteredPrices.map((price) => (
-                                    <tr key={price.id} className="hover:bg-slate-50/50 transition-colors group">
-                                        <td className="px-6 py-4"><p className="text-mh-blue-dark font-bold">{price.name}</p></td>
+                                    <tr key={price.id} className="hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900/50 transition-colors group">
+                                        <td className="px-6 py-4"><p className="text-mh-blue-dark dark:text-white font-bold">{price.name}</p></td>
                                         <td className="px-6 py-4">
-                                            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200">{price.currency}</span>
+                                            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">{price.currency}</span>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2 text-slate-600"><Percent className="w-3.5 h-3.5 text-mh-blue" /><span className="font-medium text-sm">{price.rule}</span></div>
+                                            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300"><Percent className="w-3.5 h-3.5 text-mh-blue" /><span className="font-medium text-sm">{price.rule}</span></div>
                                         </td>
                                         <td className="px-6 py-4 text-center">
-                                            <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1 bg-blue-50 text-mh-blue-dark rounded-full font-bold text-xs"><Users className="w-3.5 h-3.5" />{price.activeClients}</div>
+                                            <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-mh-blue-dark dark:text-blue-400 rounded-full font-bold text-xs"><Users className="w-3.5 h-3.5" />{price.activeClients}</div>
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar Lista"><Edit2 className="w-4 h-4" /></button>
-                                                <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors" title="Ver Productos"><PackageOpen className="w-4 h-4" /></button>
+                                                <button className="p-2 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors" title="Editar Lista"><Edit2 className="w-4 h-4" /></button>
+                                                <button className="p-2 text-slate-400 hover:text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900 rounded-lg transition-colors" title="Ver Productos"><PackageOpen className="w-4 h-4" /></button>
                                             </div>
                                         </td>
                                     </tr>

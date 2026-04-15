@@ -588,7 +588,7 @@ export default function Users() {
 
   const StatusBadge = ({ active }: { active: boolean }) => (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${active ? "bg-emerald-100/80 text-emerald-700 border border-emerald-200/50" : "bg-rose-100/80 text-rose-700 border border-rose-200/50"}`}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${active ? "bg-emerald-100/80 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50" : "bg-rose-100/80 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50"}`}
     >
       <span
         className={`w-1.5 h-1.5 rounded-full ${active ? "bg-emerald-500" : "bg-rose-500"}`}
@@ -599,7 +599,7 @@ export default function Users() {
 
   const RoleBadge = ({ roleName }: { roleName: string }) => (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold border uppercase tracking-wider shadow-sm ${roleName === "Administrador" ? "bg-gradient-to-r from-purple-50 to-indigo-50 text-indigo-700 border-indigo-200" : "bg-gradient-to-r from-blue-50 to-sky-50 text-blue-700 border-blue-200"}`}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold border uppercase tracking-wider shadow-sm ${roleName === "Administrador" ? "bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/50" : "bg-gradient-to-r from-blue-50 to-sky-50 dark:from-blue-900/20 dark:to-sky-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800/50"}`}
     >
       <Shield className="w-3 h-3" />
       {roleName}
@@ -607,7 +607,7 @@ export default function Users() {
   );
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen font-sans relative">
+    <div className="p-4 sm:p-8 bg-slate-50 dark:bg-slate-900 min-h-screen font-sans relative">
       <div className="max-w-7xl mx-auto">
         {/* MODALES REUTILIZABLES */}
         <SuccessModal
@@ -641,17 +641,17 @@ export default function Users() {
 
         <div className="mb-8 flex justify-between items-end">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
               Gestión de Usuarios
             </h1>
-            <p className="text-slate-500 text-sm mt-1">
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
               Administra los accesos y roles de tu equipo de trabajo.
             </p>
           </div>
           {editingUserId && (
             <button
               onClick={resetForm}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 hover:bg-slate-300 font-bold rounded-lg transition-colors text-sm shadow-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 dark:text-slate-300 hover:bg-slate-300 font-bold rounded-lg transition-colors text-sm shadow-sm"
             >
               <RotateCcw className="w-4 h-4" /> Cancelar Edición
             </button>
@@ -670,14 +670,14 @@ export default function Users() {
         <div className="flex flex-col xl:flex-row gap-6">
           {/* Panel Izquierdo: Lista de Usuarios */}
           <div className="w-full xl:w-2/3 flex flex-col gap-4">
-            <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+            <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
               <div className="relative flex-1">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Search className="w-5 h-5 text-slate-400" />
                 </div>
                 <input
                   type="text"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400"
                   placeholder="Buscar usuarios por nombre, apellido o correo..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -685,10 +685,10 @@ export default function Users() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex-1">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex-1">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm whitespace-nowrap">
-                  <thead className="bg-slate-50/80 text-slate-500 border-b border-slate-200 text-xs uppercase tracking-wider font-bold">
+                  <thead className="bg-slate-50 dark:bg-slate-900/80 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 text-xs uppercase tracking-wider font-bold">
                     <tr>
                       <th className="px-4 py-3 xl:px-3">Usuario</th>
                       <th className="px-4 py-3 xl:px-3">Rol</th>
@@ -708,7 +708,7 @@ export default function Users() {
                       <tr>
                         <td
                           colSpan={5}
-                          className="py-10 text-center text-slate-500"
+                          className="py-10 text-center text-slate-500 dark:text-slate-400"
                         >
                           No hay usuarios que coincidan con la búsqueda.
                         </td>
@@ -717,19 +717,19 @@ export default function Users() {
                       filteredUsers.map((user) => (
                         <tr
                           key={user.id}
-                          className={`transition-colors group ${editingUserId === user.id ? "bg-blue-50/50" : "hover:bg-slate-50/80"}`}
+                          className={`transition-colors group ${editingUserId === user.id ? "bg-blue-50/50 dark:bg-blue-900/10" : "hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900/80"}`}
                         >
                           <td className="px-4 py-3 xl:px-3">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0 border text-slate-700 font-bold text-sm shadow-sm">
+                              <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800/50 flex items-center justify-center shrink-0 border text-slate-700 dark:text-slate-300 font-bold text-sm shadow-sm">
                                 {user.nombres[0]?.toUpperCase() || ""}
                                 {user.apePaterno[0]?.toUpperCase() || ""}
                               </div>
                               <div>
-                                <p className="text-slate-900 font-bold">
+                                <p className="text-slate-900 dark:text-white font-bold">
                                   {user.nombres} {user.apePaterno}
                                 </p>
-                                <p className="text-slate-500 text-xs mt-0.5 flex gap-2">
+                                <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 flex gap-2">
                                   <span>{user.username}</span> •{" "}
                                   <span className="text-blue-500">
                                     {user.email}
@@ -743,7 +743,7 @@ export default function Users() {
                           </td>
                           <td className="px-4 py-3 xl:px-3">
                             {user.role === "Administrador" ? (
-                              <span className="text-xs font-bold text-slate-500 italic">
+                              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 italic">
                                 Acceso Total
                               </span>
                             ) : (
@@ -753,7 +753,7 @@ export default function Users() {
                                   user.permissions.map((p: string) => (
                                     <span
                                       key={p}
-                                      className="px-2 py-0.5 bg-slate-100 border text-slate-600 rounded-md text-[10px] font-bold uppercase"
+                                      className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800/50 border text-slate-600 dark:text-slate-300 rounded-md text-[10px] font-bold uppercase"
                                     >
                                       {p}
                                     </span>
@@ -773,7 +773,7 @@ export default function Users() {
                             <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button
                                 onClick={() => handleEditClick(user)}
-                                className="p-2 hover:text-blue-600 hover:bg-blue-50 rounded-lg shadow-sm"
+                                className="p-2 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg shadow-sm"
                                 title="Editar"
                               >
                                 <Edit2 className="w-4 h-4" />
@@ -784,7 +784,7 @@ export default function Users() {
                                   userEmail: user.email,
                                   userName: user.nombres,
                                 })}
-                                className="p-2 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg shadow-sm"
+                                className="p-2 hover:text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:bg-indigo-500/10 rounded-lg shadow-sm"
                                 title="Enviar Link de Recuperación"
                               >
                                 <Mail className="w-4 h-4" />
@@ -797,7 +797,7 @@ export default function Users() {
                                     user.status,
                                   )
                                 }
-                                className={`p-2 rounded-lg shadow-sm ${user.status ? "hover:text-rose-600 hover:bg-rose-50" : "hover:text-emerald-600 hover:bg-emerald-50"}`}
+                                className={`p-2 rounded-lg shadow-sm ${user.status ? "hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30" : "hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"}`}
                                 title={user.status ? "Desactivar" : "Reactivar"}
                               >
                                 {user.status ? (
@@ -824,15 +824,15 @@ export default function Users() {
                 e.preventDefault();
                 handleSubmit();
               }}
-              className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-5"
+              className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 space-y-5"
             >
-              <h2 className="text-lg font-bold text-slate-800">
+              <h2 className="text-lg font-bold text-slate-800 dark:text-white">
                 {editingUserId ? "Editar Usuario" : "Registrar Nuevo Usuario"}
               </h2>
 
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                     Nombre(s) <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
@@ -842,7 +842,7 @@ export default function Users() {
                     <input
                       type="text"
                       required
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                       placeholder="Ej: Ana María"
                       value={nombres}
                       onChange={(e) => setNombres(e.target.value)}
@@ -853,13 +853,13 @@ export default function Users() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                       Ap. Paterno <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="text"
                       required
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                       placeholder="Ej: Martinez"
                       value={apePaterno}
                       onChange={(e) => setApePaterno(e.target.value)}
@@ -867,12 +867,12 @@ export default function Users() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                       Ap. Materno
                     </label>
                     <input
                       type="text"
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                       placeholder="Ej: Hernandez"
                       value={apeMaterno}
                       onChange={(e) => setApeMaterno(e.target.value)}
@@ -887,7 +887,7 @@ export default function Users() {
                       <AtSign size={16} />
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500 font-medium">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                         Usuario de Acceso (Auto-generado)
                       </p>
                       <p className="text-sm font-bold text-blue-700">
@@ -899,7 +899,7 @@ export default function Users() {
 
                 {!editingUserId && (
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                       Correo Electrónico <span className="text-rose-500">*</span>
                     </label>
                     <div className="relative">
@@ -909,7 +909,7 @@ export default function Users() {
                       <input
                         type="email"
                         required
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                         placeholder="ana@distribuidoramh.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -922,7 +922,7 @@ export default function Users() {
                 {/* 🔥 CONTRASEÑA COMPLETAMENTE REMOVIDA EN MODO EDICIÓN */}
                 {!editingUserId && (
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                       Contraseña <span className="text-rose-500">*</span>
                     </label>
                     <div className="relative">
@@ -939,7 +939,7 @@ export default function Users() {
                       </button>
                       <input
                         type={showPassword ? "text" : "password"}
-                        className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 border rounded-xl text-sm font-medium outline-none transition-all ${password.length > 0 && password.length < 6 ? "border-rose-400 focus:ring-2 focus:ring-rose-500/20" : "border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500"}`}
+                        className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border rounded-xl text-sm font-medium outline-none transition-all ${password.length > 0 && password.length < 6 ? "border-rose-400 focus:ring-2 focus:ring-rose-500/20" : "border-slate-200 dark:border-slate-700 focus:bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500"}`}
                         placeholder="Mínimo 6 caracteres"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -951,11 +951,11 @@ export default function Users() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                       Rol
                     </label>
                     <select
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all cursor-pointer"
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-300 focus:bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all cursor-pointer"
                       value={role}
                       onChange={(e) => setRole(e.target.value as RoleType)}
                       disabled={isLoading}
@@ -968,7 +968,7 @@ export default function Users() {
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                       Estado
                     </label>
                     <div className="flex flex-col justify-center h-[42px] px-1">
@@ -980,7 +980,7 @@ export default function Users() {
                           onChange={() => setIsActive(!isActive)}
                           disabled={isLoading}
                         />
-                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 shadow-inner"></div>
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white dark:bg-slate-800 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 shadow-inner"></div>
                         <span
                           className={`ml-3 text-sm font-bold ${isActive ? "text-blue-700" : "text-slate-400"}`}
                         >
@@ -991,12 +991,12 @@ export default function Users() {
                   </div>
                 </div>
 
-                <div className="space-y-3 pt-4 border-t border-slate-100">
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-700">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                     Permisos de Acceso
                   </label>
                   {role === "Administrador" ? (
-                    <p className="text-xs font-bold text-slate-500 italic py-2">
+                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400 italic py-2">
                       El rol Administrador tiene acceso total a todos los módulos.
                     </p>
                   ) : (
@@ -1009,17 +1009,17 @@ export default function Users() {
                             type="button"
                             onClick={() => togglePermission(perm)}
                             disabled={isLoading}
-                            className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all text-left ${isSelected ? "bg-blue-50/50 border-blue-300 shadow-sm shadow-blue-500/10" : "bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50"}`}
+                            className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all text-left ${isSelected ? "bg-blue-50/50 border-blue-300 shadow-sm shadow-blue-500/10" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900"}`}
                           >
                             <div
-                              className={`w-4 h-4 rounded-md flex items-center justify-center transition-all shrink-0 ${isSelected ? "bg-blue-600 text-white scale-110" : "bg-white border-2 border-slate-300"}`}
+                              className={`w-4 h-4 rounded-md flex items-center justify-center transition-all shrink-0 ${isSelected ? "bg-blue-600 text-white scale-110" : "bg-white dark:bg-slate-800 border-2 border-slate-300"}`}
                             >
                               {isSelected && (
                                 <Check className="w-3 h-3" strokeWidth={3} />
                               )}
                             </div>
                             <span
-                              className={`text-xs font-bold tracking-wide truncate ${isSelected ? "text-blue-800" : "text-slate-600"}`}
+                              className={`text-xs font-bold tracking-wide truncate ${isSelected ? "text-blue-800" : "text-slate-600 dark:text-slate-300"}`}
                             >
                               {perm}
                             </span>

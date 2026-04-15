@@ -2,6 +2,8 @@
 
 @import "tailwindcss";
 
+@custom-variant dark (&:is(.dark *));
+
 @theme {
   --color-mh-blue: #15335c;
   --color-mh-blue-dark: #0f2744;

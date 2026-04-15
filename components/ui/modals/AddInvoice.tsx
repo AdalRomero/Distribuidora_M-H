@@ -8,8 +8,8 @@ interface InvoiceForm { serie: string; folio: string; fecha: string; hora: strin
 const newConcepto = (): Concepto => ({ id: Math.random().toString(36).slice(2), cantidad: '', unidadSat: '', claveSat: '', concepto: '', valorUnitario: '', descuento: '', porcImpuesto: '16' });
 const initialForm: InvoiceForm = { serie: 'A', folio: '1', fecha: new Date().toISOString().split('T')[0], hora: new Date().toTimeString().slice(0, 5), tipoComprobante: 'I', lugarExpedicion: '83554', metodoPago: 'PPD', formaPago: '99', moneda: 'MXN', codigoCliente: '', nombre: '', rfc: 'XAXX010101000', domicilio: '', agente: '', usoCFDI: 'S01', observaciones: '', conceptos: [newConcepto()] };
 
-const inputClass = 'w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm text-slate-700 bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors';
-const labelClass = 'block text-xs font-medium text-slate-600 mb-0.5';
+const inputClass = 'w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors';
+const labelClass = 'block text-xs font-medium text-slate-600 dark:text-slate-300 mb-0.5';
 
 function calcConcepto(c: Concepto) { const cant = parseFloat(c.cantidad) || 0; const vu = parseFloat(c.valorUnitario) || 0; const desc = parseFloat(c.descuento) || 0; const porc = parseFloat(c.porcImpuesto) || 0; const subtotal = cant * vu; const impuestos = subtotal * (porc / 100); const total = subtotal - desc + impuestos; return { subtotal, impuestos, total }; }
 function toLetras(num: number): string { if (num === 0) return 'CERO PESOS 00/100 M.N.'; const entero = Math.floor(num); const dec = Math.round((num - entero) * 100); return `${entero.toLocaleString()} PESOS ${dec.toString().padStart(2, '0')}/100 M.N.`; }
@@ -75,25 +75,25 @@ export default function AddInvoice({ isOpen, onClose, recoverData }: AddInvoiceP
         <div className="fixed inset-0 z-50">
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={handleClose} />
             <div className="fixed inset-0 flex items-center justify-center p-3">
-                <div className="w-[95vw] max-w-7xl h-[90vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden relative z-10">
+                <div className="w-[95vw] max-w-7xl h-[90vh] bg-white dark:bg-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden relative z-10">
 
                     {/* HEADER */}
-                    <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200 bg-white shrink-0">
+                    <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-blue-100 rounded-lg"><FileText className="w-5 h-5 text-blue-700" /></div>
-                            <h3 className="text-lg font-bold text-slate-800">Generar Factura — CFDI 4.0</h3>
+                            <h3 className="text-lg font-bold text-slate-800 dark:text-white">Generar Factura — CFDI 4.0</h3>
                         </div>
-                        <button onClick={handleClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
+                        <button onClick={handleClose} className="p-2 text-slate-400 hover:text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
                     </div>
 
                     {/* BODY (Split View) */}
                     <div className="flex-1 grid grid-cols-2 overflow-hidden">
 
                         {/* LEFT - Form */}
-                        <div className="overflow-y-auto p-5 pr-3 bg-slate-50 border-r border-slate-200 space-y-4">
+                        <div className="overflow-y-auto p-5 pr-3 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 space-y-4">
 
                             {/* Card 1: Datos del Comprobante */}
-                            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 shadow-sm">
                                 <div className="flex items-center gap-2 mb-3"><FileText className="w-4 h-4 text-blue-700" /><h4 className="font-semibold text-blue-900 text-sm">Datos del Comprobante</h4></div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div><label className={labelClass}>Serie</label><input type="text" name="serie" value={form.serie} onChange={handleChange} className={inputClass} /></div>
@@ -109,7 +109,7 @@ export default function AddInvoice({ isOpen, onClose, recoverData }: AddInvoiceP
                             </div>
 
                             {/* Card 2: Datos del Receptor */}
-                            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 shadow-sm">
                                 <div className="flex items-center gap-2 mb-3"><User className="w-4 h-4 text-blue-700" /><h4 className="font-semibold text-blue-900 text-sm">Datos del Cliente (Receptor)</h4></div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div><label className={labelClass}>Código de Cliente</label><input type="text" name="codigoCliente" value={form.codigoCliente} onChange={handleChange} className={inputClass} placeholder="000001" /></div>
@@ -123,16 +123,16 @@ export default function AddInvoice({ isOpen, onClose, recoverData }: AddInvoiceP
                             </div>
 
                             {/* Card 3: Conceptos */}
-                            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 shadow-sm">
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-2"><ShoppingCart className="w-4 h-4 text-blue-700" /><h4 className="font-semibold text-blue-900 text-sm">Conceptos (Items)</h4></div>
                                     <button type="button" onClick={addConcepto} className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors"><Plus className="w-3 h-3" /> Agregar</button>
                                 </div>
                                 <div className="space-y-4">
                                     {form.conceptos.map((c, idx) => (
-                                        <div key={c.id} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+                                        <div key={c.id} className="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50 dark:bg-slate-900">
                                             <div className="flex items-center justify-between mb-2">
-                                                <span className="text-xs font-semibold text-slate-500">Artículo #{idx + 1}</span>
+                                                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Artículo #{idx + 1}</span>
                                                 {form.conceptos.length > 1 && (<button type="button" onClick={() => removeConcepto(c.id)} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>)}
                                             </div>
                                             <div className="grid grid-cols-3 gap-2">
@@ -152,7 +152,7 @@ export default function AddInvoice({ isOpen, onClose, recoverData }: AddInvoiceP
 
                         {/* RIGHT - PDF Preview */}
                         <div className="overflow-y-auto bg-gray-200 p-4">
-                            <div className="bg-white shadow-lg mx-auto text-gray-900" style={{ maxWidth: 680, fontFamily: 'Arial, sans-serif', fontSize: '8px', lineHeight: '1.35' }}>
+                            <div className="bg-white dark:bg-slate-800 shadow-lg mx-auto text-gray-900" style={{ maxWidth: 680, fontFamily: 'Arial, sans-serif', fontSize: '8px', lineHeight: '1.35' }}>
                                 <div className="p-4">
 
                                     {/* Header: Logo | Emisor | Factura Box */}
@@ -266,8 +266,8 @@ export default function AddInvoice({ isOpen, onClose, recoverData }: AddInvoiceP
                     </div>
 
                     {/* FOOTER */}
-                    <div className="px-6 py-3 border-t border-slate-200 bg-white shrink-0 flex justify-end gap-3">
-                        <button type="button" onClick={handleClose} className="px-6 py-2 rounded-xl text-slate-500 text-sm font-medium hover:bg-slate-100 transition-colors">Cancelar</button>
+                    <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0 flex justify-end gap-3">
+                        <button type="button" onClick={handleClose} className="px-6 py-2 rounded-xl text-slate-500 dark:text-slate-400 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 transition-colors">Cancelar</button>
                         <button type="button" className="px-6 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition-all active:scale-95 shadow-md shadow-blue-500/20">Generar Factura</button>
                     </div>
                 </div>

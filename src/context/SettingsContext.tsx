@@ -52,6 +52,7 @@ export const DEFAULT_HOTKEYS: HotkeyMap = {
     nav_prices: "Ctrl + P",
     nav_invoices: "Ctrl + F",
     nav_settings: "Ctrl + S",
+    nav_catalogs: "Ctrl + T",
 };
 
 const DEFAULT_NOTIFICATIONS: NotificationPreferences = {
@@ -119,6 +120,36 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
         const hotkeyChanged = JSON.stringify(hotkeys) !== JSON.stringify(savedHotkeys);
         setHasUnsavedChanges(themeChanged || notifChanged || hotkeyChanged);
     }, [theme, notifications, hotkeys, savedTheme, savedNotifications, savedHotkeys, isLoading]);
+
+    // Aplicar tema oscuro globalmente
+    useEffect(() => {
+        if (typeof window === 'undefined' || !window.document) return;
+
+        const applyTheme = () => {
+            const root = window.document.documentElement;
+            if (theme === 'dark') {
+                root.classList.add('dark');
+            } else if (theme === 'light') {
+                root.classList.remove('dark');
+            } else if (theme === 'auto') {
+                const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (systemPrefersDark) {
+                    root.classList.add('dark');
+                } else {
+                    root.classList.remove('dark');
+                }
+            }
+        };
+
+        applyTheme();
+
+        if (theme === 'auto') {
+            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            const listener = () => applyTheme();
+            mediaQuery.addEventListener('change', listener);
+            return () => mediaQuery.removeEventListener('change', listener);
+        }
+    }, [theme]);
 
     const setTheme = useCallback((newTheme: ThemeMode) => {
         setThemeState(newTheme);

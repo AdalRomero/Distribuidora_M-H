@@ -143,7 +143,7 @@ function CatalogsContent({ familias, almacenes, impuestos, margenes }: CatalogsP
     ];
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen font-sans">
+    <div className="p-4 sm:p-8 bg-slate-50 dark:bg-slate-900 min-h-screen font-sans">
       <div className="max-w-7xl mx-auto">
         {/* ── Modals ── */}
         <SuccessModal isOpen={modal.success.open} onClose={closeSuccess} title={modal.success.title} message={modal.success.message} />
@@ -153,8 +153,8 @@ function CatalogsContent({ familias, almacenes, impuestos, margenes }: CatalogsP
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-mh-blue-dark tracking-tight">Catálogos</h1>
-            <p className="text-slate-500 text-sm mt-1">
+            <h1 className="text-2xl font-bold text-mh-blue-dark dark:text-white tracking-tight">Catálogos</h1>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
               Administra las bases de datos de Familias, Almacenes e Impuestos
             </p>
           </div>
@@ -176,22 +176,22 @@ function CatalogsContent({ familias, almacenes, impuestos, margenes }: CatalogsP
         />
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-6 bg-slate-100 p-1 rounded-xl w-fit">
+        <div className="flex gap-1 mb-6 bg-slate-100 dark:bg-slate-800/50 p-1 rounded-xl w-fit">
           {tabs.map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === t.key
-                ? "bg-white text-mh-blue-dark shadow-sm font-bold"
-                : "text-slate-500 hover:text-slate-700"
+                ? "bg-white dark:bg-slate-800 text-mh-blue-dark dark:text-white shadow-sm font-bold"
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-300"
                 }`}
             >
               {t.icon}
               {t.label}
               <span
                 className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${tab === t.key
-                  ? "bg-blue-100 text-blue-700"
-                  : "bg-slate-200 text-slate-500"
+                  ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
+                  : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
                   }`}
               >
                 {t.count}
@@ -375,44 +375,44 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
 
       {/* Add form */}
       {showAdd && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-100 mb-6 space-y-4">
-          <h3 className="font-bold text-slate-700 flex items-center gap-2">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-blue-100 mb-6 space-y-4">
+          <h3 className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
             <Plus className="w-4 h-4 text-blue-500" />
             Crear Nueva Familia
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
                 Código *
               </label>
               <input
                 type="text"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 placeholder="Ej. 01"
                 value={codigo}
                 onChange={(e) => setCodigo(e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
                 Nombre *
               </label>
               <input
                 type="text"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 placeholder="Ej. Harinas"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
                 🟢 ¿Cuántos días antes es "seguro"?
               </label>
               <input
                 type="number"
                 min="1"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                 placeholder="90"
                 value={umbralVerde}
                 onChange={(e) => setUmbralVerde(e.target.value)}
@@ -420,13 +420,13 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
               <p className="text-[10px] text-slate-400 mt-1">Ej: 90 = más de 3 meses</p>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
                 🟡 ¿Cuándo empieza el riesgo?
               </label>
               <input
                 type="number"
                 min="1"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none"
                 placeholder="30"
                 value={umbralAmarillo}
                 onChange={(e) => setUmbralAmarillo(e.target.value)}
@@ -435,46 +435,46 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
             </div>
           </div>
           {/* ── Vista previa visual de avisos ── */}
-          <div className="rounded-xl border border-slate-200 overflow-hidden">
-            <div className="bg-slate-100 px-4 py-2">
-              <p className="text-xs font-bold text-slate-600">📋 Así se verán los avisos de esta familia:</p>
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div className="bg-slate-100 dark:bg-slate-800/50 px-4 py-2">
+              <p className="text-xs font-bold text-slate-600 dark:text-slate-300">📋 Así se verán los avisos de esta familia:</p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-0 divide-x divide-slate-100">
               {/* Seguro */}
-              <div className="bg-emerald-50 p-4 flex flex-col items-center text-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                  <ShieldCheck className="w-5 h-5 text-emerald-600" />
+              <div className="bg-emerald-50 dark:bg-emerald-900/10 p-4 flex flex-col items-center text-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                  <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-500" />
                 </div>
-                <p className="text-sm font-extrabold text-emerald-700">Seguro</p>
-                <p className="text-[11px] text-emerald-600 font-medium leading-tight">
+                <p className="text-sm font-extrabold text-emerald-700 dark:text-emerald-400">Seguro</p>
+                <p className="text-[11px] text-emerald-600 dark:text-emerald-500 font-medium leading-tight">
                   Más de <strong>{umbralVerde || 90} días</strong>
                 </p>
-                <div className="w-full h-1.5 rounded-full bg-emerald-300 mt-1"></div>
+                <div className="w-full h-1.5 rounded-full bg-emerald-300 dark:bg-emerald-800/50 mt-1"></div>
               </div>
               {/* Atención */}
-              <div className="bg-amber-50 p-4 flex flex-col items-center text-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                  <ShieldAlert className="w-5 h-5 text-amber-600" />
+              <div className="bg-amber-50 dark:bg-amber-500/10 p-4 flex flex-col items-center text-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                  <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-500" />
                 </div>
-                <p className="text-sm font-extrabold text-amber-700">Atención</p>
-                <p className="text-[11px] text-amber-600 font-medium leading-tight">
+                <p className="text-sm font-extrabold text-amber-700 dark:text-amber-400">Atención</p>
+                <p className="text-[11px] text-amber-600 dark:text-amber-500 font-medium leading-tight">
                   De <strong>{umbralAmarillo || 30}</strong> a <strong>{umbralVerde || 90} días</strong>
                 </p>
-                <div className="w-full h-1.5 rounded-full bg-amber-300 mt-1"></div>
+                <div className="w-full h-1.5 rounded-full bg-amber-300 dark:bg-amber-800/50 mt-1"></div>
               </div>
               {/* Peligro */}
-              <div className="bg-rose-50 p-4 flex flex-col items-center text-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center">
-                  <ShieldX className="w-5 h-5 text-rose-600" />
+              <div className="bg-rose-50 dark:bg-rose-900/10 p-4 flex flex-col items-center text-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
+                  <ShieldX className="w-5 h-5 text-rose-600 dark:text-rose-500" />
                 </div>
-                <p className="text-sm font-extrabold text-rose-700">Peligro</p>
-                <p className="text-[11px] text-rose-600 font-medium leading-tight">
+                <p className="text-sm font-extrabold text-rose-700 dark:text-rose-400">Peligro</p>
+                <p className="text-[11px] text-rose-600 dark:text-rose-500 font-medium leading-tight">
                   Menos de <strong>{umbralAmarillo || 30} días</strong>
                 </p>
-                <div className="w-full h-1.5 rounded-full bg-rose-300 mt-1"></div>
+                <div className="w-full h-1.5 rounded-full bg-rose-300 dark:bg-rose-800/50 mt-1"></div>
               </div>
               {/* Caducado */}
-              <div className="bg-gray-900 p-4 flex flex-col items-center text-center gap-2">
+              <div className="bg-gray-900 dark:bg-slate-900 p-4 flex flex-col items-center text-center gap-2">
                 <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center">
                   <Skull className="w-5 h-5 text-gray-300" />
                 </div>
@@ -489,7 +489,7 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
           <div className="flex justify-end gap-3">
             <button
               onClick={() => setShowAdd(false)}
-              className="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 rounded-lg transition-colors"
             >
               Cancelar
             </button>
@@ -504,9 +504,9 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
       )}
 
       {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50/50 text-slate-500 font-semibold border-b border-slate-100">
+          <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-100 dark:border-slate-700">
             <tr>
               <th className="px-6 py-4">Código</th>
               <th className="px-6 py-4">Nombre</th>
@@ -529,7 +529,7 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
               familias.map((f) => (
                 <tr
                   key={f.id}
-                  className={`hover:bg-slate-50/50 transition-colors group ${!f.estado ? 'opacity-50 bg-slate-50/30' : ''}`}
+                  className={`hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900/50 transition-colors group ${!f.estado ? 'opacity-50 bg-slate-50 dark:bg-slate-900/30' : ''}`}
                 >
                   {editId === f.id ? (
                     <>
@@ -586,7 +586,7 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
                           </button>
                           <button
                             onClick={() => setEditId(null)}
-                            className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg"
+                            className="p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 rounded-lg"
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -596,24 +596,24 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
                   ) : (
                     <>
                       <td className="px-6 py-4">
-                        <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-bold">
+                        <span className="px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-md text-xs font-bold">
                           {f.codigoFamilia}
                         </span>
                       </td>
-                      <td className="px-6 py-4 font-medium text-slate-800">
+                      <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">
                         {f.nombre}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] font-bold text-emerald-700" title={`Seguro: más de ${f.umbralVerdeDias || 90} días`}>
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50 rounded-lg text-[11px] font-bold text-emerald-700 dark:text-emerald-400" title={`Seguro: más de ${f.umbralVerdeDias || 90} días`}>
                             <ShieldCheck className="w-3.5 h-3.5" />
                             Seguro &gt;{f.umbralVerdeDias || 90}d
                           </span>
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 border border-amber-200 rounded-lg text-[11px] font-bold text-amber-700" title={`Atención: ${f.umbralAmarilloDias || 30} a ${f.umbralVerdeDias || 90} días`}>
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800/50 rounded-lg text-[11px] font-bold text-amber-700 dark:text-amber-400" title={`Atención: ${f.umbralAmarilloDias || 30} a ${f.umbralVerdeDias || 90} días`}>
                             <ShieldAlert className="w-3.5 h-3.5" />
                             Atención {f.umbralAmarilloDias || 30}d
                           </span>
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-50 border border-rose-200 rounded-lg text-[11px] font-bold text-rose-700" title={`Peligro: menos de ${f.umbralAmarilloDias || 30} días`}>
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800/50 rounded-lg text-[11px] font-bold text-rose-700 dark:text-rose-400" title={`Peligro: menos de ${f.umbralAmarilloDias || 30} días`}>
                             <ShieldX className="w-3.5 h-3.5" />
                             Peligro &lt;{f.umbralAmarilloDias || 30}d
                           </span>
@@ -623,8 +623,8 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
                         <button
                           onClick={() => toggleEstado(f)}
                           className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 ${f.estado
-                            ? "bg-emerald-50 border border-emerald-200 hover:bg-emerald-100"
-                            : "bg-slate-50 border border-slate-200 hover:bg-slate-100"
+                            ? "bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+                            : "bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50"
                             }`}
                         >
                           {f.estado ? (
@@ -782,18 +782,18 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
       </div>
 
       {showAdd && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-100 mb-6 space-y-4">
-          <h3 className="font-bold text-slate-700 flex items-center gap-2">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-blue-100 mb-6 space-y-4">
+          <h3 className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
             <Plus className="w-4 h-4 text-blue-500" />
             Crear Nuevo Almacén
           </h3>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
               Nombre *
             </label>
             <input
               type="text"
-              className="w-full max-w-md px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full max-w-md px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
               placeholder="Ej. Bodega Central"
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
@@ -802,7 +802,7 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
           <div className="flex justify-end gap-3">
             <button
               onClick={() => setShowAdd(false)}
-              className="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 rounded-lg transition-colors"
             >
               Cancelar
             </button>
@@ -816,9 +816,9 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50/50 text-slate-500 font-semibold border-b border-slate-100">
+          <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-100 dark:border-slate-700">
             <tr>
               <th className="px-6 py-4">Nombre</th>
               <th className="px-6 py-4">Estado</th>
@@ -839,7 +839,7 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
               almacenes.map((a) => (
                 <tr
                   key={a.id}
-                  className={`hover:bg-slate-50/50 transition-colors group ${!a.estado ? 'opacity-50 bg-slate-50/30' : ''}`}
+                  className={`hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900/50 transition-colors group ${!a.estado ? 'opacity-50 bg-slate-50 dark:bg-slate-900/30' : ''}`}
                 >
                   {editId === a.id ? (
                     <>
@@ -862,7 +862,7 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
                           </button>
                           <button
                             onClick={() => setEditId(null)}
-                            className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg"
+                            className="p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 rounded-lg"
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -873,10 +873,10 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
                     <>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
-                            <Warehouse className="w-4 h-4 text-blue-600" />
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                            <Warehouse className="w-4 h-4 text-blue-600 dark:text-blue-500" />
                           </div>
-                          <span className="font-medium text-slate-800">
+                          <span className="font-medium text-slate-800 dark:text-white">
                             {a.nombre}
                           </span>
                         </div>
@@ -885,8 +885,8 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
                         <button
                           onClick={() => toggleEstado(a)}
                           className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 ${a.estado
-                            ? "bg-emerald-50 border border-emerald-200 hover:bg-emerald-100"
-                            : "bg-slate-50 border border-slate-200 hover:bg-slate-100"
+                            ? "bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+                            : "bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50"
                             }`}
                         >
                           {a.estado ? (
@@ -1053,33 +1053,33 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
       </div>
 
       {showAdd && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-100 mb-6 space-y-4">
-          <h3 className="font-bold text-slate-700 flex items-center gap-2">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-blue-100 mb-6 space-y-4">
+          <h3 className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
             <Plus className="w-4 h-4 text-blue-500" />
             Crear Nuevo Impuesto
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-md">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
                 Nombre *
               </label>
               <input
                 type="text"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 placeholder="Ej. IVA"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
                 Tasa (%) *
               </label>
               <input
                 type="number"
                 step="0.01"
                 min="0"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 placeholder="Ej. 16"
                 value={tasa}
                 onChange={(e) => setTasa(e.target.value)}
@@ -1089,7 +1089,7 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
           <div className="flex justify-end gap-3">
             <button
               onClick={() => setShowAdd(false)}
-              className="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 rounded-lg transition-colors"
             >
               Cancelar
             </button>
@@ -1103,9 +1103,9 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50/50 text-slate-500 font-semibold border-b border-slate-100">
+          <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-100 dark:border-slate-700">
             <tr>
               <th className="px-6 py-4">Nombre</th>
               <th className="px-6 py-4">Tasa</th>
@@ -1127,7 +1127,7 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
               impuestos.map((i) => (
                 <tr
                   key={i.id}
-                  className={`hover:bg-slate-50/50 transition-colors group ${!i.activo ? 'opacity-50 bg-slate-50/30' : ''}`}
+                  className={`hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900/50 transition-colors group ${!i.activo ? 'opacity-50 bg-slate-50 dark:bg-slate-900/30' : ''}`}
                 >
                   {editId === i.id ? (
                     <>
@@ -1159,7 +1159,7 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
                           </button>
                           <button
                             onClick={() => setEditId(null)}
-                            className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg"
+                            className="p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 rounded-lg"
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -1170,16 +1170,16 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
                     <>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
-                            <Receipt className="w-4 h-4 text-emerald-600" />
+                          <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
+                            <Receipt className="w-4 h-4 text-emerald-600 dark:text-emerald-500" />
                           </div>
-                          <span className="font-medium text-slate-800">
+                          <span className="font-medium text-slate-800 dark:text-white">
                             {i.nombre}
                           </span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold">
+                        <span className="px-2.5 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg text-xs font-bold">
                           {i.tasa}%
                         </span>
                       </td>
@@ -1187,8 +1187,8 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
                         <button
                           onClick={() => toggleActivo(i)}
                           className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 ${i.activo
-                            ? "bg-emerald-50 border border-emerald-200 hover:bg-emerald-100"
-                            : "bg-slate-50 border border-slate-200 hover:bg-slate-100"
+                            ? "bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+                            : "bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50"
                             }`}
                         >
                           {i.activo ? (
@@ -1356,33 +1356,33 @@ function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterO
       </div>
 
       {showAdd && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-100 mb-6 space-y-4">
-          <h3 className="font-bold text-slate-700 flex items-center gap-2">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-blue-100 mb-6 space-y-4">
+          <h3 className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
             <Plus className="w-4 h-4 text-blue-500" />
             Crear Nuevo Margen
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-md">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
                 Nombre *
               </label>
               <input
                 type="text"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 placeholder="Ej. Margen Ideal"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
                 Porcentaje (%) *
               </label>
               <input
                 type="number"
                 step="0.01"
                 min="0"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 placeholder="Ej. 35"
                 value={porcentaje}
                 onChange={(e) => setPorcentaje(e.target.value)}
@@ -1392,7 +1392,7 @@ function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterO
           <div className="flex justify-end gap-3">
             <button
               onClick={() => setShowAdd(false)}
-              className="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 rounded-lg transition-colors"
             >
               Cancelar
             </button>
@@ -1406,9 +1406,9 @@ function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterO
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50/50 text-slate-500 font-semibold border-b border-slate-100">
+          <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-100 dark:border-slate-700">
             <tr>
               <th className="px-6 py-4">Nombre</th>
               <th className="px-6 py-4">Porcentaje</th>
@@ -1430,7 +1430,7 @@ function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterO
               margenes.map((m) => (
                 <tr
                   key={m.id}
-                  className={`hover:bg-slate-50/50 transition-colors group ${!m.estado ? 'opacity-50 bg-slate-50/30' : ''}`}
+                  className={`hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900/50 transition-colors group ${!m.estado ? 'opacity-50 bg-slate-50 dark:bg-slate-900/30' : ''}`}
                 >
                   {editId === m.id ? (
                     <>
@@ -1462,7 +1462,7 @@ function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterO
                           </button>
                           <button
                             onClick={() => setEditId(null)}
-                            className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg"
+                            className="p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 rounded-lg"
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -1473,16 +1473,16 @@ function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterO
                     <>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
-                            <DollarSign className="w-4 h-4 text-emerald-600" />
+                          <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
+                            <DollarSign className="w-4 h-4 text-emerald-600 dark:text-emerald-500" />
                           </div>
-                          <span className="font-medium text-slate-800">
+                          <span className="font-medium text-slate-800 dark:text-white">
                             {m.nombre}
                           </span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold">
+                        <span className="px-2.5 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg text-xs font-bold">
                           {m.porcentaje}%
                         </span>
                       </td>
@@ -1490,8 +1490,8 @@ function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterO
                         <button
                           onClick={() => toggleEstado(m)}
                           className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 ${m.estado
-                            ? "bg-emerald-50 border border-emerald-200 hover:bg-emerald-100"
-                            : "bg-slate-50 border border-slate-200 hover:bg-slate-100"
+                            ? "bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+                            : "bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50"
                             }`}
                         >
                           {m.estado ? (

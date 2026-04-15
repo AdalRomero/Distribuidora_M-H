@@ -71,19 +71,19 @@ function InventoryContent({ productos, familias }: InventoryProps) {
     };
 
     return (
-        <div className="p-8 bg-slate-50 min-h-screen font-sans">
+        <div className="p-8 bg-slate-50 dark:bg-slate-900 min-h-screen font-sans">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-800">Inventario de Productos</h1>
-                        <p className="text-slate-500 text-sm mt-1">Gestiona y consulta tu catálogo de distribución</p>
+                        <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Inventario de Productos</h1>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Gestiona y consulta tu catálogo de distribución</p>
                     </div>
                     <div className="flex gap-3">
-                        <button className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg bg-white text-slate-700 hover:bg-slate-50 transition-colors font-medium text-sm shadow-sm">
+                        <button className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900 transition-colors font-medium text-sm shadow-sm">
                             <Download className="w-4 h-4" /><span>Exportar</span>
                         </button>
-                        <button onClick={() => setIsAddEntryOpen(true)} className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg bg-white text-slate-700 hover:bg-slate-50 transition-colors font-medium text-sm shadow-sm">
+                        <button onClick={() => setIsAddEntryOpen(true)} className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900 transition-colors font-medium text-sm shadow-sm">
                             <Package className="w-4 h-4" /><span>Registrar Entrada</span>
                         </button>
                         <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm shadow-sm">
@@ -102,35 +102,35 @@ function InventoryContent({ productos, familias }: InventoryProps) {
 
                 {/* KPIs */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center shrink-0"><Package className="w-6 h-6 text-blue-600" /></div>
-                        <div><p className="text-sm text-slate-500 font-medium">Total Productos</p><p className="text-xl font-bold text-slate-800">{productos.length}</p></div>
+                    <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0"><Package className="w-6 h-6 text-blue-600 dark:text-blue-500" /></div>
+                        <div><p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Total Productos</p><p className="text-xl font-bold text-slate-800 dark:text-white">{productos.length}</p></div>
                     </div>
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center shrink-0"><DollarSign className="w-6 h-6 text-emerald-600" /></div>
-                        <div><p className="text-sm text-slate-500 font-medium">Familias Activas</p><p className="text-xl font-bold text-slate-800">{familias.filter(f => f.estado).length}</p></div>
+                    <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center shrink-0"><DollarSign className="w-6 h-6 text-emerald-600 dark:text-emerald-500" /></div>
+                        <div><p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Familias Activas</p><p className="text-xl font-bold text-slate-800 dark:text-white">{familias.filter(f => f.estado).length}</p></div>
                     </div>
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center shrink-0"><AlertTriangle className="w-6 h-6 text-amber-500" /></div>
-                        <div><p className="text-sm text-slate-500 font-medium">Stock Bajo</p><p className="text-xl font-bold text-amber-600">— Prods</p></div>
+                    <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center shrink-0"><AlertTriangle className="w-6 h-6 text-amber-500" /></div>
+                        <div><p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Stock Bajo</p><p className="text-xl font-bold text-amber-600 dark:text-amber-500">— Prods</p></div>
                     </div>
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 bg-rose-50"><Clock className="w-6 h-6 text-rose-500" /></div>
-                        <div><p className="text-sm text-slate-500 font-medium">Próximos a Caducar</p><p className="text-xl font-bold text-rose-600">— Prods</p></div>
+                    <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 bg-rose-50 dark:bg-rose-900/30"><Clock className="w-6 h-6 text-rose-500" /></div>
+                        <div><p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Próximos a Caducar</p><p className="text-xl font-bold text-rose-600 dark:text-rose-500">— Prods</p></div>
                     </div>
                 </div>
 
                 {/* Search & Filter */}
-                <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
                     <div className="relative flex-1">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Search className="w-5 h-5 text-slate-400" /></div>
-                        <input type="text" className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400" placeholder="Buscar por código, nombre o lote..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                        <input type="text" className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400" placeholder="Buscar por código, nombre o lote..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                     </div>
                     <div className="flex gap-3">
                         <select
                             value={filterFamilia}
                             onChange={e => setFilterFamilia(e.target.value)}
-                            className="px-4 py-2.5 bg-slate-50 border-none rounded-xl text-sm font-medium text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+                            className="px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border-none rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
                         >
                             <option value="">Todas las Familias</option>
                             {familias.filter(f => f.estado).map(fam => (
@@ -142,30 +142,30 @@ function InventoryContent({ productos, familias }: InventoryProps) {
 
                 {/* Alert Legend */}
                 <div className="flex flex-wrap items-center gap-3 mb-4 px-1">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Avisos:</span>
-                    <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 rounded-full border border-emerald-200">
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Avisos:</span>
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/30 rounded-full border border-emerald-200 dark:border-emerald-800/50">
                         <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                        <span className="text-[10px] font-bold text-emerald-700">OK</span>
+                        <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">OK</span>
                     </div>
-                    <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-50 rounded-full border border-amber-200">
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-50 dark:bg-amber-900/30 rounded-full border border-amber-200 dark:border-amber-800/50">
                         <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-                        <span className="text-[10px] font-bold text-amber-700">Precaución</span>
+                        <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400">Precaución</span>
                     </div>
-                    <div className="flex items-center gap-1.5 px-2 py-1 bg-rose-50 rounded-full border border-rose-200">
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-rose-50 dark:bg-rose-900/30 rounded-full border border-rose-200 dark:border-rose-800/50">
                         <div className="w-2 h-2 rounded-full bg-rose-500"></div>
-                        <span className="text-[10px] font-bold text-rose-700">Urgente</span>
+                        <span className="text-[10px] font-bold text-rose-700 dark:text-rose-400">Urgente</span>
                     </div>
                     <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-900 rounded-full border border-gray-700">
-                        <div className="w-2 h-2 rounded-full bg-white"></div>
+                        <div className="w-2 h-2 rounded-full bg-white dark:bg-slate-300"></div>
                         <span className="text-[10px] font-bold text-white">Vencido</span>
                     </div>
                 </div>
 
                 {/* Table */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm whitespace-nowrap">
-                            <thead className="bg-slate-50/50 text-slate-500 font-semibold border-b border-slate-100">
+                            <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-100 dark:border-slate-700">
                                 <tr>
                                     <th className="px-6 py-4">Producto</th>
                                     <th className="px-6 py-4">Clasificación</th>
@@ -181,7 +181,7 @@ function InventoryContent({ productos, familias }: InventoryProps) {
                                         <td colSpan={6} className="px-6 py-12 text-center">
                                             <div className="flex flex-col items-center gap-3">
                                                 <Package className="w-10 h-10 text-slate-300" />
-                                                <p className="text-slate-500 font-medium">No se encontraron productos</p>
+                                                <p className="text-slate-500 dark:text-slate-400 font-medium">No se encontraron productos</p>
                                                 <p className="text-slate-400 text-xs">Crea uno nuevo para empezar a gestionar tu inventario</p>
                                             </div>
                                         </td>

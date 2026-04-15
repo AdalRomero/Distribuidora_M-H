@@ -3,11 +3,13 @@ import { StatusBar } from "expo-status-bar";
 import "../global.css";
 import { AuthProvider } from "../src/context/AuthContext";
 import { SettingsProvider } from "../src/context/SettingsContext";
+import { GlobalHotkeyListener } from "../components/GlobalHotkeyListener";
 
 export default function RootLayout() {
   return (
     <AuthProvider>
       <SettingsProvider>
+        <GlobalHotkeyListener />
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="(main)" />

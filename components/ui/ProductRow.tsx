@@ -41,18 +41,18 @@ export function calculateAlertLevel(
 // ─── Alert Badge Styles ─────────────────────────────────────
 const alertStyles: Record<AlertLevel, { bg: string; text: string; border: string; icon: string }> = {
     green: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: 'text-emerald-500' },
-    yellow: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: 'text-amber-500' },
+    yellow: { bg: 'bg-amber-50 dark:bg-amber-500/10', text: 'text-amber-700', border: 'border-amber-200', icon: 'text-amber-500' },
     red: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', icon: 'text-rose-500' },
     black: { bg: 'bg-gray-900', text: 'text-white', border: 'border-gray-700', icon: 'text-gray-400' },
-    none: { bg: 'bg-slate-50', text: 'text-slate-500', border: 'border-slate-200', icon: 'text-slate-400' },
+    none: { bg: 'bg-slate-50 dark:bg-slate-900', text: 'text-slate-500 dark:text-slate-400', border: 'border-slate-200 dark:border-slate-700', icon: 'text-slate-400' },
 };
 
 const getMarginBadgeStyle = (category: string) => {
     switch (category) {
-        case 'Margen Ideal': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-        case 'Margen Alto': return 'bg-purple-100 text-purple-700 border-purple-200';
-        case 'De Servicio': return 'bg-slate-100 text-slate-600 border-slate-200';
-        default: return 'bg-orange-100 text-orange-700 border-orange-200';
+        case 'Margen Ideal': return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:border-emerald-800/50 dark:text-emerald-400';
+        case 'Margen Alto': return 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:border-purple-800/50 dark:text-purple-400';
+        case 'De Servicio': return 'bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700';
+        default: return 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:border-orange-800/50 dark:text-orange-400';
     }
 };
 
@@ -117,20 +117,20 @@ function ProductRowInner({ producto, familia, lotes, impuestosLinks, stockGlobal
     };
 
     return (
-        <tr className="hover:bg-slate-50/50 transition-colors group">
+        <tr className="hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900/50 transition-colors group">
             {/* Producto */}
             <td className="px-6 py-4">
                 <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border overflow-hidden ${worstLevel === 'black' ? 'bg-gray-900 border-gray-700' : worstLevel === 'red' ? 'bg-rose-50 border-rose-200' : 'bg-slate-100 border-slate-200'}`}>
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border overflow-hidden ${worstLevel === 'black' ? 'bg-gray-900 border-gray-700' : worstLevel === 'red' ? 'bg-rose-50 border-rose-200 dark:bg-rose-900/20 dark:border-rose-800/50' : 'bg-slate-100 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'}`}>
                         {producto.imagen ? (
                             <img src={producto.imagen} alt="Producto" className="w-full h-full object-cover" />
                         ) : (
-                            <ImageIcon className={`w-5 h-5 ${worstLevel === 'black' ? 'text-gray-400' : worstLevel === 'red' ? 'text-rose-400' : 'text-slate-400'}`} />
+                            <ImageIcon className={`w-5 h-5 ${worstLevel === 'black' ? 'text-gray-400' : worstLevel === 'red' ? 'text-rose-400 dark:text-rose-500' : 'text-slate-400'}`} />
                         )}
                     </div>
                     <div>
-                        <p className="text-slate-900 font-bold max-w-xs truncate" title={producto.descripcion}>{producto.descripcion}</p>
-                        <p className="text-slate-500 text-xs mt-0.5">{producto.codigoInterno}</p>
+                        <p className="text-slate-900 dark:text-white font-bold max-w-xs truncate" title={producto.descripcion}>{producto.descripcion}</p>
+                        <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">{producto.codigoInterno}</p>
                     </div>
                 </div>
             </td>
@@ -138,7 +138,7 @@ function ProductRowInner({ producto, familia, lotes, impuestosLinks, stockGlobal
             {/* Clasificación */}
             <td className="px-6 py-4">
                 <div>
-                    <p className="text-slate-700 font-medium">{familia ? `${familia.codigoFamilia}-${familia.nombre}` : 'Sin Familia'}</p>
+                    <p className="text-slate-700 dark:text-slate-300 font-medium">{familia ? `${familia.codigoFamilia}-${familia.nombre}` : 'Sin Familia'}</p>
                     <span className={`inline-block mt-1 px-2 py-0.5 rounded-md text-[10px] font-bold border uppercase tracking-wider ${getMarginBadgeStyle('Margen Ideal')}`}>Margen Ideal</span>
                 </div>
             </td>
@@ -146,12 +146,12 @@ function ProductRowInner({ producto, familia, lotes, impuestosLinks, stockGlobal
             {/* Fiscal y Finanzas */}
             <td className="px-6 py-4">
                 <div>
-                    <p className="text-slate-800 font-bold">${(producto.precioLista || 0).toFixed(2)}</p>
+                    <p className="text-slate-800 dark:text-white font-bold">${(producto.precioLista || 0).toFixed(2)}</p>
                     <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                         {impuestoNames.length > 0 ? impuestoNames.map((name, i) => (
-                            <span key={i} className="px-1.5 py-0.5 bg-blue-50 text-blue-600 text-[10px] rounded-md font-bold">{name}</span>
+                            <span key={i} className="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] rounded-md font-bold">{name}</span>
                         )) : (
-                            <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 text-[10px] rounded-md font-bold">Sin impuestos</span>
+                            <span className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-[10px] rounded-md font-bold">Sin impuestos</span>
                         )}
                     </div>
                 </div>
@@ -163,12 +163,12 @@ function ProductRowInner({ producto, familia, lotes, impuestosLinks, stockGlobal
                     {lotes.length > 0 ? (
                         <div className="space-y-1">
                             {lotes.slice(0, 2).map(l => (
-                                <p key={l.id} className="text-slate-700 text-xs font-medium">{l.identificadorLote}</p>
+                                <p key={l.id} className="text-slate-700 dark:text-slate-300 text-xs font-medium">{l.identificadorLote}</p>
                             ))}
                             {lotes.length > 2 && <p className="text-slate-400 text-[10px]">+{lotes.length - 2} más</p>}
                         </div>
                     ) : (
-                        <p className="text-slate-500 text-xs">Sin lotes</p>
+                        <p className="text-slate-500 dark:text-slate-400 text-xs">Sin lotes</p>
                     )}
                 </div>
             </td>
@@ -176,8 +176,8 @@ function ProductRowInner({ producto, familia, lotes, impuestosLinks, stockGlobal
             {/* Existencia y Caducidad con Avisos */}
             <td className="px-6 py-4">
                 <div>
-                    <p className={`font-bold text-base ${isLowStock ? 'text-amber-600' : 'text-slate-800'}`}>
-                        {stockGlobal} <span className="text-sm font-medium text-slate-500">{lotes[0]?.unidadMedida || 'pzas'}</span>
+                    <p className={`font-bold text-base ${isLowStock ? 'text-amber-600 dark:text-amber-500' : 'text-slate-800 dark:text-white'}`}>
+                        {stockGlobal} <span className="text-sm font-medium text-slate-500 dark:text-slate-400">{lotes[0]?.unidadMedida || 'pzas'}</span>
                     </p>
 
                     {/* Alert badges */}
@@ -205,7 +205,7 @@ function ProductRowInner({ producto, familia, lotes, impuestosLinks, stockGlobal
                     ) : (
                         <div className="flex items-center gap-1.5 mt-0.5">
                             <Clock className="w-3 h-3 text-slate-400" />
-                            <span className="text-xs font-medium text-slate-500">N/A</span>
+                            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">N/A</span>
                         </div>
                     )}
                 </div>

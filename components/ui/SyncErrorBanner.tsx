@@ -27,11 +27,11 @@ export default function SyncErrorBanner({
 }: SyncErrorBannerProps) {
   if (!errors || errors.length === 0) return null;
 
-  const bgContainer = isHighPriority ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200";
+  const bgContainer = isHighPriority ? "bg-red-50 border-red-200" : "bg-amber-50 dark:bg-amber-500/10 border-amber-200";
   const textHeaderColor = isHighPriority ? "text-red-800" : "text-amber-800";
   const textDescColor = isHighPriority ? "text-red-700" : "text-amber-700";
   const bgCard = isHighPriority ? "border-red-100" : "border-amber-100";
-  const textHighlight = isHighPriority ? "text-red-600" : "text-amber-600";
+  const textHighlight = isHighPriority ? "text-red-600" : "text-amber-600 dark:text-amber-500";
   const bgButton = isHighPriority ? "bg-red-100 hover:bg-red-200 text-red-700" : "bg-amber-100 hover:bg-amber-200 text-amber-700";
 
   return (
@@ -62,14 +62,14 @@ export default function SyncErrorBanner({
           return (
             <div
               key={err.id}
-              className={`flex flex-col md:flex-row justify-between md:items-center bg-white p-4 rounded-xl border ${bgCard} gap-4 shadow-sm`}
+              className={`flex flex-col md:flex-row justify-between md:items-center bg-white dark:bg-slate-800 p-4 rounded-xl border ${bgCard} gap-4 shadow-sm`}
             >
               <div>
-                <p className="text-sm font-semibold text-slate-800">
+                <p className="text-sm font-semibold text-slate-800 dark:text-white">
                   Error al intentar {accionText}:{" "}
                   <span className={textHighlight}>{targetItem}</span>
                 </p>
-                <p className="text-xs text-slate-600 mt-1">
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
                   <span className="font-bold">Motivo:</span> {mensajeRevisado}
                 </p>
               </div>
@@ -85,7 +85,7 @@ export default function SyncErrorBanner({
                 </button>
                 <button
                   onClick={() => onDismiss(err.id)}
-                  className="flex items-center gap-1.5 px-4 py-2 text-slate-500 bg-slate-100 hover:bg-slate-200 hover:text-slate-700 rounded-lg text-sm font-bold transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/50 hover:bg-slate-200 hover:text-slate-700 dark:text-slate-300 rounded-lg text-sm font-bold transition-colors"
                   title="Eliminar esta notificación (y los datos rescatados)"
                 >
                   <Trash2 className="w-4 h-4" />
