@@ -23,6 +23,7 @@ import MovimientoInventario from "./models/registros/movimientoInventario";
 import InformacionPerfil from "./models/users/informacionPerfil";
 import Perfil from "./models/users/perfil";
 import Permiso from "./models/users/permiso";
+import InvoiceTemplate from "./models/configuracion/invoiceTemplate";
 
 const adapter = getAdapter();
 
@@ -51,5 +52,6 @@ export const database = new Database({
     Documento,
     DocumentoDetalle,
     BitacoraError,
+    InvoiceTemplate,
   ],
 });

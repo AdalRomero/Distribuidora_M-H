@@ -49,3 +49,23 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* REACT GRID LAYOUT STYLES */
+.react-grid-layout { position: relative; transition: height 200ms ease; }
+.react-grid-item { transition: all 200ms ease; transition-property: left, top, width, height; }
+.react-grid-item img { pointer-events: none; user-select: none; }
+.react-grid-item.cssTransforms { transition-property: transform, width, height; }
+.react-grid-item.resizing { transition: none; z-index: 1; will-change: width, height; }
+.react-grid-item.react-draggable-dragging { transition: none; z-index: 3; will-change: transform; }
+.react-grid-item.dropping { visibility: hidden; }
+.react-grid-item.react-grid-placeholder { background: #93c5fd; opacity: 0.2; transition-duration: 100ms; z-index: 2; user-select: none; }
+.react-grid-item.react-grid-placeholder.placeholder-resizing { transition: none; }
+
+/* REACT RESIZABLE STYLES */
+.react-resizable { position: relative; }
+.react-resizable-handle {
+  position: absolute; width: 20px; height: 20px; background-repeat: no-repeat; background-origin: content-box; box-sizing: border-box;
+  background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2IDYiIHN0eWxlPSJiYWNrZ3JvdW5kLWNvbG9yOiNmZmZmZmYwMCIgeD0iMHB4IiB5PSIwcHgiIHdpZHRoPSI2cHgiIGhlaWdodD0iNnB4Ij48ZyBvcGFjaXR5PSIwLjMwMiI+PHBhdGggZD0iTSA2IDYgTCAwIDYgTCAwIDQuMiBMIDQgNC4yIEwgNC4yIDQuMiBMIDQuMiAwIEwgNiAwIEwgNiA2IEwgNiA2IFoiIGZpbGw9IiMwMDAwMDAiLz48L2c+PC9zdmc+');
+  background-position: bottom right; padding: 0 3px 3px 0; z-index: 100 !important; cursor: se-resize;
+}
+.react-resizable-handle-se { bottom: 0; right: 0; cursor: se-resize; }
