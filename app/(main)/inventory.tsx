@@ -15,6 +15,7 @@ import FamiliaModel from '../../src/services/DB/models/bases/familia';
 import LoteModel from '../../src/services/DB/models/catalogo/lote';
 import ProductoModel from '../../src/services/DB/models/catalogo/producto';
 import { syncApp } from '../../src/sync';
+import * as Crypto from 'expo-crypto';
 
 interface InventoryProps {
     productos: ProductoModel[];
@@ -35,21 +36,37 @@ function InventoryContent({ productos, familias }: InventoryProps) {
 
     const confirmDelete = async () => {
         if (!deleteProduct) return;
+        const newEstado = !deleteProduct.estado; // toggle
         await database.write(async () => {
             await deleteProduct.update((p) => {
-                p.estado = false;
+                p.estado = newEstado;
             });
+            // Cascade: also toggle all lotes of this product
+            const lotesDelProducto = await database.collections.get('lotes')
+                .query(Q.where('producto_id', deleteProduct.id))
+                .fetch();
+            for (const lote of lotesDelProducto) {
+                await lote.update((l: any) => {
+                    l.estado = newEstado;
+                });
+            }
         });
         setDeleteProduct(null);
         syncApp().catch(console.error);
     };
 
-    const filteredProductos = productos.filter(p => {
-        const matchesSearch = p.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            p.codigoInterno.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesFamilia = !filterFamilia || (p as any).familiaId === filterFamilia;
-        return matchesSearch && matchesFamilia;
-    });
+    const filteredProductos = productos
+        .filter(p => {
+            const matchesSearch = p.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                p.codigoInterno.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesFamilia = !filterFamilia || (p as any).familiaId === filterFamilia;
+            return matchesSearch && matchesFamilia;
+        })
+        .sort((a, b) => {
+            // Activos primero, inactivos (elimiandos lógicos) al final
+            if (a.estado === b.estado) return 0;
+            return a.estado ? -1 : 1;
+        });
 
     const tablesToWatch = useMemo(() => ['productos', 'lotes', 'producto_impuestos', 'codigos_alternos', 'proveedor_productos', 'movimientos_inventario'], []);
     const { syncErrors, handleDismissError } = useSyncErrors(tablesToWatch);
@@ -74,6 +91,7 @@ function InventoryContent({ productos, familias }: InventoryProps) {
 
     const [selectedProduct, setSelectedProduct] = useState<ProductoModel | null>(null);
     const [editLoteData, setEditLoteData] = useState<LoteModel | null>(null);
+    const [deleteLote, setDeleteLote] = useState<LoteModel | null>(null);
 
     // Auto-desactivar lotes vencidos localmente
     useEffect(() => {
@@ -100,13 +118,36 @@ function InventoryContent({ productos, familias }: InventoryProps) {
         checkExpiredLocalLotes();
     }, []);
 
-    const toggleLoteEstado = async (lote: LoteModel) => {
+    const confirmToggleLote = async () => {
+        if (!deleteLote) return;
         await database.write(async () => {
-            await lote.update((l: any) => {
-                l.estado = !l.estado;
+            const nuevoEstado = !deleteLote.estado;
+            await deleteLote.update((l: any) => {
+                l.estado = nuevoEstado;
+            });
+
+            // Registrar en auditoría de movimientos que el lote fue activado/desactivado
+            // cantidad = 0 porque AJUSTE_EDICION es solo auditoria, no afecta stock
+            const almacenes = await database.collections.get('almacenes').query().fetch();
+            const almacenId = almacenes.length > 0 ? almacenes[0].id : 'default';
+            
+            await database.collections.get('movimientos_inventario').create((m: any) => {
+                m._raw.id = Crypto.randomUUID();
+                m.almacen.id = almacenId;
+                m.producto.id = deleteLote.producto.id;
+                m.lote.id = deleteLote.id;
+                m.tipo = 'AJUSTE_EDICION'; 
+                m.cantidad = 0; // Audit-only: no stock impact
+                m.usuarioId = 'Local-App'; 
             });
         });
+        setDeleteLote(null);
         syncApp().catch(console.error);
+    };
+
+    const handleEditProduct = (p: ProductoModel) => {
+        setEditProduct(p);
+        setIsAddModalOpen(true);
     };
 
     return (
@@ -125,7 +166,7 @@ function InventoryContent({ productos, familias }: InventoryProps) {
                         <button onClick={() => setIsAddEntryOpen(true)} className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900 transition-colors font-medium text-sm shadow-sm">
                             <Package className="w-4 h-4" /><span>Registrar Entrada</span>
                         </button>
-                        <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm shadow-sm">
+                        <button onClick={() => { setEditProduct(null); setIsAddModalOpen(true); }} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm shadow-sm">
                             <Plus className="w-4 h-4" /><span>Nuevo Producto</span>
                         </button>
                     </div>
@@ -199,7 +240,7 @@ function InventoryContent({ productos, familias }: InventoryProps) {
                         </div>
                         <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-900 rounded-full border border-gray-700">
                             <div className="w-2 h-2 rounded-full bg-white"></div>
-                            <span className="text-[10px] font-bold text-white">Vencido</span>
+                            <span className="text-[10px] font-bold text-white">Vencido/Inactivo</span>
                         </div>
                     </div>
                 )}
@@ -209,12 +250,9 @@ function InventoryContent({ productos, familias }: InventoryProps) {
                     <ProductLotsView
                         producto={selectedProduct}
                         onBack={() => setSelectedProduct(null)}
-                        onAddLote={() => {
-                            // Pre-seleccionar este producto en el AddEntry si quisiéramos, por ahora sólo lo abrimos
-                            setIsAddEntryOpen(true);
-                        }}
                         onEditLote={(lote: LoteModel) => setEditLoteData(lote)}
-                        onToggleEstado={toggleLoteEstado}
+                        onToggleEstado={(lote: LoteModel) => setDeleteLote(lote)}
+                        onEditProduct={() => handleEditProduct(selectedProduct)}
                     />
                 ) : (
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -242,7 +280,13 @@ function InventoryContent({ productos, familias }: InventoryProps) {
                                             </td>
                                         </tr>
                                     ) : filteredProductos.map((item) => (
-                                        <ProductRow key={item.id} producto={item} onClick={() => setSelectedProduct(item)} onDelete={(p: ProductoModel) => { /* stop propagation issues */ }} onEdit={(p: ProductoModel) => { /* handled */ }} />
+                                        <ProductRow 
+                                            key={item.id} 
+                                            producto={item} 
+                                            onClick={() => setSelectedProduct(item)} 
+                                            onDelete={(p: ProductoModel) => handleDelete(p)} 
+                                            onEdit={(p: ProductoModel) => handleEditProduct(p)} 
+                                        />
                                     ))}
                                 </tbody>
                             </table>
@@ -273,7 +317,8 @@ function InventoryContent({ productos, familias }: InventoryProps) {
                         }
                     }}
                 />
-                <WarningModal isOpen={!!deleteProduct} onClose={() => setDeleteProduct(null)} onConfirm={confirmDelete} title="Desactivar Producto" message="¿Estás seguro de que deseas desactivar este producto? Podrás reactivarlo más adelante si lo necesitas." />
+                <WarningModal isOpen={!!deleteProduct} onClose={() => setDeleteProduct(null)} onConfirm={confirmDelete} title={deleteProduct?.estado === false ? "Reactivar Producto" : "Desactivar Producto"} message={deleteProduct?.estado === false ? "¿Estás seguro de que deseas REACTIVAR este producto? Volverá a estar disponible en el sistema." : "¿Estás seguro de que deseas desactivar este producto? Podrás reactivarlo más adelante si lo necesitas."} />
+                <WarningModal isOpen={!!deleteLote} onClose={() => setDeleteLote(null)} onConfirm={confirmToggleLote} title={deleteLote?.estado === false ? "Reactivar Lote" : "Desactivar Lote"} message={deleteLote?.estado === false ? "¿Estás seguro de que deseas REACTIVAR este lote de inventario? Volverá a ser considerado en el stock." : "¿Estás seguro de que deseas desactivar este lote? Su cantidad ya no contará en el stock, pero podrás reactivarlo si es necesario."} />
                 <EditLote isOpen={!!editLoteData} onClose={() => setEditLoteData(null)} lote={editLoteData} />
             </div>
         </div>
@@ -281,8 +326,6 @@ function InventoryContent({ productos, familias }: InventoryProps) {
 }
 
 export default withObservables([], () => ({
-    productos: database.collections.get<ProductoModel>('productos').query(
-        Q.where('estado', true)
-    ).observe(),
+    productos: database.collections.get<ProductoModel>('productos').query().observe(),
     familias: database.collections.get<FamiliaModel>('familias').query().observe(),
 }))(InventoryContent);

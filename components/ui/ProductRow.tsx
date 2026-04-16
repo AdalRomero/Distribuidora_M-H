@@ -1,10 +1,11 @@
 import withObservables from "@nozbe/with-observables";
 import {
-    AlertOctagon,
-    Clock,
-    Edit2,
-    Image as ImageIcon,
-    Trash2,
+  AlertOctagon,
+  Clock,
+  Edit2,
+  Image as ImageIcon,
+  RefreshCw,
+  Trash2,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { of } from "rxjs";
@@ -188,7 +189,7 @@ function ProductRowInner({
 
   return (
     <tr
-      className={`hover:bg-slate-50/50 transition-colors group ${onClick ? "cursor-pointer" : ""}`}
+      className={`hover:bg-slate-50/50 transition-colors group ${onClick ? "cursor-pointer" : ""} ${!producto.estado ? "border-l-4 border-l-slate-400 opacity-60 bg-slate-50/30 grayscale" : ""}`}
       onClick={onClick}
     >
       {/* Producto */}
@@ -214,7 +215,7 @@ function ProductRowInner({
               className="text-slate-900 dark:text-white font-bold max-w-xs truncate"
               title={producto.descripcion}
             >
-              {producto.descripcion}
+              {producto.descripcion} {!producto.estado && "(INACTIVO)"}
             </p>
             <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
               {producto.codigoInterno}
@@ -353,6 +354,7 @@ function ProductRowInner({
               onEdit(producto);
             }}
             className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            title="Editar info base del producto"
           >
             <Edit2 className="w-4 h-4" />
           </button>
@@ -361,9 +363,16 @@ function ProductRowInner({
               e.stopPropagation();
               onDelete(producto);
             }}
-            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+            className={`p-1.5 ${producto.estado ? "text-slate-400 hover:text-rose-600 hover:bg-rose-50" : "text-amber-500 hover:text-amber-600 hover:bg-amber-50"} rounded-lg transition-colors`}
+            title={
+              producto.estado ? "Desactivar Producto" : "Reactivar Producto"
+            }
           >
-            <Trash2 className="w-4 h-4" />
+            {producto.estado ? (
+              <Trash2 className="w-4 h-4" />
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
           </button>
         </div>
       </td>

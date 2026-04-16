@@ -4,6 +4,8 @@ import { database } from '../../../src/services/DB/indexBD';
 import { syncApp } from '../../../src/sync';
 import LoteModel from '../../../src/services/DB/models/catalogo/lote';
 
+import * as Crypto from 'expo-crypto';
+
 interface EditLoteProps {
     isOpen: boolean;
     onClose: () => void;
@@ -50,10 +52,15 @@ export default function EditLote({ isOpen, onClose, lote }: EditLoteProps) {
         setIsSaving(true);
         try {
             await database.write(async () => {
+                const oldCantidad = lote.cantidad;
+                const newCantidad = parseInt(cantidad, 10) || 0;
+                const oldCosto = lote.costoAdquisicion;
+                const newCosto = parseFloat(costoAdquisicion) || 0;
+
                 await lote.update((l) => {
                     l.identificadorLote = identificadorLote;
-                    l.costoAdquisicion = parseFloat(costoAdquisicion) || 0;
-                    l.cantidad = parseInt(cantidad, 10) || 0;
+                    l.costoAdquisicion = newCosto;
+                    l.cantidad = newCantidad;
                     if (fechaCaducidad) {
                         const parsed = new Date(fechaCaducidad).getTime();
                         if (!isNaN(parsed) && parsed > 0) {
@@ -65,6 +72,39 @@ export default function EditLote({ isOpen, onClose, lote }: EditLoteProps) {
                         (l as any)._raw.fecha_caducidad = null;
                     }
                 });
+
+                // Si cambió la cantidad o el costo, siempre dejamos un rastro de edición
+                if (oldCantidad !== newCantidad || oldCosto !== newCosto) {
+                    const almacenes = await database.collections.get('almacenes').query().fetch();
+                    const almacenId = almacenes.length > 0 ? almacenes[0].id : 'default';
+
+                    await database.collections.get('movimientos_inventario').create((m: any) => {
+                        m._raw.id = Crypto.randomUUID();
+                        m.almacen.id = almacenId;
+                        m.producto.id = lote.producto.id;
+                        m.lote.id = lote.id;
+                        m.tipo = oldCantidad !== newCantidad ? 'AJUSTE_ABSOLUTO' : 'AJUSTE_EDICION'; // AJUSTE_EDICION para trazar cambios de costo
+                        m.cantidad = newCantidad;
+                        m.usuarioId = 'Local-App'; 
+                    });
+                }
+
+                // Si cambió el costo, recalculamos los precios del producto
+                if (oldCosto !== newCosto) {
+                    const producto = await lote.producto.fetch();
+                    if (producto) {
+                        const margen = await producto.margen.fetch();
+                        if (margen) {
+                            const multiplier = 1 + (margen.porcentaje / 100);
+                            const nuevoPrecio = parseFloat((newCosto * multiplier).toFixed(2));
+                            await producto.update((p: any) => {
+                                p.precioLista = nuevoPrecio;
+                                p.precioMayoreo = nuevoPrecio;
+                                p.precioMenudeo = nuevoPrecio;
+                            });
+                        }
+                    }
+                }
             });
             syncApp().catch(console.error);
             setIsSaving(false);
