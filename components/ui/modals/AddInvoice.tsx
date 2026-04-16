@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, FileText, User, ShoppingCart, Plus, Trash2, Edit3, Eye } from 'lucide-react';
 import InvoiceBuilderCanvas from './InvoiceBuilderCanvas';
 
-interface AddInvoiceProps { isOpen: boolean; onClose: () => void; recoverData?: any; }
+interface AddInvoiceProps { isOpen: boolean; onClose: () => void; recoverData?: any; onSaveSuccess?: () => void; }
 interface Concepto { id: string; cantidad: string; unidadSat: string; claveSat: string; concepto: string; valorUnitario: string; descuento: string; porcImpuesto: string; }
 interface InvoiceForm { serie: string; folio: string; fecha: string; hora: string; tipoComprobante: string; lugarExpedicion: string; metodoPago: string; formaPago: string; moneda: string; codigoCliente: string; nombre: string; rfc: string; domicilio: string; agente: string; usoCFDI: string; observaciones: string; conceptos: Concepto[]; }
 
@@ -22,7 +22,7 @@ const FAKE_CERT_EMISOR = '30001000000500003416';
 const FAKE_CERT_SAT = '20001000000300022323';
 const FAKE_CADENA = '||4.0|A|1|2026-03-21|Puerto Peñasco|I|PPD|99|MXN|XAXX010101000|S01|...MICO1234567890||';
 
-export default function AddInvoice({ isOpen, onClose, recoverData }: AddInvoiceProps) {
+export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess }: AddInvoiceProps) {
     const [form, setForm] = useState<InvoiceForm>(initialForm);
     const [isEditMode, setIsEditMode] = useState(false);
     useEffect(() => {

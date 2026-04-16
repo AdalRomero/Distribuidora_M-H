@@ -48,6 +48,7 @@ export default function Invoices() {
     const [searchTerm, setSearchTerm] = useState('');
     const [showAddInvoice, setShowAddInvoice] = useState(false);
     const [recoverData, setRecoverData] = useState<any>(null);
+    const [recoveringErrorId, setRecoveringErrorId] = useState<string | null>(null);
 
     const tablesToWatch = useMemo(() => ["documentos", "documentos_detalles"], []);
     const { syncErrors, handleDismissError } = useSyncErrors(tablesToWatch);
@@ -62,6 +63,7 @@ export default function Invoices() {
 
     const triggerRecoveryWrapper = (err: SyncError) => {
         setRecoverData(err.datosAtrapados);
+        setRecoveringErrorId(err.id);
         setShowAddInvoice(true);
     };
 
@@ -208,7 +210,13 @@ export default function Invoices() {
                     </div>
                 </div>
             </div>
-            <AddInvoice isOpen={showAddInvoice} onClose={() => { setShowAddInvoice(false); setRecoverData(null); }} recoverData={recoverData} />
+            <AddInvoice isOpen={showAddInvoice} onClose={() => { setShowAddInvoice(false); setRecoverData(null); setRecoveringErrorId(null); }} recoverData={recoverData} onSaveSuccess={() => {
+                if (recoveringErrorId) {
+                    handleDismissError(recoveringErrorId);
+                    setRecoveringErrorId(null);
+                    setRecoverData(null);
+                }
+            }} />
         </Fragment>
     );
 }

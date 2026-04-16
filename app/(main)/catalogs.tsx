@@ -65,7 +65,7 @@ function CatalogsContent({ familias, almacenes, impuestos, margenes }: CatalogsP
   // Error Sync Logics
   const tablesToWatch = useMemo(() => ["familias", "almacenes", "impuestos", "margenes"], []);
   const { syncErrors, handleDismissError } = useSyncErrors(tablesToWatch);
-  const [recoverData, setRecoverData] = useState<{ tabla: string, data: any } | null>(null);
+  const [recoverData, setRecoverData] = useState<{ tabla: string, data: any, errorId?: string } | null>(null);
 
   // Automatic Recover from URL
   useEffect(() => {
@@ -80,10 +80,16 @@ function CatalogsContent({ familias, almacenes, impuestos, margenes }: CatalogsP
      const tabla = err.tabla_origen as ActiveTab;
      if (['familias', 'almacenes', 'impuestos', 'margenes'].includes(tabla)) {
         setTab(tabla);
-        setRecoverData({ tabla, data: err.datosAtrapados });
+        setRecoverData({ tabla, data: err.datosAtrapados, errorId: err.id });
         showSuccess("Datos Recuperados", "Revisa el formulario para editar y re-enviar.");
-        // We do not delete the error yet, user must hit 'Guardar' on the form wait... 
      }
+  };
+
+  const handleRecoverSaveSuccess = () => {
+    if (recoverData?.errorId) {
+      handleDismissError(recoverData.errorId);
+      setRecoverData(null);
+    }
   };
 
   const showSuccess = (title: string, message: string) =>
@@ -201,10 +207,10 @@ function CatalogsContent({ familias, almacenes, impuestos, margenes }: CatalogsP
         </div>
 
         {/* Tab Content */}
-        {tab === "familias" && <FamiliasTab familias={familias} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} recoverData={recoverData} />}
-        {tab === "almacenes" && <AlmacenesTab almacenes={almacenes} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} recoverData={recoverData} />}
-        {tab === "impuestos" && <ImpuestosTab impuestos={impuestos} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} recoverData={recoverData} />}
-        {tab === "margenes" && <MargenesTab margenes={margenes} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} recoverData={recoverData} />}
+        {tab === "familias" && <FamiliasTab familias={familias} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} recoverData={recoverData} onRecoverSaveSuccess={handleRecoverSaveSuccess} />}
+        {tab === "almacenes" && <AlmacenesTab almacenes={almacenes} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} recoverData={recoverData} onRecoverSaveSuccess={handleRecoverSaveSuccess} />}
+        {tab === "impuestos" && <ImpuestosTab impuestos={impuestos} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} recoverData={recoverData} onRecoverSaveSuccess={handleRecoverSaveSuccess} />}
+        {tab === "margenes" && <MargenesTab margenes={margenes} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} recoverData={recoverData} onRecoverSaveSuccess={handleRecoverSaveSuccess} />}
       </div>
     </div>
   );
@@ -218,13 +224,14 @@ interface TabCallbacks {
   showError: (title: string, message: string) => void;
   showWarning: (title: string, message: string, onConfirm: () => void) => void;
   syncAfterOp: () => Promise<void>;
-  recoverData?: { tabla: string, data: any } | null;
+  recoverData?: { tabla: string, data: any, errorId?: string } | null;
+  onRecoverSaveSuccess?: () => void;
 }
 
 // ═══════════════════════════════════════════════════════════
 // FAMILIAS TAB (with alert threshold configuration)
 // ═══════════════════════════════════════════════════════════
-function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterOp, recoverData }: { familias: FamiliaModel[] } & TabCallbacks) {
+function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterOp, recoverData, onRecoverSaveSuccess }: { familias: FamiliaModel[] } & TabCallbacks) {
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
 
@@ -283,6 +290,7 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
       setUmbralAmarillo("30");
       setShowAdd(false);
       showSuccess("Familia creada", `La familia "${nombre}" se ha guardado correctamente.`);
+      if (onRecoverSaveSuccess) onRecoverSaveSuccess();
       await syncAfterOp();
     } catch (e: any) {
       showError("Error al crear", e.message || "No se pudo crear la familia.");
@@ -675,7 +683,7 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
 // ═══════════════════════════════════════════════════════════
 // ALMACENES TAB
 // ═══════════════════════════════════════════════════════════
-function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfterOp, recoverData }: { almacenes: AlmacenModel[] } & TabCallbacks) {
+function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfterOp, recoverData, onRecoverSaveSuccess }: { almacenes: AlmacenModel[] } & TabCallbacks) {
   const [showAdd, setShowAdd] = useState(false);
   const [nombre, setNombre] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
@@ -712,6 +720,7 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
       showSuccess("Almacén creado", `El almacén "${nombre}" se ha guardado correctamente.`);
       setNombre("");
       setShowAdd(false);
+      if (onRecoverSaveSuccess) onRecoverSaveSuccess();
       await syncAfterOp();
     } catch (e: any) {
       showError("Error al crear", e.message || "No se pudo crear el almacén.");
@@ -940,7 +949,7 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
 // ═══════════════════════════════════════════════════════════
 // IMPUESTOS TAB
 // ═══════════════════════════════════════════════════════════
-function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfterOp, recoverData }: { impuestos: ImpuestoModel[] } & TabCallbacks) {
+function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfterOp, recoverData, onRecoverSaveSuccess }: { impuestos: ImpuestoModel[] } & TabCallbacks) {
   const [showAdd, setShowAdd] = useState(false);
   const [nombre, setNombre] = useState("");
   const [tasa, setTasa] = useState("");
@@ -982,6 +991,7 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
       setNombre("");
       setTasa("");
       setShowAdd(false);
+      if (onRecoverSaveSuccess) onRecoverSaveSuccess();
       await syncAfterOp();
     } catch (e: any) {
       showError("Error al crear", e.message || "No se pudo crear el impuesto.");
@@ -1243,7 +1253,7 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
 // ═══════════════════════════════════════════════════════════
 // MARGENES TAB
 // ═══════════════════════════════════════════════════════════
-function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterOp, recoverData }: { margenes: MargenModel[] } & TabCallbacks) {
+function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterOp, recoverData, onRecoverSaveSuccess }: { margenes: MargenModel[] } & TabCallbacks) {
   const [showAdd, setShowAdd] = useState(false);
   const [nombre, setNombre] = useState("");
   const [porcentaje, setPorcentaje] = useState("");
@@ -1285,6 +1295,7 @@ function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterO
       setNombre("");
       setPorcentaje("");
       setShowAdd(false);
+      if (onRecoverSaveSuccess) onRecoverSaveSuccess();
       await syncAfterOp();
     } catch (e: any) {
       showError("Error al crear", e.message || "No se pudo crear el margen.");

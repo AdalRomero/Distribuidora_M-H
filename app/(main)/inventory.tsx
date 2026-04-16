@@ -54,7 +54,7 @@ function InventoryContent({ productos, familias }: InventoryProps) {
 
     const tablesToWatch = useMemo(() => ['productos', 'lotes', 'producto_impuestos', 'codigos_alternos', 'proveedor_productos', 'movimientos_inventario'], []);
     const { syncErrors, handleDismissError } = useSyncErrors(tablesToWatch);
-    const [recoverData, setRecoverData] = useState<{ tabla: string, data: any } | null>(null);
+    const [recoverData, setRecoverData] = useState<{ tabla: string, data: any, errorId?: string } | null>(null);
 
     useEffect(() => {
         const autoRecoverId = new URLSearchParams(window.location.search).get("recoverErrorId");
@@ -65,7 +65,7 @@ function InventoryContent({ productos, familias }: InventoryProps) {
     }, [syncErrors]);
 
     const triggerRecoveryWrapper = (err: SyncError) => {
-        setRecoverData({ tabla: err.tabla_origen || "", data: err.datosAtrapados });
+        setRecoverData({ tabla: err.tabla_origen || "", data: err.datosAtrapados, errorId: err.id });
         if (err.tabla_origen === 'productos') {
             setIsAddModalOpen(true);
         } else if (err.tabla_origen === 'lotes' || err.tabla_origen === 'movimientos_inventario') {
@@ -231,7 +231,7 @@ function InventoryContent({ productos, familias }: InventoryProps) {
                                         <th className="px-6 py-4 text-center">Acciones</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100 cursor-pointer">
+                                <tbody className="divide-y divide-slate-100">
                                     {filteredProductos.length === 0 ? (
                                         <tr>
                                             <td colSpan={6} className="px-6 py-12 text-center pointer-events-none">
@@ -243,9 +243,7 @@ function InventoryContent({ productos, familias }: InventoryProps) {
                                             </td>
                                         </tr>
                                     ) : filteredProductos.map((item) => (
-                                        <div key={item.id} className="contents" onClick={() => setSelectedProduct(item)}>
-                                            <ProductRow producto={item} onDelete={(p: ProductoModel) => { /* stop propagation issues */ }} onEdit={(p: ProductoModel) => { /* handled */ }} />
-                                        </div>
+                                        <ProductRow key={item.id} producto={item} onClick={() => setSelectedProduct(item)} onDelete={(p: ProductoModel) => { /* stop propagation issues */ }} onEdit={(p: ProductoModel) => { /* handled */ }} />
                                     ))}
                                 </tbody>
                             </table>
@@ -253,8 +251,29 @@ function InventoryContent({ productos, familias }: InventoryProps) {
                     </div>
                 )}
 
-                <AddInventory isOpen={isAddModalOpen} onClose={() => { setIsAddModalOpen(false); setEditProduct(null); }} recoverData={recoverData} editProduct={editProduct} />
-                <AddEntry isOpen={isAddEntryOpen} onClose={() => setIsAddEntryOpen(false)} recoverData={recoverData} />
+                <AddInventory 
+                    isOpen={isAddModalOpen} 
+                    onClose={() => { setIsAddModalOpen(false); setEditProduct(null); }} 
+                    recoverData={recoverData} 
+                    editProduct={editProduct} 
+                    onSaveSuccess={() => {
+                        if (recoverData?.errorId) {
+                            handleDismissError(recoverData.errorId);
+                            setRecoverData(null);
+                        }
+                    }}
+                />
+                <AddEntry 
+                    isOpen={isAddEntryOpen} 
+                    onClose={() => setIsAddEntryOpen(false)} 
+                    recoverData={recoverData} 
+                    onSaveSuccess={() => {
+                        if (recoverData?.errorId) {
+                            handleDismissError(recoverData.errorId);
+                            setRecoverData(null);
+                        }
+                    }}
+                />
                 <WarningModal isOpen={!!deleteProduct} onClose={() => setDeleteProduct(null)} onConfirm={confirmDelete} title="Desactivar Producto" message="¿Estás seguro de que deseas desactivar este producto? Podrás reactivarlo más adelante si lo necesitas." />
                 <EditLote isOpen={!!editLoteData} onClose={() => setEditLoteData(null)} lote={editLoteData} />
             </div>

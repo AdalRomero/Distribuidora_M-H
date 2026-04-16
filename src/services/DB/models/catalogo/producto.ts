@@ -58,10 +58,10 @@ export default class Producto extends Model {
   @children("movimientos_inventario")
   movimientos!: Query<MovimientoInventario>;
 
-  // Cálculo de stock reactivo en tiempo real
-  @lazy stockGlobal = this.movimientos.observe().pipe(
-    map((movimientos) =>
-      movimientos.reduce((total, mov) => total + mov.cantidad, 0)
+  // Cálculo de stock reactivo basado en lotes activos
+  @lazy stockGlobal = this.lotes.observe().pipe(
+    map((lotes) =>
+      lotes.filter(l => l.estado).reduce((total, lote) => total + lote.cantidad, 0)
     )
   );
 }

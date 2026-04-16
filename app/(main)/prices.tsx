@@ -19,6 +19,7 @@ export default function Prices() {
     const [searchTerm, setSearchTerm] = useState('');
     const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
     const [recoverData, setRecoverData] = useState<any>(null);
+    const [recoveringErrorId, setRecoveringErrorId] = useState<string | null>(null);
 
     const tablesToWatch = useMemo(() => ["listas_precios", "precios_especiales"], []);
     const { syncErrors, handleDismissError } = useSyncErrors(tablesToWatch);
@@ -33,6 +34,7 @@ export default function Prices() {
 
     const triggerRecoveryWrapper = (err: SyncError) => {
         setRecoverData(err.datosAtrapados);
+        setRecoveringErrorId(err.id);
         setIsPriceModalOpen(true);
     };
 
@@ -128,7 +130,13 @@ export default function Prices() {
                         </table>
                     </div>
                 </div>
-                <AddPrices isOpen={isPriceModalOpen} onClose={() => { setIsPriceModalOpen(false); setRecoverData(null); }} recoverData={recoverData} />
+                <AddPrices isOpen={isPriceModalOpen} onClose={() => { setIsPriceModalOpen(false); setRecoverData(null); setRecoveringErrorId(null); }} recoverData={recoverData} onSaveSuccess={() => {
+                    if (recoveringErrorId) {
+                        handleDismissError(recoveringErrorId);
+                        setRecoveringErrorId(null);
+                        setRecoverData(null);
+                    }
+                }} />
             </div>
         </div>
     );

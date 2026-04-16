@@ -60,6 +60,7 @@ export default function Clients() {
 
     const tablesToWatch = useMemo(() => ["clientes", "proveedores"], []);
     const { syncErrors, handleDismissError } = useSyncErrors(tablesToWatch);
+    const [recoveringErrorId, setRecoveringErrorId] = useState<string | null>(null);
 
     useEffect(() => {
         const autoRecoverId = new URLSearchParams(window.location.search).get("recoverErrorId");
@@ -86,6 +87,7 @@ export default function Clients() {
             ciudad: d.ciudad || ""
         });
         setEditingClientId(d.id || null);
+        setRecoveringErrorId(err.id);
         setIsClientModalOpen(true);
         setMessage({ type: 'success', text: 'Datos rescatados listos para corregirse y reenviarse.' });
     };
@@ -167,6 +169,10 @@ export default function Clients() {
             });
 
             setMessage({ type: 'success', text: `Cliente "${formData.nombre}" registrado exitosamente. Sincronizando...` });
+            if (recoveringErrorId) {
+                handleDismissError(recoveringErrorId);
+                setRecoveringErrorId(null);
+            }
             loadClients();
             syncApp().catch(console.error);
         } catch (error: any) {
@@ -221,6 +227,10 @@ export default function Clients() {
             });
 
             setMessage({ type: 'success', text: `Cliente "${formData.nombre}" actualizado correctamente. Sincronizando...` });
+            if (recoveringErrorId) {
+                handleDismissError(recoveringErrorId);
+                setRecoveringErrorId(null);
+            }
             setEditingClientId(null);
             setEditData(null);
             loadClients();

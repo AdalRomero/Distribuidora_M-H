@@ -29,8 +29,9 @@ interface AddInventoryInnerProps {
   familias: FamiliaModel[];
   margenes: MargenModel[];
   impuestos: ImpuestoModel[];
-  recoverData?: { tabla: string, data: any } | null;
+  recoverData?: { tabla: string, data: any, errorId?: string } | null;
   editProduct?: Producto | null;
+  onSaveSuccess?: () => void;
 }
 
 function AddInventoryInner({
@@ -41,6 +42,7 @@ function AddInventoryInner({
   impuestos,
   recoverData,
   editProduct,
+  onSaveSuccess,
 }: AddInventoryInnerProps) {
   const [nombre, setNombre] = useState("");
   const [familiaId, setFamiliaId] = useState("");
@@ -110,12 +112,29 @@ function AddInventoryInner({
     try {
       const familia = familias.find((f) => f.id === selectedFamiliaId);
       if (!familia) return;
-      const productosEnFamilia = await database.collections
+
+      const codigoFam = familia.codigoFamilia.padStart(2, "0");
+
+      const productosFamilia = await database.collections
         .get<Producto>("productos")
         .query(Q.where("familia_id", selectedFamiliaId))
-        .fetchCount();
-      const codigoFam = familia.codigoFamilia.padStart(2, "0");
-      const siguiente = String(productosEnFamilia + 1).padStart(3, "0");
+        .fetch();
+
+      let maxSuffix = 0;
+      productosFamilia.forEach((p) => {
+        const cod = p.codigoInterno || "";
+        // Si el código actual empieza con el código de la familia, revisamos su sufijo
+        if (cod.startsWith(codigoFam)) {
+          const suffixStr = cod.substring(codigoFam.length);
+          const suffixNum = parseInt(suffixStr, 10);
+          if (!isNaN(suffixNum) && suffixNum > maxSuffix) {
+            maxSuffix = suffixNum;
+          }
+        }
+      });
+
+      // Aseguramos que siempre el sufijo sea de al menos 3 dígitos (ej: 001, 002... 010... 100)
+      const siguiente = String(maxSuffix + 1).padStart(3, "0");
       setCodigoInterno(`${codigoFam}${siguiente}`);
     } catch (e) {
       console.warn("Error auto-generating code:", e);
@@ -321,6 +340,8 @@ function AddInventoryInner({
 
       // Sync to Supabase
       syncApp().catch(console.error);
+
+      if (onSaveSuccess) onSaveSuccess();
 
       setIsUploading(false);
       resetForm();

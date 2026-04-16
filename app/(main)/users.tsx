@@ -78,6 +78,7 @@ export default function Users() {
   const tablesToWatch = useMemo(() => ["perfiles", "informacion_perfil", "permisos"], []);
   const { syncErrors, handleDismissError, loadSyncErrors } = useSyncErrors(tablesToWatch);
   const [errorToRecover, setErrorToRecover] = useState<SyncError | null>(null);
+  const [recoveringErrorId, setRecoveringErrorId] = useState<string | null>(null);
 
   // Catch automatic recover from URL query
   useEffect(() => {
@@ -200,6 +201,7 @@ export default function Users() {
   // ==========================================
   const triggerRecovery = (err: SyncError) => {
     setErrorToRecover(err);
+    setRecoveringErrorId(err.id);
     setWarningModalConfig({
       isOpen: true,
       title: "Recuperar Información",
@@ -454,6 +456,10 @@ export default function Users() {
           type: "success",
           text: "Información de usuario actualizada. Sincronizando en segundo plano...",
         });
+        if (recoveringErrorId) {
+          handleDismissError(recoveringErrorId);
+          setRecoveringErrorId(null);
+        }
         resetForm();
         loadUsers();
         syncApp().catch(console.error);
@@ -550,6 +556,10 @@ export default function Users() {
           type: "success",
           text: `Usuario creado exitosamente. Su usuario de acceso es: ${finalNickname}`,
         });
+        if (recoveringErrorId) {
+          handleDismissError(recoveringErrorId);
+          setRecoveringErrorId(null);
+        }
         resetForm();
         loadUsers();
         syncApp().catch(console.error);

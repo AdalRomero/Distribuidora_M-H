@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from "@nozbe/watermelondb";
 
 export const mySchema = appSchema({
-  version: 12,
+  version: 14,
   tables: [
     // ==================
     // 1. USUARIOS Y PERMISOS
@@ -170,6 +170,7 @@ export const mySchema = appSchema({
         { name: "costo_adquisicion", type: "number" },
         { name: "fecha_caducidad", type: "number", isOptional: true },
         { name: "estado", type: "boolean" },
+        { name: "cantidad", type: "number" },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],

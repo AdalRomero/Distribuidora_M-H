@@ -41,6 +41,7 @@ function ProductLotsViewInner({ producto, lotes, onBack, onAddLote, onEditLote, 
                     <thead className="bg-slate-50 text-slate-500 font-semibold border-y border-slate-100">
                         <tr>
                             <th className="px-6 py-4">Identificador de Lote</th>
+                            <th className="px-6 py-4">Cantidad</th>
                             <th className="px-6 py-4">Costo de Adquisición</th>
                             <th className="px-6 py-4">Fecha de Caducidad</th>
                             <th className="px-6 py-4">Estado</th>
@@ -50,7 +51,7 @@ function ProductLotsViewInner({ producto, lotes, onBack, onAddLote, onEditLote, 
                     <tbody className="divide-y divide-slate-100">
                         {lotes.length === 0 ? (
                             <tr>
-                                <td colSpan={5} className="px-6 py-16 text-center">
+                                <td colSpan={6} className="px-6 py-16 text-center">
                                     <div className="flex flex-col items-center gap-3">
                                         <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center">
                                             <Archive className="w-8 h-8 text-slate-300" />
@@ -70,6 +71,11 @@ function ProductLotsViewInner({ producto, lotes, onBack, onAddLote, onEditLote, 
                                         <div className="flex items-center gap-2">
                                             <span className="font-bold text-slate-800 tracking-wide">{lote.identificadorLote}</span>
                                             <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-bold">{lote.unidadMedida}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center font-bold text-blue-600">
+                                            {lote.cantidad !== undefined && lote.cantidad !== null ? lote.cantidad : '-'} <span className="text-[10px] text-slate-400 ml-1 font-medium">{lote.unidadMedida}</span>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">

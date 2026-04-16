@@ -31,7 +31,8 @@ interface AddEntryInnerProps {
   familias: FamiliaModel[];
   margenes: MargenModel[];
   impuestos: ImpuestoModel[];
-  recoverData?: { tabla: string, data: any } | null;
+  recoverData?: { tabla: string, data: any, errorId?: string } | null;
+  onSaveSuccess?: () => void;
 }
 
 function AddEntryInner({
@@ -43,6 +44,7 @@ function AddEntryInner({
   margenes,
   impuestos,
   recoverData,
+  onSaveSuccess,
 }: AddEntryInnerProps) {
   const [productoId, setProductoId] = useState("");
   const [almacenId, setAlmacenId] = useState("");
@@ -181,8 +183,13 @@ function AddEntryInner({
           l.identificadorLote = lote;
           l.unidadMedida = unidad;
           l.costoAdquisicion = parseFloat(costo) || 0;
+          l.cantidad = parseInt(cantidad, 10) || 0;
+          l.estado = true;
           if (caducidad) {
-            (l as any)._raw.fecha_caducidad = new Date(caducidad).getTime();
+            const parsed = new Date(caducidad).getTime();
+            if (!isNaN(parsed) && parsed > 0) {
+              (l as any)._raw.fecha_caducidad = parsed;
+            }
           }
         });
 
@@ -213,6 +220,8 @@ function AddEntryInner({
 
       // Sync to Supabase
       syncApp().catch(console.error);
+
+      if (onSaveSuccess) onSaveSuccess();
 
       setIsSaving(false);
       resetForm();

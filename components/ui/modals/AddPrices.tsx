@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { X, Info, Calculator, Settings } from 'lucide-react';
 
-interface AddPricesProps { isOpen: boolean; onClose: () => void; onSave?: (data: any) => void; recoverData?: any; }
+interface AddPricesProps { isOpen: boolean; onClose: () => void; onSave?: (data: any) => void; recoverData?: any; onSaveSuccess?: () => void; }
 
 interface PriceListData { nombre: string; moneda: string; precioBase: string; tipoRegla: string; valorRegla: string; estado: string; notas: string; }
 
 const initialState: PriceListData = { nombre: '', moneda: 'MXN', precioBase: '', tipoRegla: 'Precio Base', valorRegla: '', estado: 'Activo', notas: '' };
 
-export default function AddPrices({ isOpen, onClose, onSave, recoverData }: AddPricesProps) {
+export default function AddPrices({ isOpen, onClose, onSave, recoverData, onSaveSuccess }: AddPricesProps) {
     const [form, setForm] = useState<PriceListData>(initialState);
 
     useEffect(() => {
@@ -25,7 +25,7 @@ export default function AddPrices({ isOpen, onClose, onSave, recoverData }: AddP
     }, [recoverData]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => { const { name, value } = e.target; setForm(prev => ({ ...prev, [name]: value })); };
-    const handleSave = () => { if (!form.nombre.trim()) { alert('El nombre de la lista es obligatorio.'); return; } onSave?.(form); setForm(initialState); onClose(); };
+    const handleSave = () => { if (!form.nombre.trim()) { alert('El nombre de la lista es obligatorio.'); return; } onSave?.(form); if (onSaveSuccess) onSaveSuccess(); setForm(initialState); onClose(); };
     const handleClose = () => { setForm(initialState); onClose(); };
     const isRuleValueDisabled = form.tipoRegla === 'Precio Base';
 

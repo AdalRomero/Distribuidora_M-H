@@ -13,6 +13,7 @@ interface EditLoteProps {
 export default function EditLote({ isOpen, onClose, lote }: EditLoteProps) {
     const [identificadorLote, setIdentificadorLote] = useState("");
     const [costoAdquisicion, setCostoAdquisicion] = useState("");
+    const [cantidad, setCantidad] = useState("");
     const [fechaCaducidad, setFechaCaducidad] = useState("");
     const [isSaving, setIsSaving] = useState(false);
 
@@ -20,6 +21,7 @@ export default function EditLote({ isOpen, onClose, lote }: EditLoteProps) {
         if (isOpen && lote) {
             setIdentificadorLote(lote.identificadorLote);
             setCostoAdquisicion(lote.costoAdquisicion ? String(lote.costoAdquisicion) : "");
+            setCantidad(lote.cantidad !== undefined && lote.cantidad !== null ? String(lote.cantidad) : "");
             if (lote.fechaCaducidad) {
                 try {
                     const dateStr = new Date(lote.fechaCaducidad).toISOString().split("T")[0];
@@ -31,6 +33,7 @@ export default function EditLote({ isOpen, onClose, lote }: EditLoteProps) {
         } else if (!isOpen) {
             setIdentificadorLote("");
             setCostoAdquisicion("");
+            setCantidad("");
             setFechaCaducidad("");
         }
     }, [isOpen, lote]);
@@ -50,10 +53,16 @@ export default function EditLote({ isOpen, onClose, lote }: EditLoteProps) {
                 await lote.update((l) => {
                     l.identificadorLote = identificadorLote;
                     l.costoAdquisicion = parseFloat(costoAdquisicion) || 0;
+                    l.cantidad = parseInt(cantidad, 10) || 0;
                     if (fechaCaducidad) {
-                        l.fechaCaducidad = new Date(fechaCaducidad).getTime();
+                        const parsed = new Date(fechaCaducidad).getTime();
+                        if (!isNaN(parsed) && parsed > 0) {
+                            l.fechaCaducidad = parsed;
+                        } else {
+                            (l as any)._raw.fecha_caducidad = null;
+                        }
                     } else {
-                        l.fechaCaducidad = undefined;
+                        (l as any)._raw.fecha_caducidad = null;
                     }
                 });
             });
@@ -108,6 +117,18 @@ export default function EditLote({ isOpen, onClose, lote }: EditLoteProps) {
                             className={inputClass}
                             value={costoAdquisicion}
                             onChange={(e) => setCostoAdquisicion(e.target.value)}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5 flex items-center gap-2">
+                            Cantidad Actual *
+                        </label>
+                        <input
+                            type="number"
+                            min="0"
+                            className={inputClass}
+                            value={cantidad}
+                            onChange={(e) => setCantidad(e.target.value)}
                         />
                     </div>
                     <div>

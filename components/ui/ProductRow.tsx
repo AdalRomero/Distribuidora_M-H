@@ -65,9 +65,10 @@ interface ProductRowProps {
     stockGlobal: number;
     onDelete: (p: ProductoModel) => void;
     onEdit: (p: ProductoModel) => void;
+    onClick?: () => void;
 }
 
-function ProductRowInner({ producto, familia, lotes, impuestosLinks, stockGlobal, onDelete, onEdit }: ProductRowProps) {
+function ProductRowInner({ producto, familia, lotes, impuestosLinks, stockGlobal, onDelete, onEdit, onClick }: ProductRowProps) {
     const [impuestoNames, setImpuestoNames] = useState<string[]>([]);
 
     // Fetch actual impuesto names from junction records
@@ -117,7 +118,7 @@ function ProductRowInner({ producto, familia, lotes, impuestosLinks, stockGlobal
     };
 
     return (
-        <tr className="hover:bg-slate-50/50 transition-colors group">
+        <tr className={`hover:bg-slate-50/50 transition-colors group ${onClick ? 'cursor-pointer' : ''}`} onClick={onClick}>
             {/* Producto */}
             <td className="px-6 py-4">
                 <div className="flex items-center gap-4">
@@ -214,8 +215,8 @@ function ProductRowInner({ producto, familia, lotes, impuestosLinks, stockGlobal
             {/* Acciones */}
             <td className="px-6 py-4 text-center">
                 <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => onEdit(producto)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
-                    <button onClick={() => onDelete(producto)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); onEdit(producto); }} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); onDelete(producto); }} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
                 </div>
             </td>
         </tr>
