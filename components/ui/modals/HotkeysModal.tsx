@@ -17,6 +17,7 @@ const PAGE_HOTKEYS: HotkeyOption[] = [
     { id: 'nav_home', label: 'Inicio', description: 'Ir al panel de inicio' },
     { id: 'nav_inventory', label: 'Inventario', description: 'Abrir gestión de inventario' },
     { id: 'nav_clients', label: 'Clientes', description: 'Ver directorio de clientes' },
+    { id: 'nav_catalogs', label: 'Catálogos', description: 'Ver catálogos de productos' },
     { id: 'nav_prices', label: 'Precios', description: 'Administrar listas de precios' },
     { id: 'nav_invoices', label: 'Facturas', description: 'Ir a facturación e informes' },
     { id: 'nav_settings', label: 'Configuraciones', description: 'Abrir esta página' },
@@ -76,20 +77,20 @@ export default function HotkeysModal({ isOpen, onClose }: HotkeysModalProps) {
             <div className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity" onClick={handleCancel} />
             <div className="fixed inset-0 overflow-y-auto">
                 <div className="flex min-h-full items-center justify-center p-4">
-                    <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-xl flex flex-col">
+                    <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white dark:bg-slate-800 shadow-xl flex flex-col">
                         
                         {/* Header */}
-                        <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
+                        <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
                             <div className="flex items-center gap-3">
-                                <div className="p-2.5 bg-indigo-100 text-indigo-600 rounded-xl">
+                                <div className="p-2.5 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl">
                                     <Keyboard className="w-6 h-6" />
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-bold text-slate-800 tracking-tight">Atajos de Navegación</h3>
-                                    <p className="text-sm text-slate-500 mt-0.5">Configura combinaciones de teclas para abrir secciones rápidamente</p>
+                                    <h3 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">Atajos de Navegación</h3>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Configura combinaciones de teclas para abrir secciones rápidamente</p>
                                 </div>
                             </div>
-                            <button onClick={handleCancel} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+                            <button onClick={handleCancel} className="p-2 text-slate-400 hover:text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 rounded-full transition-colors">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
@@ -102,10 +103,10 @@ export default function HotkeysModal({ isOpen, onClose }: HotkeysModalProps) {
                                     const currentKey = localHotkeys[item.id];
 
                                     return (
-                                        <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                                        <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900 transition-colors">
                                             <div>
-                                                <p className="font-semibold text-slate-800 text-sm">{item.label}</p>
-                                                <p className="text-xs text-slate-500 mt-1">{item.description}</p>
+                                                <p className="font-semibold text-slate-800 dark:text-white text-sm">{item.label}</p>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{item.description}</p>
                                             </div>
                                             
                                             <button 
@@ -113,8 +114,8 @@ export default function HotkeysModal({ isOpen, onClose }: HotkeysModalProps) {
                                                 onKeyDown={(e) => isRecording && handleKeyDown(e, item.id)}
                                                 className={`relative w-full sm:w-48 px-4 py-2.5 rounded-lg text-sm font-mono flex items-center justify-center overflow-hidden transition-all outline-none
                                                     ${isRecording 
-                                                        ? 'bg-indigo-50 border-2 border-indigo-500 text-indigo-700 shadow-inner' 
-                                                        : 'bg-white border text-slate-600 border-slate-200 hover:border-indigo-300 focus:border-indigo-500 shadow-sm'
+                                                        ? 'bg-indigo-50 dark:bg-indigo-500/10 border-2 border-indigo-500 text-indigo-700 dark:text-indigo-400 shadow-inner' 
+                                                        : 'bg-white dark:bg-slate-800 border text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-300 focus:border-indigo-500 shadow-sm'
                                                     }`}
                                             >
                                                 {isRecording ? (
@@ -134,10 +135,10 @@ export default function HotkeysModal({ isOpen, onClose }: HotkeysModalProps) {
                         </div>
 
                         {/* Footer */}
-                        <div className="flex items-center justify-between gap-3 p-6 border-t border-slate-100 bg-slate-50/80">
+                        <div className="flex items-center justify-between gap-3 p-6 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/80">
                             <button 
                                 onClick={handleResetDefaults} 
-                                className="flex items-center gap-2 px-4 py-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-200 font-medium text-sm rounded-xl transition-colors"
+                                className="flex items-center gap-2 px-4 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700/50 font-medium text-sm rounded-xl transition-colors"
                             >
                                 <RotateCcw className="w-4 h-4" />
                                 Restaurar Predeterminados
@@ -145,7 +146,7 @@ export default function HotkeysModal({ isOpen, onClose }: HotkeysModalProps) {
                             <div className="flex items-center gap-3">
                                 <button 
                                     onClick={handleCancel} 
-                                    className="px-5 py-2.5 text-slate-600 hover:bg-slate-200 font-medium text-sm rounded-xl transition-colors"
+                                    className="px-5 py-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700/50 font-medium text-sm rounded-xl transition-colors"
                                 >
                                     Cancelar
                                 </button>

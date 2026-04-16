@@ -49,7 +49,7 @@ const priorityConfig: Record<
     label: "Crítica",
     dot: "bg-black",
     bg: "bg-gray-100",
-    text: "text-slate-900",
+    text: "text-slate-900 dark:text-white",
     border: "border-slate-300",
     icon: Skull,
   },
@@ -66,7 +66,7 @@ const priorityConfig: Record<
     // Para otros apartados (Catálogos, Usuarios, Clientes)
     label: "Media",
     dot: "bg-amber-500",
-    bg: "bg-amber-50",
+    bg: "bg-amber-50 dark:bg-amber-500/10",
     text: "text-amber-700",
     border: "border-amber-200",
     icon: AlertTriangle,
@@ -241,7 +241,7 @@ export default function NotificationFlyoutMenu() {
     try {
       const bitacoraDb = database.collections.get("bitacora_errores");
       const errorRecords = await bitacoraDb.query(Q.where('id', id)).fetch();
-      
+
       if (errorRecords.length > 0) {
         const record = errorRecords[0] as any;
         try {
@@ -309,11 +309,10 @@ export default function NotificationFlyoutMenu() {
           setIsOpen((o) => !o);
           setShowFilterMenu(false);
         }}
-        className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${
-          isOpen
-            ? "bg-white/20 border-white/30 text-white"
-            : "bg-[#15335c] border-transparent hover:bg-white/10 text-slate-300 hover:text-white"
-        }`}
+        className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${isOpen
+          ? "bg-[#38bdf8]/20 dark:bg-slate-800/20 border-white/30 text-white"
+          : "bg-[#15335c] border-transparent hover:bg-black/20 text-slate-300 hover:text-white"
+          }`}
         title="Notificaciones"
       >
         <Bell size={18} />
@@ -326,11 +325,11 @@ export default function NotificationFlyoutMenu() {
 
       {/* Panel */}
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-[380px] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50 origin-top-right animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute right-0 mt-3 w-[380px] bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden z-50 origin-top-right animate-in fade-in zoom-in-95 duration-150">
           {/* ── Header ── */}
           <div className="bg-[radial-gradient(ellipse_at_center,_#15335c_0%,_#15335c_100%)] px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-white/10 rounded-xl">
+              <div className="p-2 bg-white dark:bg-slate-800/10 rounded-xl">
                 <Bell size={16} className="text-white" />
               </div>
               <div>
@@ -345,14 +344,14 @@ export default function NotificationFlyoutMenu() {
             <div className="flex items-center gap-1.5">
               <button
                 onClick={markAllRead}
-                className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                className="p-2 rounded-lg hover:bg-black/20 text-slate-400 hover:text-white transition-colors"
                 title="Marcar todo como leído"
               >
                 <CheckCheck size={15} />
               </button>
               <button
                 onClick={() => setIsOpen(false)}
-                className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                className="p-2 rounded-lg hover:bg-black/20 text-slate-400 hover:text-white transition-colors"
                 title="Cerrar"
               >
                 <X size={15} />
@@ -361,11 +360,11 @@ export default function NotificationFlyoutMenu() {
           </div>
 
           {/* ── Filter bar ── */}
-          <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
             <div className="relative">
               <button
                 onClick={() => setShowFilterMenu((s) => !s)}
-                className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-white border border-slate-200"
+                className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-300 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-black/20 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
               >
                 <span
                   className={`w-2 h-2 rounded-full ${priorityFilter === "todas" ? "bg-slate-400" : priorityConfig[priorityFilter].dot}`}
@@ -377,7 +376,7 @@ export default function NotificationFlyoutMenu() {
               </button>
 
               {showFilterMenu && (
-                <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 min-w-[130px]">
+                <div className="absolute top-full left-0 mt-1 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1.5 z-50 min-w-[130px]">
                   {(["todas", "critica", "alta", "media", "baja"] as const).map(
                     (opt) => (
                       <button
@@ -386,18 +385,16 @@ export default function NotificationFlyoutMenu() {
                           setPriorityFilter(opt);
                           setShowFilterMenu(false);
                         }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-medium transition-colors ${
-                          priorityFilter === opt
-                            ? "bg-slate-100 text-slate-800"
-                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-                        }`}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-medium transition-colors ${priorityFilter === opt
+                          ? "bg-slate-100 dark:bg-slate-800/50 text-slate-800 dark:text-white"
+                          : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900 hover:text-slate-700 dark:text-slate-300"
+                          }`}
                       >
                         <span
-                          className={`w-2 h-2 rounded-full ${
-                            opt === "todas"
-                              ? "bg-slate-400"
-                              : priorityConfig[opt].dot
-                          }`}
+                          className={`w-2 h-2 rounded-full ${opt === "todas"
+                            ? "bg-slate-400"
+                            : priorityConfig[opt].dot
+                            }`}
                         />
                         {opt === "todas" ? "Todas" : priorityConfig[opt].label}
                       </button>
@@ -420,7 +417,7 @@ export default function NotificationFlyoutMenu() {
                   size={32}
                   className="text-emerald-500 bg-emerald-50 p-3 rounded-full"
                 />
-                <p className="text-sm font-semibold text-slate-700">
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                   Todo al día
                 </p>
                 <p className="text-[11px] text-slate-400 leading-snug">
@@ -435,9 +432,8 @@ export default function NotificationFlyoutMenu() {
                 return (
                   <div
                     key={notif.id}
-                    className={`group px-4 py-3.5 transition-colors relative cursor-pointer ${
-                      isUnread ? "bg-white" : "bg-slate-50/60"
-                    } hover:bg-slate-50`}
+                    className={`group px-4 py-3.5 transition-colors relative cursor-pointer ${isUnread ? "bg-white dark:bg-slate-800" : "bg-slate-50 dark:bg-slate-900/60"
+                      } hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900`}
                     onClick={() => handleNotificationClick(notif)}
                   >
                     {/* Unread indicator bar */}
@@ -459,11 +455,10 @@ export default function NotificationFlyoutMenu() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                           <h4
-                            className={`text-sm leading-snug truncate ${
-                              isUnread
-                                ? "font-extrabold text-slate-800"
-                                : "font-semibold text-slate-600"
-                            }`}
+                            className={`text-sm leading-snug truncate ${isUnread
+                              ? "font-extrabold text-slate-800 dark:text-white"
+                              : "font-semibold text-slate-600 dark:text-slate-300"
+                              }`}
                           >
                             {notif.title}
                           </h4>
@@ -473,7 +468,7 @@ export default function NotificationFlyoutMenu() {
                             {pCfg.label}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-600 font-medium mt-1 leading-relaxed line-clamp-3">
+                        <p className="text-xs text-slate-600 dark:text-slate-300 font-medium mt-1 leading-relaxed line-clamp-3">
                           {notif.message}
                         </p>
                         <div className="flex items-center justify-between mt-2.5">
@@ -511,7 +506,7 @@ export default function NotificationFlyoutMenu() {
 
           {/* ── Footer ── */}
           {visibleItems.length > 0 && (
-            <div className="px-4 py-3 bg-slate-50 border-t border-slate-100 text-center">
+            <div className="px-4 py-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-700 text-center">
               <button
                 onClick={markAllRead}
                 className="text-xs font-semibold text-[#6383a1] hover:text-[#15335c] transition-colors"

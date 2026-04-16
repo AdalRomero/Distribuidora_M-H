@@ -149,9 +149,9 @@ function AddEntryInner({
   if (!isOpen) return null;
 
   const inputClass =
-    "w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400";
+    "w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400";
   const selectClass =
-    "w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-slate-600";
+    "w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-slate-600 dark:text-slate-300";
 
   function resetForm() {
     setProductoId("");
@@ -273,21 +273,21 @@ function AddEntryInner({
         className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       ></div>
-      <div className="relative z-10 bg-slate-50 w-full max-w-4xl max-h-[95vh] flex flex-col rounded-3xl shadow-2xl overflow-hidden">
+      <div className="relative z-10 bg-slate-50 dark:bg-slate-900 w-full max-w-4xl max-h-[95vh] flex flex-col rounded-3xl shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="bg-white px-8 py-5 flex items-center justify-between border-b border-slate-100 shrink-0">
+        <div className="bg-white dark:bg-slate-800 px-8 py-5 flex items-center justify-between border-b border-slate-100 dark:border-slate-700 shrink-0">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">
               Registrar Entrada de Mercancía
             </h2>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
               Ingresa un lote nuevo para un producto existente
             </p>
           </div>
           <button
             onClick={onClose}
             disabled={isSaving}
-            className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+            className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 text-slate-400 hover:text-slate-600 dark:text-slate-300 transition-colors"
           >
             <X className="w-6 h-6" />
           </button>
@@ -298,16 +298,16 @@ function AddEntryInner({
           <form className="flex flex-col gap-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
               {/* Sección Principal */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5 flex flex-col">
+              <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-5 flex flex-col">
                 <div className="flex items-center gap-2 mb-4 border-b border-slate-50 pb-3">
                   <Package className="w-5 h-5 text-blue-600" />
-                  <h3 className="text-base font-bold text-slate-700">
+                  <h3 className="text-base font-bold text-slate-700 dark:text-slate-300">
                     Identificación
                   </h3>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                     Producto *
                   </label>
                   <select
@@ -327,7 +327,7 @@ function AddEntryInner({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                     Almacén Destino *
                   </label>
                   <select
@@ -348,7 +348,7 @@ function AddEntryInner({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                       Identificador de Lote *
                     </label>
                     <input
@@ -360,13 +360,13 @@ function AddEntryInner({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5 flex items-center gap-2">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-slate-400" />
                       Caducidad
                     </label>
                     <input
                       type="date"
-                      className={`${inputClass} text-slate-600`}
+                      className={`${inputClass} text-slate-600 dark:text-slate-300`}
                       value={caducidad}
                       onChange={(e) => setCaducidad(e.target.value)}
                     />
@@ -375,7 +375,7 @@ function AddEntryInner({
 
                 {/* Código Alterno */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5 flex items-center gap-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-2">
                     <Barcode className="w-4 h-4 text-indigo-500" />
                     Código Alterno (Barras)
                   </label>
@@ -437,17 +437,17 @@ function AddEntryInner({
               </div>
 
               {/* Operación y Costo */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5 flex flex-col">
+              <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-5 flex flex-col">
                 <div className="flex items-center gap-2 mb-4 border-b border-slate-50 pb-3">
                   <DollarSign className="w-5 h-5 text-emerald-500" />
-                  <h3 className="text-base font-bold text-slate-700">
+                  <h3 className="text-base font-bold text-slate-700 dark:text-slate-300">
                     Cantidades y Costo
                   </h3>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                       Cantidad Entrante *
                     </label>
                     <input
@@ -460,7 +460,7 @@ function AddEntryInner({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                       Unidad de Medida
                     </label>
                     <select
@@ -479,7 +479,7 @@ function AddEntryInner({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                     Costo de Adquisición Unitario *
                   </label>
                   <div className="relative">
@@ -490,14 +490,14 @@ function AddEntryInner({
                       type="number"
                       step="0.01"
                       min="0"
-                      className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400"
+                      className="w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:bg-white dark:bg-slate-800 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400"
                       placeholder="0.00"
                       value={costo}
                       onChange={(e) => setCosto(e.target.value)}
                     />
                   </div>
                   {ultimoCosto !== null && (
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                       Último costo registrado:{" "}
                       <span className="font-semibold">
                         ${ultimoCosto.toFixed(2)}
@@ -507,13 +507,13 @@ function AddEntryInner({
                 </div>
 
                 {showCostoAlerta && (
-                  <div className="mt-2 flex items-start gap-3 px-4 py-3 bg-amber-50 rounded-xl border border-amber-200">
+                  <div className="mt-2 flex items-start gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-500/10 rounded-xl border border-amber-200">
                     <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm font-bold text-amber-700">
                         Alerta de Variación de Costo
                       </p>
-                      <p className="text-xs text-amber-600 mt-1">
+                      <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
                         El costo ingresado (${costo}) difiere en un{" "}
                         <span className="font-semibold">
                           {Math.abs(diffPerc!).toFixed(2)}%
@@ -527,19 +527,19 @@ function AddEntryInner({
 
                 {/* Info del Margen asignado al producto */}
                 {productoId && (
-                  <div className="mt-1 px-4 py-3 bg-slate-50 rounded-xl border border-slate-200">
-                    <p className="text-xs text-slate-500">
+                  <div className="mt-1 px-4 py-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
                       Margen asignado:{" "}
-                      <span className="font-bold text-slate-700">
+                      <span className="font-bold text-slate-700 dark:text-slate-300">
                         {productoMargen
                           ? `${productoMargen.nombre} (${productoMargen.porcentaje}%)`
                           : "Sin margen"}
                       </span>
                     </p>
                     {productoImpuestosTasas.length > 0 && (
-                      <p className="text-xs text-slate-500 mt-1">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                         Impuestos:{" "}
-                        <span className="font-bold text-slate-700">
+                        <span className="font-bold text-slate-700 dark:text-slate-300">
                           {productoImpuestosTasas
                             .map((imp) => `${imp.nombre} (${imp.tasa}%)`)
                             .join(", ")}
@@ -555,25 +555,25 @@ function AddEntryInner({
             {showCalculadoraLote && (
               <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-2xl border border-indigo-200 p-6">
                 <div className="flex items-center gap-2 mb-4">
-                  <TrendingUp className="w-5 h-5 text-indigo-600" />
+                  <TrendingUp className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                   <h4 className="text-sm font-bold text-indigo-800">
                     Proyección Financiera del Lote
                   </h4>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                  <div className="bg-white/80 rounded-xl p-4 text-center">
-                    <p className="text-xs text-slate-500 mb-1">
+                  <div className="bg-white dark:bg-slate-800/80 rounded-xl p-4 text-center">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
                       Inversión Total
                     </p>
-                    <p className="text-lg font-bold text-slate-800">
+                    <p className="text-lg font-bold text-slate-800 dark:text-white">
                       ${inversionTotalLote.toFixed(2)}
                     </p>
                     <p className="text-[10px] text-slate-400">
                       {cantidadNum} × ${costoNum.toFixed(2)}
                     </p>
                   </div>
-                  <div className="bg-white/80 rounded-xl p-4 text-center">
-                    <p className="text-xs text-slate-500 mb-1">
+                  <div className="bg-white dark:bg-slate-800/80 rounded-xl p-4 text-center">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
                       Utilidad x Unidad
                     </p>
                     <p className="text-lg font-bold text-emerald-700">
@@ -583,8 +583,8 @@ function AddEntryInner({
                       Margen {margenPorcentaje}%
                     </p>
                   </div>
-                  <div className="bg-white/80 rounded-xl p-4 text-center">
-                    <p className="text-xs text-slate-500 mb-1">
+                  <div className="bg-white dark:bg-slate-800/80 rounded-xl p-4 text-center">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
                       Precio Público
                     </p>
                     <p className="text-lg font-bold text-blue-700">
@@ -594,8 +594,8 @@ function AddEntryInner({
                       c/impuestos ({totalImpuestoPorcentaje}%)
                     </p>
                   </div>
-                  <div className="bg-white/80 rounded-xl p-4 text-center">
-                    <p className="text-xs text-slate-500 mb-1">
+                  <div className="bg-white dark:bg-slate-800/80 rounded-xl p-4 text-center">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
                       Utilidad del Lote
                     </p>
                     <p className="text-lg font-bold text-emerald-700">
@@ -623,12 +623,12 @@ function AddEntryInner({
         </div>
 
         {/* Footer */}
-        <div className="bg-white border-t border-slate-100 p-5 px-8 shrink-0 flex items-center justify-end gap-3 rounded-b-3xl">
+        <div className="bg-white dark:bg-slate-800 border-t border-slate-100 dark:border-slate-700 p-5 px-8 shrink-0 flex items-center justify-end gap-3 rounded-b-3xl">
           <button
             type="button"
             onClick={onClose}
             disabled={isSaving}
-            className="px-6 py-2.5 rounded-xl font-medium text-sm text-slate-500 hover:bg-slate-100 transition-colors disabled:opacity-50"
+            className="px-6 py-2.5 rounded-xl font-medium text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 transition-colors disabled:opacity-50"
           >
             Cancelar
           </button>

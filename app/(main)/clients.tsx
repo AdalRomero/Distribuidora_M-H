@@ -321,10 +321,10 @@ export default function Clients() {
     // ==========================================
     const getCategoryBadgeColor = (category: string) => {
         switch (category) {
-            case 'Panadería': return 'bg-blue-50 text-mh-blue-dark border-blue-100';
-            case 'Dulcería': return 'bg-mh-pink/10 text-mh-pink border-mh-pink/20';
-            case 'Abarrotes': return 'bg-amber-50 text-amber-700 border-amber-200';
-            default: return 'bg-slate-50 text-slate-700 border-slate-200';
+            case 'Panadería': return 'bg-blue-50 dark:bg-blue-900/30 text-mh-blue-dark dark:text-blue-400 border-blue-100 dark:border-blue-800/50';
+            case 'Dulcería': return 'bg-mh-pink/10 dark:bg-mh-pink/20 text-mh-pink dark:text-pink-400 border-mh-pink/20 dark:border-pink-800/50';
+            case 'Abarrotes': return 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/50';
+            default: return 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700';
         }
     };
 
@@ -347,7 +347,7 @@ export default function Clients() {
     };
 
     return (
-        <div className="p-4 sm:p-8 bg-slate-50 min-h-screen font-sans">
+        <div className="p-4 sm:p-8 bg-slate-50 dark:bg-slate-900 min-h-screen font-sans">
             <div className="max-w-7xl mx-auto">
                 {/* MODALES */}
                 <SuccessModal isOpen={message?.type === 'success'} onClose={() => setMessage(null)} title="¡Éxito!" message={message?.type === 'success' ? message.text : ''} />
@@ -357,8 +357,8 @@ export default function Clients() {
                 {/* HEADER */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-mh-blue-dark tracking-tight">Directorio de Clientes</h1>
-                        <p className="text-slate-500 text-sm mt-1">Administra la información y asignaciones de tus clientes.</p>
+                        <h1 className="text-2xl font-bold text-mh-blue-dark dark:text-white tracking-tight">Directorio de Clientes</h1>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Administra la información y asignaciones de tus clientes.</p>
                     </div>
                     <button onClick={() => { setEditingClientId(null); setEditData(null); setIsClientModalOpen(true); }} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm shadow-sm">
                         <Plus className="w-4 h-4" /><span>Nuevo Cliente</span>
@@ -375,18 +375,18 @@ export default function Clients() {
                     isHighPriority={false} 
                 />
 
-                <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
                     <div className="relative flex-1">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Search className="w-5 h-5 text-slate-400" /></div>
-                        <input type="text" className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400" placeholder="Buscar por nombre, RFC o categoría..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                        <input type="text" className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400" placeholder="Buscar por nombre, RFC o categoría..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                     </div>
                 </div>
 
                 {/* TABLA */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm whitespace-nowrap">
-                            <thead className="bg-slate-50/80 text-slate-500 border-b border-slate-100 text-xs uppercase tracking-wider font-bold">
+                            <thead className="bg-slate-50 dark:bg-slate-900/80 text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-700 text-xs uppercase tracking-wider font-bold">
                                 <tr>
                                     <th className="px-6 py-4">Cliente</th>
                                     <th className="px-6 py-4">Categoría</th>
@@ -407,10 +407,10 @@ export default function Clients() {
                                     </td></tr>
                                 ) : (
                                     filteredClients.map((client) => (
-                                        <tr key={client.id} className={`hover:bg-slate-50/50 transition-colors group ${!client.estado ? 'opacity-50 bg-slate-50/30' : ''}`}>
+                                        <tr key={client.id} className={`hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900/50 transition-colors group ${!client.estado ? 'opacity-50 bg-slate-50 dark:bg-slate-900/30' : ''}`}>
                                             <td className="px-6 py-4">
                                                 <div>
-                                                    <p className="text-mh-blue-dark font-bold">{client.nombre}</p>
+                                                    <p className="text-mh-blue-dark dark:text-white font-bold">{client.nombre}</p>
                                                     <p className="text-slate-400 text-xs mt-0.5">{client.rfc || 'Sin RFC'}</p>
                                                     {client.contacto && <p className="text-slate-400 text-xs mt-0.5">{client.contacto}</p>}
                                                 </div>
@@ -419,7 +419,7 @@ export default function Clients() {
                                                 <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border ${getCategoryBadgeColor(client.categoria)}`}>{client.categoria}</span>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2 text-slate-600">
+                                                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                                                     <Tag className="w-4 h-4 text-mh-blue" />
                                                     <span className="font-medium text-sm">{getPriceListLabel(client.listaPrecioBase)}</span>
                                                     {client.descuentoGlobal > 0 && (
@@ -433,8 +433,8 @@ export default function Clients() {
                                                 <div className="relative inline-block">
                                                     <button
                                                         className={`p-2 rounded-lg transition-all duration-200 ${hasAddress(client)
-                                                            ? 'text-mh-blue hover:bg-blue-50 hover:scale-110'
-                                                            : 'text-slate-300 cursor-default'
+                                                            ? 'text-mh-blue dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:scale-110'
+                                                            : 'text-slate-300 dark:text-slate-600 cursor-default'
                                                         }`}
                                                         onClick={() => hasAddress(client) && setAddressFlyoutId(addressFlyoutId === client.id ? null : client.id)}
                                                         onMouseEnter={() => setHoveredAddressId(client.id)}
@@ -454,14 +454,14 @@ export default function Clients() {
 
                                                     {/* Click Flyout */}
                                                     {addressFlyoutId === client.id && (
-                                                        <div ref={flyoutRef} className="absolute z-40 top-full right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden animate-fade-in">
+                                                        <div ref={flyoutRef} className="absolute z-40 top-full right-0 mt-2 w-72 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-fade-in">
                                                             {/* Flyout Header */}
-                                                            <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-50 to-slate-50 border-b border-slate-100">
+                                                            <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-50 to-slate-50 dark:from-slate-800 dark:to-slate-900 border-b border-slate-100 dark:border-slate-700">
                                                                 <div className="flex items-center gap-2">
                                                                     <MapPin className="w-4 h-4 text-mh-blue" />
-                                                                    <span className="text-sm font-bold text-mh-blue-dark">Dirección</span>
+                                                                    <span className="text-sm font-bold text-mh-blue-dark dark:text-white">Dirección</span>
                                                                 </div>
-                                                                <button onClick={() => setAddressFlyoutId(null)} className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors">
+                                                                <button onClick={() => setAddressFlyoutId(null)} className="p-1 text-slate-400 hover:text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 rounded-md transition-colors">
                                                                     <X className="w-3.5 h-3.5" />
                                                                 </button>
                                                             </div>
@@ -472,7 +472,7 @@ export default function Clients() {
                                                                         <Navigation className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
                                                                         <div>
                                                                             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Calle</p>
-                                                                            <p className="text-sm text-slate-700">{client.calle}</p>
+                                                                            <p className="text-sm text-slate-700 dark:text-slate-300">{client.calle}</p>
                                                                         </div>
                                                                     </div>
                                                                 )}
@@ -481,7 +481,7 @@ export default function Clients() {
                                                                         <MapPin className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
                                                                         <div>
                                                                             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Colonia</p>
-                                                                            <p className="text-sm text-slate-700">{client.colonia}</p>
+                                                                            <p className="text-sm text-slate-700 dark:text-slate-300">{client.colonia}</p>
                                                                         </div>
                                                                     </div>
                                                                 )}
@@ -489,21 +489,21 @@ export default function Clients() {
                                                                     {client.cp && (
                                                                         <div className="flex-1">
                                                                             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">C.P.</p>
-                                                                            <p className="text-sm text-slate-700 font-mono">{client.cp}</p>
+                                                                            <p className="text-sm text-slate-700 dark:text-slate-300 font-mono">{client.cp}</p>
                                                                         </div>
                                                                     )}
                                                                     {client.ciudad && (
                                                                         <div className="flex-1">
                                                                             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Ciudad</p>
-                                                                            <p className="text-sm text-slate-700">{client.ciudad}</p>
+                                                                            <p className="text-sm text-slate-700 dark:text-slate-300">{client.ciudad}</p>
                                                                         </div>
                                                                     )}
                                                                 </div>
                                                                 {client.contacto && (
-                                                                    <div className="pt-2 border-t border-slate-100">
+                                                                    <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
                                                                         <div className="flex items-center gap-2">
                                                                             {client.contacto.includes('@') ? <Mail className="w-3.5 h-3.5 text-slate-400" /> : <Phone className="w-3.5 h-3.5 text-slate-400" />}
-                                                                            <p className="text-sm text-slate-600">{client.contacto}</p>
+                                                                            <p className="text-sm text-slate-600 dark:text-slate-300">{client.contacto}</p>
                                                                         </div>
                                                                     </div>
                                                                 )}
@@ -519,8 +519,8 @@ export default function Clients() {
                                                     <button
                                                         onClick={() => handleToggleStatus(client.id, client.nombre, client.estado)}
                                                         className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 ${client.estado
-                                                            ? 'bg-emerald-50 border border-emerald-200 hover:bg-emerald-100'
-                                                            : 'bg-slate-50 border border-slate-200 hover:bg-slate-100'
+                                                            ? 'bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50'
+                                                            : 'bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50'
                                                         }`}
                                                     >
                                                         {client.estado ? (
@@ -543,14 +543,14 @@ export default function Clients() {
                                                 <div className="flex items-center justify-center gap-1">
                                                     <button
                                                         onClick={() => startEdit(client)}
-                                                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                        className="p-2 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
                                                         title="Editar cliente"
                                                     >
                                                         <Edit2 className="w-4 h-4" />
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeleteClient(client.id, client.nombre)}
-                                                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                                        className="p-2 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors"
                                                         title="Eliminar cliente"
                                                     >
                                                         <Trash2 className="w-4 h-4" />

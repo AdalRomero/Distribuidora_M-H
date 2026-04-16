@@ -1,21 +1,20 @@
 import { Q } from '@nozbe/watermelondb';
 import withObservables from '@nozbe/with-observables';
 import { AlertTriangle, Clock, DollarSign, Download, Package, Plus, Search } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import AddEntry from '../../components/ui/modals/AddEntry';
 import AddInventory from '../../components/ui/modals/AddInventory';
+import EditLote from '../../components/ui/modals/EditLote';
 import WarningModal from '../../components/ui/modals/WarningModal';
+import ProductLotsView from '../../components/ui/ProductLotsView';
 import ProductRow from '../../components/ui/ProductRow';
-import { database } from '../../src/services/DB/indexBD';
-import FamiliaModel from '../../src/services/DB/models/bases/familia';
-import ProductoModel from '../../src/services/DB/models/catalogo/producto';
-import { syncApp } from '../../src/sync';
 import SyncErrorBanner, { SyncError } from "../../components/ui/SyncErrorBanner";
 import { useSyncErrors } from "../../src/hooks/useSyncErrors";
+import { database } from '../../src/services/DB/indexBD';
+import FamiliaModel from '../../src/services/DB/models/bases/familia';
 import LoteModel from '../../src/services/DB/models/catalogo/lote';
-import ProductLotsView from '../../components/ui/ProductLotsView';
-import EditLote from '../../components/ui/modals/EditLote';
-import { useMemo, useEffect } from 'react';
+import ProductoModel from '../../src/services/DB/models/catalogo/producto';
+import { syncApp } from '../../src/sync';
 
 interface InventoryProps {
     productos: ProductoModel[];
@@ -59,8 +58,8 @@ function InventoryContent({ productos, familias }: InventoryProps) {
     useEffect(() => {
         const autoRecoverId = new URLSearchParams(window.location.search).get("recoverErrorId");
         if (autoRecoverId && syncErrors.length > 0) {
-          const err = syncErrors.find(e => e.id === autoRecoverId);
-          if (err) triggerRecoveryWrapper(err);
+            const err = syncErrors.find(e => e.id === autoRecoverId);
+            if (err) triggerRecoveryWrapper(err);
         }
     }, [syncErrors]);
 
@@ -84,7 +83,7 @@ function InventoryContent({ productos, familias }: InventoryProps) {
                 const expiredLotes = await database.collections.get('lotes')
                     .query(Q.where('estado', true))
                     .fetch();
-                
+
                 const toDeactivate = expiredLotes.filter((l: any) => l.fechaCaducidad && l.fechaCaducidad < now);
                 if (toDeactivate.length > 0) {
                     await database.write(async () => {
@@ -111,19 +110,19 @@ function InventoryContent({ productos, familias }: InventoryProps) {
     };
 
     return (
-        <div className="p-8 bg-slate-50 min-h-screen font-sans">
+        <div className="p-8 bg-slate-50 dark:bg-slate-900 min-h-screen font-sans">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-800">Inventario de Productos</h1>
-                        <p className="text-slate-500 text-sm mt-1">Gestiona y consulta tu catálogo de distribución</p>
+                        <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Inventario de Productos</h1>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Gestiona y consulta tu catálogo de distribución</p>
                     </div>
                     <div className="flex gap-3">
-                        <button className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg bg-white text-slate-700 hover:bg-slate-50 transition-colors font-medium text-sm shadow-sm">
+                        <button className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900 transition-colors font-medium text-sm shadow-sm">
                             <Download className="w-4 h-4" /><span>Exportar</span>
                         </button>
-                        <button onClick={() => setIsAddEntryOpen(true)} className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg bg-white text-slate-700 hover:bg-slate-50 transition-colors font-medium text-sm shadow-sm">
+                        <button onClick={() => setIsAddEntryOpen(true)} className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900 transition-colors font-medium text-sm shadow-sm">
                             <Package className="w-4 h-4" /><span>Registrar Entrada</span>
                         </button>
                         <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm shadow-sm">
@@ -132,31 +131,31 @@ function InventoryContent({ productos, familias }: InventoryProps) {
                     </div>
                 </div>
 
-                <SyncErrorBanner 
-                    errors={syncErrors} 
-                    onRecover={triggerRecoveryWrapper} 
-                    onDismiss={handleDismissError} 
-                    contextName="Inventario/Producto" 
-                    isHighPriority={true} 
+                <SyncErrorBanner
+                    errors={syncErrors}
+                    onRecover={triggerRecoveryWrapper}
+                    onDismiss={handleDismissError}
+                    contextName="Inventario/Producto"
+                    isHighPriority={true}
                 />
 
                 {/* KPIs */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center shrink-0"><Package className="w-6 h-6 text-blue-600" /></div>
-                        <div><p className="text-sm text-slate-500 font-medium">Total Productos</p><p className="text-xl font-bold text-slate-800">{productos.length}</p></div>
+                    <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0"><Package className="w-6 h-6 text-blue-600 dark:text-blue-500" /></div>
+                        <div><p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Total Productos</p><p className="text-xl font-bold text-slate-800 dark:text-white">{productos.length}</p></div>
                     </div>
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center shrink-0"><DollarSign className="w-6 h-6 text-emerald-600" /></div>
-                        <div><p className="text-sm text-slate-500 font-medium">Familias Activas</p><p className="text-xl font-bold text-slate-800">{familias.filter(f => f.estado).length}</p></div>
+                    <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center shrink-0"><DollarSign className="w-6 h-6 text-emerald-600 dark:text-emerald-500" /></div>
+                        <div><p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Familias Activas</p><p className="text-xl font-bold text-slate-800 dark:text-white">{familias.filter(f => f.estado).length}</p></div>
                     </div>
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center shrink-0"><AlertTriangle className="w-6 h-6 text-amber-500" /></div>
-                        <div><p className="text-sm text-slate-500 font-medium">Stock Bajo</p><p className="text-xl font-bold text-amber-600">— Prods</p></div>
+                    <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center shrink-0"><AlertTriangle className="w-6 h-6 text-amber-500" /></div>
+                        <div><p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Stock Bajo</p><p className="text-xl font-bold text-amber-600 dark:text-amber-500">— Prods</p></div>
                     </div>
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 bg-rose-50"><Clock className="w-6 h-6 text-rose-500" /></div>
-                        <div><p className="text-sm text-slate-500 font-medium">Próximos a Caducar</p><p className="text-xl font-bold text-rose-600">— Prods</p></div>
+                    <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 bg-rose-50 dark:bg-rose-900/30"><Clock className="w-6 h-6 text-rose-500" /></div>
+                        <div><p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Próximos a Caducar</p><p className="text-xl font-bold text-rose-600 dark:text-rose-500">— Prods</p></div>
                     </div>
                 </div>
 
@@ -207,9 +206,9 @@ function InventoryContent({ productos, familias }: InventoryProps) {
 
                 {/* View Switch */}
                 {selectedProduct ? (
-                    <ProductLotsView 
-                        producto={selectedProduct} 
-                        onBack={() => setSelectedProduct(null)} 
+                    <ProductLotsView
+                        producto={selectedProduct}
+                        onBack={() => setSelectedProduct(null)}
                         onAddLote={() => {
                             // Pre-seleccionar este producto en el AddEntry si quisiéramos, por ahora sólo lo abrimos
                             setIsAddEntryOpen(true);

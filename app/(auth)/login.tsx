@@ -308,7 +308,7 @@ export default function Login() {
 
   const iconColorClass = isCaja ? "text-blue-500" : "text-rose-400";
 
-  const inputClass = `w-full pl-11 pr-4 py-3.5 text-gray-900 bg-white border rounded-2xl outline-none transition-all duration-300
+  const inputClass = `w-full pl-11 pr-4 py-3.5 text-gray-900 bg-white dark:bg-slate-800 border rounded-2xl outline-none transition-all duration-300
     ${isCaja
       ? "border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 placeholder:text-gray-400"
       : "border-rose-200 focus:border-rose-400 focus:ring-4 focus:ring-rose-400/15 placeholder:text-rose-300"
@@ -356,7 +356,7 @@ export default function Login() {
         <button
           type="button"
           onClick={() => setIsFormLeft(!isFormLeft)}
-          className="absolute top-6 right-6 z-20 p-2.5 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-sm transition-colors text-white"
+          className="absolute top-6 right-6 z-20 p-2.5 rounded-full bg-white dark:bg-slate-800/20 hover:bg-white dark:bg-slate-800/30 backdrop-blur-sm transition-colors text-white"
           title="Intercambiar vista"
         >
           <svg
@@ -394,8 +394,8 @@ export default function Login() {
               type="button"
               onClick={() => setBusinessType("caja")}
               className={`relative flex items-center justify-center w-16 h-16 rounded-2xl border-2 transition-all duration-500 ease-out overflow-visible ${isCaja
-                  ? "bg-white border-blue-500 shadow-[0_8px_24px_-6px_rgba(59,130,246,0.5)] scale-110 z-10"
-                  : "bg-white/60 border-gray-200 shadow-sm hover:bg-white hover:-translate-y-0.5"
+                  ? "bg-white dark:bg-slate-800 border-blue-500 shadow-[0_8px_24px_-6px_rgba(59,130,246,0.5)] scale-110 z-10"
+                  : "bg-white dark:bg-slate-800/60 border-gray-200 shadow-sm hover:bg-white dark:bg-slate-800 hover:-translate-y-0.5"
                 }`}
             >
               <div
@@ -422,8 +422,8 @@ export default function Login() {
               type="button"
               onClick={() => setBusinessType("pastel")}
               className={`relative flex items-center justify-center w-16 h-16 rounded-2xl border-2 transition-all duration-500 ease-out overflow-visible ${!isCaja
-                  ? "bg-white border-rose-500 shadow-[0_8px_24px_-6px_rgba(244,63,94,0.5)] scale-110 z-10"
-                  : "bg-white/60 border-gray-200 shadow-sm hover:bg-white hover:-translate-y-0.5"
+                  ? "bg-white dark:bg-slate-800 border-rose-500 shadow-[0_8px_24px_-6px_rgba(244,63,94,0.5)] scale-110 z-10"
+                  : "bg-white dark:bg-slate-800/60 border-gray-200 shadow-sm hover:bg-white dark:bg-slate-800 hover:-translate-y-0.5"
                 }`}
             >
               <div
@@ -467,7 +467,7 @@ export default function Login() {
           </div>
 
           {/* ── White card ── */}
-          <div className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl p-8 border border-gray-100">
             {/* Error banner */}
             {error && (
               <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm text-center font-medium">

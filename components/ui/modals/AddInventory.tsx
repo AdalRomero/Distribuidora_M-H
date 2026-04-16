@@ -98,9 +98,9 @@ function AddInventoryInner({
   if (!isOpen) return null;
 
   const inputClass =
-    "w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400";
+    "w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400";
   const selectClass =
-    "w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-slate-600";
+    "w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-slate-600 dark:text-slate-300";
 
   // Auto-generate 5-digit internal code when family is selected
   const handleFamiliaChange = async (selectedFamiliaId: string) => {
@@ -359,21 +359,21 @@ function AddInventoryInner({
         className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       ></div>
-      <div className="relative z-10 bg-slate-50 w-full max-w-5xl max-h-[95vh] flex flex-col rounded-3xl shadow-2xl overflow-hidden">
+      <div className="relative z-10 bg-slate-50 dark:bg-slate-900 w-full max-w-5xl max-h-[95vh] flex flex-col rounded-3xl shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="bg-white px-8 py-5 flex items-center justify-between border-b border-slate-100 shrink-0">
+        <div className="bg-white dark:bg-slate-800 px-8 py-5 flex items-center justify-between border-b border-slate-100 dark:border-slate-700 shrink-0">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">
               {editProduct ? "Editar Producto" : "Agregar Nuevo Producto"}
             </h2>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
               Define la identidad del producto en el catálogo
             </p>
           </div>
           <button
             onClick={onClose}
             disabled={isUploading}
-            className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+            className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 text-slate-400 hover:text-slate-600 dark:text-slate-300 transition-colors"
           >
             <X className="w-6 h-6" />
           </button>
@@ -385,15 +385,15 @@ function AddInventoryInner({
             {/* ROW 1: Información General + Fotografía */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-stretch">
               {/* Información General — 3 columns */}
-              <div className="lg:col-span-3 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5 flex flex-col">
+              <div className="lg:col-span-3 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-5 flex flex-col">
                 <div className="flex items-center gap-2 mb-2 border-b border-slate-50 pb-3">
                   <Info className="w-5 h-5 text-blue-600" />
-                  <h3 className="text-base font-bold text-slate-700">
+                  <h3 className="text-base font-bold text-slate-700 dark:text-slate-300">
                     Información General
                   </h3>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                     Nombre del Producto *
                   </label>
                   <input
@@ -406,7 +406,7 @@ function AddInventoryInner({
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                       Familia *
                     </label>
                     <select
@@ -425,7 +425,7 @@ function AddInventoryInner({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                       Código Interno *
                     </label>
                     <input
@@ -438,7 +438,7 @@ function AddInventoryInner({
                   </div>
                 </div>
                 <div className="flex-1">
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                     Categoría de Margen
                   </label>
                   <select
@@ -457,16 +457,16 @@ function AddInventoryInner({
               </div>
 
               {/* Fotografía — 2 columns */}
-              <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
+              <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col">
                 <div className="flex items-center gap-2 mb-4 border-b border-slate-50 pb-3">
                   <ImagesIcon className="w-5 h-5 text-teal-400" />
-                  <h3 className="text-base font-bold text-slate-700">
+                  <h3 className="text-base font-bold text-slate-700 dark:text-slate-300">
                     Fotografía
                   </h3>
                 </div>
                 <div
                   onClick={chooseImageSource}
-                  className="border-2 border-dashed border-slate-200 rounded-xl p-6 flex flex-col items-center justify-center text-center hover:bg-slate-50 hover:border-blue-400 transition-all cursor-pointer group relative overflow-hidden flex-1 min-h-[180px]"
+                  className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-6 flex flex-col items-center justify-center text-center hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900 hover:border-blue-400 transition-all cursor-pointer group relative overflow-hidden flex-1 min-h-[180px]"
                 >
                   {imageUri ? (
                     <img
@@ -479,7 +479,7 @@ function AddInventoryInner({
                       <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                         <Camera className="w-6 h-6" />
                       </div>
-                      <p className="text-sm font-medium text-slate-700">
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
                         Haz clic para subir imagen
                       </p>
                       <p className="text-xs text-slate-400 mt-1">
@@ -506,10 +506,10 @@ function AddInventoryInner({
             {/* ROW 2: Fiscal y Finanzas + Precios de Venta */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
               {/* Fiscal y Finanzas */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5 flex flex-col">
+              <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-5 flex flex-col">
                 <div className="flex items-center gap-2 mb-2 border-b border-slate-50 pb-3">
                   <DollarSign className="w-5 h-5 text-emerald-500" />
-                  <h3 className="text-base font-bold text-slate-700">
+                  <h3 className="text-base font-bold text-slate-700 dark:text-slate-300">
                     Fiscal y Finanzas
                   </h3>
                 </div>
@@ -517,7 +517,7 @@ function AddInventoryInner({
                 {/* Costo + SAT */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                       Costo Base (Referencia) *
                     </label>
                     <div className="relative">
@@ -528,7 +528,7 @@ function AddInventoryInner({
                         type="number"
                         step="0.01"
                         min="0"
-                        className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400"
+                        className="w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:bg-white dark:bg-slate-800 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400"
                         placeholder="0.00"
                         value={costoPromedio}
                         onChange={(e) => setCostoPromedio(e.target.value)}
@@ -537,7 +537,7 @@ function AddInventoryInner({
                     <p className="text-xs text-slate-400 mt-1">Costo unitario del producto para calcular márgenes</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                       Clave SAT
                     </label>
                     <input
@@ -552,7 +552,7 @@ function AddInventoryInner({
 
                 {/* Impuestos */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Impuestos Aplicables
                   </label>
                   <div className="flex flex-wrap gap-3 justify-center">
@@ -561,7 +561,7 @@ function AddInventoryInner({
                       .map((imp) => (
                         <label
                           key={imp.id}
-                          className={`flex items-center gap-2 bg-slate-50 px-4 py-2.5 rounded-xl border cursor-pointer hover:border-blue-400 transition-colors ${selectedImpuestos.includes(imp.id) ? "border-blue-500 bg-blue-50/50" : "border-slate-200"}`}
+                          className={`flex items-center gap-2 bg-slate-50 dark:bg-slate-900 px-4 py-2.5 rounded-xl border cursor-pointer hover:border-blue-400 transition-colors ${selectedImpuestos.includes(imp.id) ? "border-blue-500 bg-blue-50/50" : "border-slate-200 dark:border-slate-700"}`}
                         >
                           <input
                             type="checkbox"
@@ -569,7 +569,7 @@ function AddInventoryInner({
                             checked={selectedImpuestos.includes(imp.id)}
                             onChange={() => toggleImpuesto(imp.id)}
                           />
-                          <span className="text-sm font-medium text-slate-700">
+                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                             {imp.nombre} ({imp.tasa}%)
                           </span>
                         </label>
@@ -602,22 +602,22 @@ function AddInventoryInner({
                         </button>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white/70 rounded-lg p-3 text-center">
-                          <p className="text-xs text-slate-500 mb-1">Costo Base</p>
-                          <p className="text-lg font-bold text-slate-800">
+                        <div className="bg-white dark:bg-slate-800/70 rounded-lg p-3 text-center">
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Costo Base</p>
+                          <p className="text-lg font-bold text-slate-800 dark:text-white">
                             ${costoNum.toFixed(2)}
                           </p>
                         </div>
-                        <div className="bg-white/70 rounded-lg p-3 text-center">
-                          <p className="text-xs text-slate-500 mb-1">
+                        <div className="bg-white dark:bg-slate-800/70 rounded-lg p-3 text-center">
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
                             + Margen ({margenPorcentaje}%)
                           </p>
                           <p className="text-lg font-bold text-emerald-700">
                             ${utilidadBruta.toFixed(2)}
                           </p>
                         </div>
-                        <div className="bg-white/70 rounded-lg p-3 text-center">
-                          <p className="text-xs text-slate-500 mb-1">
+                        <div className="bg-white dark:bg-slate-800/70 rounded-lg p-3 text-center">
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
                             + Impuestos ({totalImpuestoPorcentaje}%)
                           </p>
                           <p className="text-lg font-bold text-amber-700">
@@ -639,17 +639,17 @@ function AddInventoryInner({
               </div>
 
               {/* Precios de Venta (editables por el usuario) */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5 flex flex-col">
+              <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 space-y-5 flex flex-col">
                 <div className="flex items-center gap-2 mb-2 border-b border-slate-50 pb-3">
                   <Tag className="w-5 h-5 text-indigo-500" />
-                  <h3 className="text-base font-bold text-slate-700">
+                  <h3 className="text-base font-bold text-slate-700 dark:text-slate-300">
                     Precios de Venta
                   </h3>
                   <span className="text-xs text-slate-400 ml-auto">Definidos por ti — precios reales</span>
                 </div>
                 <div className="grid grid-cols-1 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                       Precio de Lista *
                     </label>
                     <div className="relative">
@@ -660,7 +660,7 @@ function AddInventoryInner({
                         type="number"
                         step="0.01"
                         min="0"
-                        className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
+                        className="w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:bg-white dark:bg-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
                         placeholder="0.00"
                         value={precioListaManual}
                         onChange={(e) => setPrecioListaManual(e.target.value)}
@@ -668,7 +668,7 @@ function AddInventoryInner({
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                       Precio Mayoreo
                     </label>
                     <div className="relative">
@@ -679,7 +679,7 @@ function AddInventoryInner({
                         type="number"
                         step="0.01"
                         min="0"
-                        className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
+                        className="w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:bg-white dark:bg-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
                         placeholder="Igual que Lista si vacío"
                         value={precioMayoreoManual}
                         onChange={(e) => setPrecioMayoreoManual(e.target.value)}
@@ -687,7 +687,7 @@ function AddInventoryInner({
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                       Precio Menudeo
                     </label>
                     <div className="relative">
@@ -698,7 +698,7 @@ function AddInventoryInner({
                         type="number"
                         step="0.01"
                         min="0"
-                        className="w-full pl-8 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
+                        className="w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:bg-white dark:bg-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
                         placeholder="Igual que Lista si vacío"
                         value={precioMenudeoManual}
                         onChange={(e) => setPrecioMenudeoManual(e.target.value)}
@@ -712,12 +712,12 @@ function AddInventoryInner({
         </div>
 
         {/* Footer */}
-        <div className="bg-white border-t border-slate-100 p-5 px-8 shrink-0 flex items-center justify-end gap-3 rounded-b-3xl">
+        <div className="bg-white dark:bg-slate-800 border-t border-slate-100 dark:border-slate-700 p-5 px-8 shrink-0 flex items-center justify-end gap-3 rounded-b-3xl">
           <button
             type="button"
             onClick={onClose}
             disabled={isUploading}
-            className="px-6 py-2.5 rounded-xl font-medium text-sm text-slate-500 hover:bg-slate-100 transition-colors disabled:opacity-50"
+            className="px-6 py-2.5 rounded-xl font-medium text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 transition-colors disabled:opacity-50"
           >
             Cancelar
           </button>
