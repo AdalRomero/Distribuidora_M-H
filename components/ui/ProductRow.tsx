@@ -6,6 +6,18 @@ import {
   Image as ImageIcon,
   RefreshCw,
   Trash2,
+  Package,
+  Box,
+  ShoppingBag,
+  Tag,
+  Cake,
+  CakeSlice,
+  Croissant,
+  Cookie,
+  Cherry,
+  ChefHat,
+  Coffee,
+  Apple
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { of } from "rxjs";
@@ -93,6 +105,10 @@ const getMarginBadgeStyle = (category: string) => {
     default:
       return "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:border-orange-800/50 dark:text-orange-400";
   }
+};
+
+const IconMap: Record<string, React.FC<any>> = {
+  Package, Box, ShoppingBag, Tag, Cake, CakeSlice, Croissant, Cookie, Cherry, ChefHat, Coffee, Apple
 };
 
 // ─── Inner Component (already has observables injected) ─────
@@ -198,17 +214,27 @@ function ProductRowInner({
           <div
             className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border overflow-hidden ${worstLevel === "black" ? "bg-gray-900 border-gray-700" : worstLevel === "red" ? "bg-rose-50 border-rose-200 dark:bg-rose-900/20 dark:border-rose-800/50" : "bg-slate-100 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"}`}
           >
-            {producto.imagen ? (
-              <img
-                src={producto.imagen}
-                alt="Producto"
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <ImageIcon
-                className={`w-5 h-5 ${worstLevel === "black" ? "text-gray-400" : worstLevel === "red" ? "text-rose-400 dark:text-rose-500" : "text-slate-400"}`}
-              />
-            )}
+            {(() => {
+              const isIcon = producto.imagen?.startsWith("icon:");
+              const iconName = isIcon ? producto.imagen!.replace("icon:", "") : null;
+              const SelectedIcon = iconName && IconMap[iconName] ? IconMap[iconName] : ImageIcon;
+              
+              if (producto.imagen && !isIcon) {
+                return (
+                  <img
+                    src={producto.imagen}
+                    alt="Producto"
+                    className="w-full h-full object-cover"
+                  />
+                );
+              }
+              
+              return (
+                <SelectedIcon
+                  className={`w-5 h-5 ${worstLevel === "black" ? "text-gray-400" : worstLevel === "red" ? "text-rose-400 dark:text-rose-500" : "text-slate-400"}`}
+                />
+              );
+            })()}
           </div>
           <div>
             <p

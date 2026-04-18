@@ -121,35 +121,40 @@ function CatalogsContent({ familias, almacenes, impuestos, margenes }: CatalogsP
     label: string;
     icon: React.ReactNode;
     count: number;
+    colorClass: string;
   }[] = [
       {
         key: "familias",
         label: "Familias",
-        icon: <Layers className="w-4 h-4" />,
+        icon: <Layers className="w-6 h-6" />,
         count: familias.length,
+        colorClass: "blue",
       },
       {
         key: "almacenes",
         label: "Almacenes",
-        icon: <Warehouse className="w-4 h-4" />,
+        icon: <Warehouse className="w-6 h-6" />,
         count: almacenes.length,
+        colorClass: "amber",
       },
       {
         key: "impuestos",
         label: "Impuestos",
-        icon: <Receipt className="w-4 h-4" />,
+        icon: <Receipt className="w-6 h-6" />,
         count: impuestos.length,
+        colorClass: "emerald",
       },
       {
         key: "margenes",
         label: "Márgenes",
-        icon: <DollarSign className="w-4 h-4" />,
+        icon: <DollarSign className="w-6 h-6" />,
         count: margenes.length,
+        colorClass: "indigo",
       },
     ];
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 dark:bg-slate-900 min-h-screen font-sans">
+    <div className="p-4 sm:p-8 bg-slate-50 dark:bg-slate-900 min-h-screen font-sans transition-colors duration-300">
       <div className="max-w-7xl mx-auto">
         {/* ── Modals ── */}
         <SuccessModal isOpen={modal.success.open} onClose={closeSuccess} title={modal.success.title} message={modal.success.message} />
@@ -161,13 +166,13 @@ function CatalogsContent({ familias, almacenes, impuestos, margenes }: CatalogsP
           <div>
             <h1 className="text-2xl font-bold text-mh-blue-dark dark:text-white tracking-tight">Catálogos</h1>
             <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-              Administra las bases de datos de Familias, Almacenes e Impuestos
+              Administra las bases de datos de Familias, Almacenes, Impuestos y Márgenes
             </p>
           </div>
           {syncing && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800/50 rounded-lg">
               <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-              <span className="text-xs font-medium text-blue-600">Sincronizando...</span>
+              <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Sincronizando...</span>
             </div>
           )}
         </div>
@@ -181,29 +186,54 @@ function CatalogsContent({ familias, almacenes, impuestos, margenes }: CatalogsP
            isHighPriority={false} 
         />
 
-        {/* Tabs */}
-        <div className="flex gap-1 mb-6 bg-slate-100 dark:bg-slate-800/50 p-1 rounded-xl w-fit">
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === t.key
-                ? "bg-white dark:bg-slate-800 text-mh-blue-dark dark:text-white shadow-sm font-bold"
-                : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-300"
-                }`}
-            >
-              {t.icon}
-              {t.label}
-              <span
-                className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${tab === t.key
-                  ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
-                  : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
+        {/* Tabs as Metric Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {tabs.map((t) => {
+            const isSelected = tab === t.key;
+            // Definimos clases dinámicas basadas en el color
+            const colorMap: Record<string, { border: string; gradient: string; iconBgSelected: string; iconTextSelected: string; shadowStr: string }> = {
+              blue: { border: "border-blue-500", gradient: "from-blue-500/10 dark:from-blue-400/15", iconBgSelected: "bg-blue-50 dark:bg-blue-900/30", iconTextSelected: "text-blue-600 dark:text-blue-500", shadowStr: "shadow-blue-500/5" },
+              amber: { border: "border-amber-500", gradient: "from-amber-500/10 dark:from-amber-400/15", iconBgSelected: "bg-amber-50 dark:bg-amber-900/30", iconTextSelected: "text-amber-500", shadowStr: "shadow-amber-500/5" },
+              emerald: { border: "border-emerald-500", gradient: "from-emerald-500/10 dark:from-emerald-400/15", iconBgSelected: "bg-emerald-50 dark:bg-emerald-900/30", iconTextSelected: "text-emerald-600 dark:text-emerald-500", shadowStr: "shadow-emerald-500/5" },
+              indigo: { border: "border-indigo-500", gradient: "from-indigo-500/10 dark:from-indigo-400/15", iconBgSelected: "bg-indigo-50 dark:bg-indigo-900/30", iconTextSelected: "text-indigo-600 dark:text-indigo-400", shadowStr: "shadow-indigo-500/5" },
+            };
+            const cInfo = colorMap[t.colorClass];
+
+            return (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`relative flex items-center gap-4 p-5 rounded-2xl shadow-sm transition-all duration-200 text-left outline-none border overflow-hidden ${isSelected
+                    ? `${cInfo.border} bg-white dark:bg-slate-800 ${cInfo.shadowStr}`
+                    : "border-transparent border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-200 dark:hover:border-slate-600"
                   }`}
               >
-                {t.count}
-              </span>
-            </button>
-          ))}
+                {/* Decorative background gradient */}
+                {isSelected && (
+                  <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl ${cInfo.gradient} to-transparent rounded-bl-full pointer-events-none transition-opacity duration-300`}></div>
+                )}
+                
+                <div className={`relative z-10 w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-colors ${isSelected ? cInfo.iconBgSelected : "bg-slate-50 dark:bg-slate-700/50 group-hover:bg-slate-100 dark:group-hover:bg-slate-700"}`}>
+                  <div className={`${isSelected ? cInfo.iconTextSelected : "text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-400"}`}>
+                    {t.icon}
+                  </div>
+                </div>
+                <div className="relative z-10">
+                  <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+                    {t.label}
+                  </p>
+                  <div className="flex items-baseline gap-1.5 mt-0.5">
+                    <p className={`text-xl font-bold transition-colors ${isSelected ? cInfo.iconTextSelected : "text-slate-800 dark:text-white"}`}>
+                      {t.count}
+                    </p>
+                    <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                      {t.count === 1 ? 'Registro' : 'Registros'}
+                    </span>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
 
         {/* Tab Content */}

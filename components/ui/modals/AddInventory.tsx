@@ -1,27 +1,46 @@
 import { Q } from "@nozbe/watermelondb";
 import withObservables from "@nozbe/with-observables";
 import { decode } from "base64-arraybuffer";
-import * as ImagePicker from "expo-image-picker";
 import * as Crypto from "expo-crypto";
+import * as ImagePicker from "expo-image-picker";
 import {
-    Camera,
-    DollarSign,
-    ImagesIcon,
-    Info,
-    Tag,
-    TrendingUp,
-    X,
+  Apple,
+  Box,
+  Cake,
+  CakeSlice,
+  Camera,
+  ChefHat,
+  Cherry,
+  Coffee,
+  Cookie,
+  Croissant,
+  DollarSign,
+  ImagesIcon,
+  Info,
+  Package,
+  ShoppingBag,
+  Tag,
+  TrendingUp,
+  X
 } from "lucide-react";
 import React, { useState } from "react";
 import { Alert, Platform } from "react-native";
 import { supabase } from "../../../src/services/api/supabaseClient";
-import { syncApp } from "../../../src/sync";
 import { database } from "../../../src/services/DB/indexBD";
 import FamiliaModel from "../../../src/services/DB/models/bases/familia";
 import ImpuestoModel from "../../../src/services/DB/models/bases/impuesto";
 import MargenModel from "../../../src/services/DB/models/bases/margen";
 import Producto from "../../../src/services/DB/models/catalogo/producto";
 import ProductoImpuesto from "../../../src/services/DB/models/catalogo/productoImpuesto";
+import { syncApp } from "../../../src/sync";
+
+const AvailableIcons = [
+  "Package", "Box", "ShoppingBag", "Tag", "Cake", "CakeSlice", "Croissant", "Cookie", "Cherry", "ChefHat", "Coffee", "Apple"
+];
+
+const IconMap: Record<string, any> = {
+  Package, Box, ShoppingBag, Tag, Cake, CakeSlice, Croissant, Cookie, Cherry, ChefHat, Coffee, Apple
+};
 
 interface AddInventoryInnerProps {
   isOpen: boolean;
@@ -61,6 +80,7 @@ function AddInventoryInner({
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [imageExt, setImageExt] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedIcon, setSelectedIcon] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (isOpen && recoverData?.data) {
@@ -72,7 +92,14 @@ function AddInventoryInner({
       if (data.precio_lista !== undefined) setPrecioListaManual(String(data.precio_lista));
       if (data.precio_mayoreo !== undefined) setPrecioMayoreoManual(String(data.precio_mayoreo));
       if (data.precio_menudeo !== undefined) setPrecioMenudeoManual(String(data.precio_menudeo));
-      if (data.imagen) setImageUri(data.imagen);
+
+      if (data.imagen) {
+        if (data.imagen.startsWith("icon:")) {
+          setSelectedIcon(data.imagen.replace("icon:", ""));
+        } else {
+          setImageUri(data.imagen);
+        }
+      }
     } else if (isOpen && editProduct) {
       const pRaw: any = editProduct._raw;
       setNombre(editProduct.descripcion || "");
@@ -83,11 +110,17 @@ function AddInventoryInner({
       setPrecioListaManual(String(editProduct.precioLista || ""));
       setPrecioMayoreoManual(String(editProduct.precioMayoreo || ""));
       setPrecioMenudeoManual(String(editProduct.precioMenudeo || ""));
-      if (editProduct.imagen) setImageUri(editProduct.imagen);
-      
+      if (editProduct.imagen) {
+        if (editProduct.imagen.startsWith("icon:")) {
+          setSelectedIcon(editProduct.imagen.replace("icon:", ""));
+        } else {
+          setImageUri(editProduct.imagen);
+        }
+      }
+
       const loadImpuestos = async () => {
-          const links = await editProduct.impuestosMultiples.fetch();
-          setSelectedImpuestos(links.map((link: any) => link._raw.impuesto_id));
+        const links = await editProduct.impuestosMultiples.fetch();
+        setSelectedImpuestos(links.map((link: any) => link._raw.impuesto_id));
       };
       loadImpuestos();
     } else if (!isOpen) {
@@ -219,6 +252,7 @@ function AddInventoryInner({
       setImageBase64(result.assets[0].base64);
       const uriParts = result.assets[0].uri.split(".");
       setImageExt(uriParts[uriParts.length - 1] || "jpeg");
+      setSelectedIcon(null);
     }
   };
 
@@ -235,6 +269,7 @@ function AddInventoryInner({
     setPrecioMenudeoManual("");
     setImageUri(null);
     setImageBase64(null);
+    setSelectedIcon(null);
   }
 
   const handleSave = async () => {
@@ -257,7 +292,7 @@ function AddInventoryInner({
       }
 
       setIsUploading(true);
-      let publicUrl = null;
+      let finalImagen: string | null = null;
 
       // Upload image if exists
       if (imageBase64) {
@@ -273,15 +308,49 @@ function AddInventoryInner({
         const { data } = supabase.storage
           .from("productos")
           .getPublicUrl(`public/${fileName}`);
-        publicUrl = data.publicUrl;
+        finalImagen = data.publicUrl;
+      } else if (selectedIcon) {
+        finalImagen = `icon:${selectedIcon}`;
+      } else if (imageUri && !imageUri.startsWith("file://")) {
+        finalImagen = imageUri;
       }
 
       // Create or update all records in a single batch
       await database.write(async () => {
         let savedProductoId: string;
-        
+
         if (editProduct) {
-            await editProduct.update((p) => {
+          await editProduct.update((p) => {
+            p.descripcion = nombre;
+            p.codigoInterno = codigoInterno;
+            if (familiaId) {
+              (p as any)._raw.familia_id = familiaId;
+            }
+            if (margenId) {
+              (p as any)._raw.margen_id = margenId;
+            }
+            if (finalImagen) {
+              p.imagen = finalImagen;
+            } else if (!imageUri && !selectedIcon) {
+              p.imagen = undefined;
+            }
+            (p as any).claveSat = sat;
+            p.precioLista = pLista;
+            p.precioMayoreo = pMayoreo || pLista;
+            p.precioMenudeo = pMenudeo || pLista;
+          });
+          savedProductoId = editProduct.id;
+
+          // Re-create impuestos: first delete old ones, then create new ones
+          const existingImpuestos = await editProduct.impuestosMultiples.fetch();
+          for (const imp of existingImpuestos) {
+            await imp.markAsDeleted();
+          }
+        } else {
+          const nuevoProducto = await database
+            .get<Producto>("productos")
+            .create((p) => {
+              (p as any)._raw.id = Crypto.randomUUID();
               p.descripcion = nombre;
               p.codigoInterno = codigoInterno;
               if (familiaId) {
@@ -290,40 +359,14 @@ function AddInventoryInner({
               if (margenId) {
                 (p as any)._raw.margen_id = margenId;
               }
-              if (publicUrl) p.imagen = publicUrl;
+              p.estado = true;
+              if (finalImagen) p.imagen = finalImagen;
               (p as any).claveSat = sat;
               p.precioLista = pLista;
               p.precioMayoreo = pMayoreo || pLista;
               p.precioMenudeo = pMenudeo || pLista;
             });
-            savedProductoId = editProduct.id;
-            
-            // Re-create impuestos: first delete old ones, then create new ones
-            const existingImpuestos = await editProduct.impuestosMultiples.fetch();
-            for (const imp of existingImpuestos) {
-                await imp.markAsDeleted();
-            }
-        } else {
-            const nuevoProducto = await database
-              .get<Producto>("productos")
-              .create((p) => {
-                (p as any)._raw.id = Crypto.randomUUID();
-                p.descripcion = nombre;
-                p.codigoInterno = codigoInterno;
-                if (familiaId) {
-                  (p as any)._raw.familia_id = familiaId;
-                }
-                if (margenId) {
-                  (p as any)._raw.margen_id = margenId;
-                }
-                p.estado = true;
-                if (publicUrl) p.imagen = publicUrl;
-                (p as any).claveSat = sat;
-                p.precioLista = pLista;
-                p.precioMayoreo = pMayoreo || pLista;
-                p.precioMenudeo = pMenudeo || pLista;
-              });
-            savedProductoId = nuevoProducto.id;
+          savedProductoId = nuevoProducto.id;
         }
 
         // Create ProductoImpuesto junction records
@@ -480,7 +523,7 @@ function AddInventoryInner({
                         <Camera className="w-6 h-6" />
                       </div>
                       <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                        Haz clic para subir imagen
+                        Haz clic para subir fotografía
                       </p>
                       <p className="text-xs text-slate-400 mt-1">
                         PNG, JPG o WEBP (Max. 2MB)
@@ -488,7 +531,7 @@ function AddInventoryInner({
                     </>
                   )}
                 </div>
-                {imageUri && (
+                {imageUri ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -497,8 +540,30 @@ function AddInventoryInner({
                     }}
                     className="mt-3 text-sm text-red-500 font-medium hover:text-red-700 w-full text-center"
                   >
-                    Eliminar Imagen
+                    Eliminar Fotografía
                   </button>
+                ) : (
+                  <div className="mt-4">
+                    <p className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">
+                      O elige un ícono predeterminado
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {AvailableIcons.map(icon => {
+                        const IconCmp = IconMap[icon];
+                        const isSelected = selectedIcon === icon;
+                        return (
+                          <button
+                            key={icon}
+                            type="button"
+                            onClick={() => setSelectedIcon(isSelected ? null : icon)}
+                            className={`p-2.5 rounded-xl border transition-all ${isSelected ? "bg-blue-50 border-blue-500 text-blue-600 dark:bg-blue-900/30" : "bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 hover:border-blue-300"}`}
+                          >
+                            <IconCmp className="w-5 h-5" />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
