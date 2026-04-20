@@ -10,10 +10,10 @@ export const defaultLayout: InvoiceBlock[] = [
   { i: 'cfdi_box', type: 'cfdi_box', x: 9, y: 0, w: 3, h: 12, static: false },
   { i: 'cliente_info', type: 'cliente_info', x: 0, y: 12, w: 12, h: 7, static: false },
   { i: 'conceptos_table', type: 'conceptos_table', x: 0, y: 19, w: 12, h: 9, static: false },
-  { i: 'totales_box', type: 'totales_box', x: 0, y: 28, w: 12, h: 8, static: false },
-  { i: 'fiscal_info', type: 'fiscal_info', x: 0, y: 36, w: 12, h: 10, static: false },
-  { i: 'sellos_box', type: 'sellos_box', x: 0, y: 46, w: 12, h: 10, static: false },
-  { i: 'pagare_box', type: 'pagare_box', x: 0, y: 56, w: 12, h: 8, static: false },
+  { i: 'totales_box', type: 'totales_box', x: 0, y: 28, w: 12, h: 13, static: false },
+  { i: 'fiscal_info', type: 'fiscal_info', x: 0, y: 41, w: 12, h: 8, static: false },
+  { i: 'sellos_box', type: 'sellos_box', x: 0, y: 49, w: 12, h: 10, static: false },
+  { i: 'pagare_box', type: 'pagare_box', x: 0, y: 59, w: 12, h: 8, static: false },
 ];
 
 interface InvoiceBuilderCanvasProps {

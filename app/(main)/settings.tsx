@@ -1,21 +1,25 @@
-import ErrorModal from '@/components/ui/modals/ErrorModal';
-import HotkeysModal from '@/components/ui/modals/HotkeysModal';
-import SuccessModal from '@/components/ui/modals/SuccessModal';
-import { useAuth } from '@/src/context/AuthContext';
-import { DEFAULT_HOTKEYS, useSettings } from '@/src/context/SettingsContext';
+import ErrorModal from '../../components/ui/modals/ErrorModal';
+import HotkeysModal from '../../components/ui/modals/HotkeysModal';
+import SuccessModal from '../../components/ui/modals/SuccessModal';
+import { useAuth } from '../../src/context/AuthContext';
+import { DEFAULT_HOTKEYS, useSettings } from '../../src/context/SettingsContext';
 import {
     AlertCircle,
     Bell,
-    Check, Info,
+    Check, ChevronDown, Edit3, Eye, FileText, Info,
     Keyboard,
     Loader2,
     Monitor,
     Moon,
     Save, Settings as SettingsIcon,
-    Sun
+    Sun, Upload
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
+import InvoiceBuilderCanvas, { defaultLayout } from '../../components/ui/modals/InvoiceBuilderCanvas';
+import { database } from '../../src/services/DB/indexBD';
+import { InvoiceBlock } from '../../types/invoice-builder';
+import * as Crypto from 'expo-crypto';
 
 export default function Settings() {
     const {
@@ -35,6 +39,146 @@ export default function Settings() {
     const [isHotkeysModalOpen, setIsHotkeysModalOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [showSavedIndicator, setShowSavedIndicator] = useState(false);
+
+    // ==========================================
+    // TEMPLATE EDITOR STATE
+    // ==========================================
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [currentLayout, setCurrentLayout] = useState<InvoiceBlock[]>(defaultLayout);
+    const [templates, setTemplates] = useState<{ id: string; name: string; isDefault: boolean; layoutJson: string }[]>([]);
+    const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
+    const [templateName, setTemplateName] = useState('');
+    const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+    const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+    const [isTemplateSectionOpen, setIsTemplateSectionOpen] = useState(false);
+
+    // Dummy form for preview
+    const dummyForm = {
+        serie: 'A', folio: '001', fecha: new Date().toISOString().split('T')[0], hora: '12:00',
+        tipoComprobante: 'I', lugarExpedicion: '83556', metodoPago: 'PPD', formaPago: '99', moneda: 'MXN',
+        codigoCliente: '01023', nombre: 'Público en General', rfc: 'XAXX010101000',
+        domicilio: 'AVE. PUERTO DE ENSENADA S/N LOPEZ PORTILLO C.P. 83556', agente: '1',
+        usoCFDI: 'S01', observaciones: '',
+        conceptos: [
+            { id: '1', cantidad: '10', unidadSat: 'H87', claveSat: '50171529', concepto: 'Harina Selecta 50kg', valorUnitario: '1200.00', descuento: '', porcImpuesto: '16' },
+            { id: '2', cantidad: '5', unidadSat: 'H87', claveSat: '50161500', concepto: 'Azúcar Refinada 25kg', valorUnitario: '800.00', descuento: '50', porcImpuesto: '16' },
+        ]
+    };
+    const calcConcepto = (c: any) => { const cant = parseFloat(c.cantidad) || 0; const vu = parseFloat(c.valorUnitario) || 0; const desc = parseFloat(c.descuento) || 0; const porc = parseFloat(c.porcImpuesto) || 0; const subtotal = cant * vu; const impuestos = subtotal * (porc / 100); const total = subtotal - desc + impuestos; return { subtotal, impuestos, total }; };
+    const totalSubtotal = dummyForm.conceptos.reduce((s, c) => s + calcConcepto(c).subtotal, 0);
+    const totalDesc = dummyForm.conceptos.reduce((s, c) => s + (parseFloat(c.descuento) || 0), 0);
+    const totalImpuestos = dummyForm.conceptos.reduce((s, c) => s + calcConcepto(c).impuestos, 0);
+    const totalFinal = dummyForm.conceptos.reduce((s, c) => s + calcConcepto(c).total, 0);
+
+    // ==========================================
+    // CARGAR PLANTILLAS
+    // ==========================================
+    useEffect(() => {
+        loadTemplates();
+    }, []);
+
+    const loadTemplates = async () => {
+        setIsLoadingTemplates(true);
+        try {
+            const templatesDb = database.collections.get('invoice_templates');
+            const all = await templatesDb.query().fetch();
+            const mapped = all.map((t: any) => ({
+                id: t.id,
+                name: t.name || 'Sin nombre',
+                isDefault: t.isDefault || false,
+                layoutJson: t.layoutJson || '',
+            }));
+            setTemplates(mapped);
+
+            // Cargar la plantilla default si existe
+            const defaultT = mapped.find(t => t.isDefault);
+            if (defaultT && defaultT.layoutJson) {
+                try {
+                    const parsed = JSON.parse(defaultT.layoutJson);
+                    setCurrentLayout(parsed);
+                    setActiveTemplateId(defaultT.id);
+                    setTemplateName(defaultT.name);
+                } catch { /* keep default layout */ }
+            }
+        } catch (err) {
+            console.error('Error cargando plantillas:', err);
+        } finally {
+            setIsLoadingTemplates(false);
+        }
+    };
+
+    // ==========================================
+    // GUARDAR PLANTILLA
+    // ==========================================
+    const handleSaveTemplate = async () => {
+        if (!templateName.trim()) {
+            setErrorMessage('Ingresa un nombre para la plantilla.');
+            setIsErrorModalOpen(true);
+            return;
+        }
+        setIsSavingTemplate(true);
+        try {
+            const templatesDb = database.collections.get('invoice_templates');
+            const layoutStr = JSON.stringify(currentLayout);
+
+            if (activeTemplateId) {
+                // Actualizar existente
+                const record = await templatesDb.find(activeTemplateId) as any;
+                await database.write(async () => {
+                    await record.update((t: any) => {
+                        t.name = templateName;
+                        t.layoutJson = layoutStr;
+                    });
+                });
+            } else {
+                // Crear nuevo
+                const newId = Crypto.randomUUID();
+                await database.write(async () => {
+                    await templatesDb.create((t: any) => {
+                        t._raw.id = newId;
+                        t.name = templateName;
+                        t.layoutJson = layoutStr;
+                        t.isDefault = templates.length === 0;
+                    });
+                });
+                setActiveTemplateId(newId);
+            }
+
+            setIsEditMode(false);
+            loadTemplates();
+            setIsSuccessModalOpen(true);
+        } catch (err: any) {
+            setErrorMessage('Error al guardar la plantilla: ' + err.message);
+            setIsErrorModalOpen(true);
+        } finally {
+            setIsSavingTemplate(false);
+        }
+    };
+
+    // ==========================================
+    // CARGAR OTRA PLANTILLA
+    // ==========================================
+    const handleLoadTemplate = (template: { id: string; name: string; layoutJson: string }) => {
+        try {
+            const parsed = JSON.parse(template.layoutJson);
+            setCurrentLayout(parsed);
+            setActiveTemplateId(template.id);
+            setTemplateName(template.name);
+        } catch {
+            setErrorMessage('La plantilla seleccionada tiene un formato inválido.');
+            setIsErrorModalOpen(true);
+        }
+    };
+
+    // ==========================================
+    // CREAR NUEVA PLANTILLA (desde cero)
+    // ==========================================
+    const handleNewTemplate = () => {
+        setCurrentLayout(defaultLayout);
+        setActiveTemplateId(null);
+        setTemplateName('');
+        setIsEditMode(true);
+    };
 
     // ==========================================
     // GUARDAR CONFIGURACIONES
@@ -309,6 +453,116 @@ export default function Settings() {
                                     );
                                 })}
                             </div>
+                        </div>
+
+                        {/* ==========================================
+                            PLANTILLA DE FACTURA
+                        ========================================== */}
+                        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
+                            <div className={`flex items-center justify-between ${isTemplateSectionOpen ? 'mb-6 pb-4 border-b border-slate-50 dark:border-slate-700/50' : ''}`}>
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                                        <FileText className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-lg font-bold text-slate-800 dark:text-white">Plantilla de Factura</h2>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Diseña y gestiona la disposición visual de tus facturas CFDI.</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {isTemplateSectionOpen && (
+                                        <>
+                                            <button
+                                                onClick={handleNewTemplate}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-800 rounded-lg transition-colors"
+                                            >
+                                                <Upload className="w-3.5 h-3.5" /> Nueva Plantilla
+                                            </button>
+                                            <button
+                                                onClick={() => setIsEditMode(!isEditMode)}
+                                                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${isEditMode
+                                                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50 border border-amber-200 dark:border-amber-800'
+                                                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 border border-slate-200 dark:border-slate-600'
+                                                    }`}
+                                            >
+                                                {isEditMode ? <><Eye className="w-3.5 h-3.5" /> Vista Previa</> : <><Edit3 className="w-3.5 h-3.5" /> Editar Plantilla</>}
+                                            </button>
+                                        </>
+                                    )}
+                                    <button
+                                        onClick={() => setIsTemplateSectionOpen(!isTemplateSectionOpen)}
+                                        className="p-2 ml-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-500"
+                                    >
+                                        <ChevronDown className={`w-5 h-5 transition-transform ${isTemplateSectionOpen ? 'rotate-180' : ''}`} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {isTemplateSectionOpen && (
+                                <>
+                                    {/* Template selector */}
+                                    {templates.length > 0 && (
+                                        <div className="mb-4">
+                                            <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">Plantilla activa:</label>
+                                            <div className="flex gap-2 flex-wrap">
+                                                {templates.map(t => (
+                                                    <button
+                                                        key={t.id}
+                                                        onClick={() => handleLoadTemplate(t)}
+                                                        className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${t.id === activeTemplateId
+                                                            ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border-indigo-300 dark:border-indigo-700 shadow-sm'
+                                                            : 'bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                                            }`}
+                                                    >
+                                                        {t.name} {t.isDefault && <span className="ml-1 text-[10px] opacity-60">(default)</span>}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Edit mode: template name + save */}
+                                    {isEditMode && (
+                                        <div className="mb-4 flex items-end gap-3">
+                                            <div className="flex-1">
+                                                <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Nombre de la plantilla</label>
+                                                <input
+                                                    type="text"
+                                                    value={templateName}
+                                                    onChange={e => setTemplateName(e.target.value)}
+                                                    placeholder="Ej: Plantilla Principal"
+                                                    className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
+                                                />
+                                            </div>
+                                            <button
+                                                onClick={handleSaveTemplate}
+                                                disabled={isSavingTemplate}
+                                                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold transition-all active:scale-95 shadow-sm disabled:opacity-60"
+                                            >
+                                                {isSavingTemplate ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                                Guardar Plantilla
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Canvas preview */}
+                                    <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700" style={{ height: 520 }}>
+                                        <InvoiceBuilderCanvas
+                                            isEditMode={isEditMode}
+                                            form={dummyForm}
+                                            calcConcepto={calcConcepto}
+                                            totals={{ totalSubtotal, totalDesc, totalImpuestos, totalFinal }}
+                                        />
+                                    </div>
+
+                                    {isEditMode && (
+                                        <div className="mt-3 flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 rounded-xl text-xs">
+                                            <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                                            <span>Arrastra y redimensiona los bloques para reorganizar el diseño de la factura. Los cambios se reflejarán al generar nuevas facturas.</span>
+                                        </div>
+                                    )}
+                                </>
+                            )}
                         </div>
                     </div>
 
