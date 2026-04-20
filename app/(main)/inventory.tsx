@@ -2,13 +2,13 @@ import { Q } from "@nozbe/watermelondb";
 import withObservables from "@nozbe/with-observables";
 import * as Crypto from "expo-crypto";
 import {
-    AlertTriangle,
-    Clock,
-    DollarSign,
-    Download,
-    Package,
-    Plus,
-    Search,
+  AlertTriangle,
+  Clock,
+  DollarSign,
+  Download,
+  Package,
+  Plus,
+  Search,
 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import AddEntry from "../../components/ui/modals/AddEntry";
@@ -18,7 +18,7 @@ import WarningModal from "../../components/ui/modals/WarningModal";
 import ProductLotsView from "../../components/ui/ProductLotsView";
 import ProductRow from "../../components/ui/ProductRow";
 import SyncErrorBanner, {
-    SyncError,
+  SyncError,
 } from "../../components/ui/SyncErrorBanner";
 import { useSyncErrors } from "../../src/hooks/useSyncErrors";
 import { database } from "../../src/services/DB/indexBD";
@@ -74,7 +74,7 @@ function InventoryContent({ productos, familias }: InventoryProps) {
         p.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.codigoInterno.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesFamilia =
-        !filterFamilia || (p as any).familiaId === filterFamilia;
+        !filterFamilia || (p as any)._raw.familia_id === filterFamilia;
       return matchesSearch && matchesFamilia;
     })
     .sort((a, b) => {
@@ -304,14 +304,14 @@ function InventoryContent({ productos, familias }: InventoryProps) {
 
         {/* Search & Filter */}
         {!selectedProduct && (
-          <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+          <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
             <div className="relative flex-1">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Search className="w-5 h-5 text-slate-400" />
               </div>
               <input
                 type="text"
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border-none rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500"
                 placeholder="Buscar por código, nombre o lote..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -321,7 +321,7 @@ function InventoryContent({ productos, familias }: InventoryProps) {
               <select
                 value={filterFamilia}
                 onChange={(e) => setFilterFamilia(e.target.value)}
-                className="px-4 py-2.5 bg-slate-50 border-none rounded-xl text-sm font-medium text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+                className="px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border-none rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
               >
                 <option value="">Todas las Familias</option>
                 {familias
@@ -377,10 +377,10 @@ function InventoryContent({ productos, familias }: InventoryProps) {
             onEditProduct={() => handleEditProduct(selectedProduct)}
           />
         ) : (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead className="bg-slate-50/50 text-slate-500 font-semibold border-b border-slate-100">
+                <thead className="bg-slate-50/50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-100 dark:border-slate-700">
                   <tr>
                     <th className="px-6 py-4">Producto</th>
                     <th className="px-6 py-4">Clasificación</th>
@@ -390,7 +390,7 @@ function InventoryContent({ productos, familias }: InventoryProps) {
                     <th className="px-6 py-4 text-center">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                   {filteredProductos.length === 0 ? (
                     <tr>
                       <td

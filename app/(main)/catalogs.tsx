@@ -574,7 +574,7 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
                       <td className="px-6 py-3">
                         <input
                           type="text"
-                          className="px-2 py-1.5 border rounded-lg text-sm w-20"
+                          className="px-2 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm w-20 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                           value={editCodigo}
                           onChange={(e) => setEditCodigo(e.target.value)}
                         />
@@ -582,7 +582,7 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
                       <td className="px-6 py-3">
                         <input
                           type="text"
-                          className="px-2 py-1.5 border rounded-lg text-sm w-40"
+                          className="px-2 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm w-40 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                           value={editNombre}
                           onChange={(e) => setEditNombre(e.target.value)}
                         />
@@ -593,7 +593,7 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
                             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                             <input
                               type="number"
-                              className="px-2 py-1 border rounded-md text-xs w-14"
+                              className="px-2 py-1 border border-slate-200 dark:border-slate-700 rounded-md text-xs w-14 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                               value={editUmbralVerde}
                               onChange={(e) =>
                                 setEditUmbralVerde(e.target.value)
@@ -604,7 +604,7 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
                             <span className="w-2 h-2 rounded-full bg-amber-500"></span>
                             <input
                               type="number"
-                              className="px-2 py-1 border rounded-md text-xs w-14"
+                              className="px-2 py-1 border border-slate-200 dark:border-slate-700 rounded-md text-xs w-14 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                               value={editUmbralAmarillo}
                               onChange={(e) =>
                                 setEditUmbralAmarillo(e.target.value)
@@ -885,7 +885,7 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
                       <td className="px-6 py-3">
                         <input
                           type="text"
-                          className="px-2 py-1.5 border rounded-lg text-sm w-60"
+                          className="px-2 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm w-60 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                           value={editNombre}
                           onChange={(e) => setEditNombre(e.target.value)}
                         />
@@ -1174,7 +1174,7 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
                       <td className="px-6 py-3">
                         <input
                           type="text"
-                          className="px-2 py-1.5 border rounded-lg text-sm w-40"
+                          className="px-2 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm w-40 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                           value={editNombre}
                           onChange={(e) => setEditNombre(e.target.value)}
                         />
@@ -1183,7 +1183,7 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
                         <input
                           type="number"
                           step="0.01"
-                          className="px-2 py-1.5 border rounded-lg text-sm w-20"
+                          className="px-2 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm w-20 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                           value={editTasa}
                           onChange={(e) => setEditTasa(e.target.value)}
                         />
@@ -1478,7 +1478,7 @@ function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterO
                       <td className="px-6 py-3">
                         <input
                           type="text"
-                          className="px-2 py-1.5 border rounded-lg text-sm w-40"
+                          className="px-2 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm w-40 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                           value={editNombre}
                           onChange={(e) => setEditNombre(e.target.value)}
                         />
@@ -1487,7 +1487,7 @@ function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterO
                         <input
                           type="number"
                           step="0.01"
-                          className="px-2 py-1.5 border rounded-lg text-sm w-20"
+                          className="px-2 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm w-20 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                           value={editPorcentaje}
                           onChange={(e) => setEditPorcentaje(e.target.value)}
                         />
