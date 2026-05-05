@@ -42,7 +42,7 @@ export default function SyncErrorBanner({
       </h3>
       <p className={`text-sm mb-4 ${textDescColor}`}>
         Se detectaron registros que fueron creados o editados sin conexión pero rechazados por la nube. 
-        Se rescató la información; haz clic en "Recuperar y Corregir" para cargar los datos y reenviarlos.
+        Se rescató la información; haz clic en &quot;Recuperar y Corregir&quot; para cargar los datos y reenviarlos.
       </p>
       <div className="space-y-3">
         {errors.map((err) => {

@@ -36,7 +36,7 @@ export default function InvoiceBlockRenderer({ type, form, calcConcepto, totals 
             <p style={{ marginBottom: 1, fontSize: 8 }}>Puerto Peñasco, Sonora, Mexico</p>
             <p style={{ fontSize: 8 }}>Tel: 638 102 1180</p>
             <div style={{ border: '1px solid #ccc', margin: '8px auto', padding: 4, width: '90%', color: '#666', fontSize: 6, textAlign: 'left' }}>
-                Image: No se puede encontrar una parte de la ruta de acceso 'E:\Compac\Empresas\Reportes\Formatos Digitales\REPTES_Cliente\imagenes_DSCFacturaFinal\BANNER1.png'.
+                Image: No se puede encontrar una parte de la ruta de acceso &apos;E:\Compac\Empresas\Reportes\Formatos Digitales\REPTES_Cliente\imagenes_DSCFacturaFinal\BANNER1.png&apos;.
             </div>
           </div>
         </div>
