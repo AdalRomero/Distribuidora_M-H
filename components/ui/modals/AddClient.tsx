@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, Building2, Tags, Contact, MapPin, Loader2 } from 'lucide-react';
+import { X, Building2, Tags, Contact, MapPin, Loader2, Plus, Trash2 } from 'lucide-react';
 
 export interface ClientData {
     nombre: string;
@@ -7,7 +7,7 @@ export interface ClientData {
     categoria: string;
     listaPrecios: string;
     descuentoGlobal: string;
-    contacto: string;
+    contactos: string[];
     estado: string;
     calle: string;
     colonia: string;
@@ -30,7 +30,7 @@ const initialState: ClientData = {
     categoria: 'General',
     listaPrecios: 'lista',
     descuentoGlobal: '0',
-    contacto: '',
+    contactos: [''],
     estado: 'Activo',
     calle: '',
     colonia: '',
@@ -56,6 +56,27 @@ export default function AddClient({ isOpen, onClose, onSave, isLoading = false, 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setForm(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleContactChange = (index: number, value: string) => {
+        setForm(prev => {
+            const newContactos = [...prev.contactos];
+            newContactos[index] = value;
+            return { ...prev, contactos: newContactos };
+        });
+    };
+
+    const addContact = () => {
+        if (form.contactos.length < 4) {
+            setForm(prev => ({ ...prev, contactos: [...prev.contactos, ''] }));
+        }
+    };
+
+    const removeContact = (index: number) => {
+        setForm(prev => ({
+            ...prev,
+            contactos: prev.contactos.filter((_, i) => i !== index)
+        }));
     };
 
     const handleSave = async () => {
@@ -129,7 +150,28 @@ export default function AddClient({ isOpen, onClose, onSave, isLoading = false, 
                                 <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm md:col-span-2">
                                     <div className="flex items-center gap-2 mb-4"><Contact className="w-5 h-5 text-blue-800" /><h4 className="font-semibold text-blue-900 text-sm">Contacto y Estado</h4></div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div><label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Teléfono / Correo de contacto</label><input type="text" name="contacto" value={form.contacto} onChange={handleChange} placeholder="Ej: 555-123-4567 o cliente@email.com" className={inputClass} /></div>
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Teléfono / Correo de contacto (Max 4)</label>
+                                                {form.contactos.length < 4 && (
+                                                    <button type="button" onClick={addContact} className="text-blue-600 hover:text-blue-700 dark:text-blue-400 text-xs font-medium flex items-center gap-1">
+                                                        <Plus className="w-3 h-3" /> Agregar
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="space-y-3">
+                                                {form.contactos.map((contacto, idx) => (
+                                                    <div key={idx} className="flex items-center gap-2">
+                                                        <input type="text" value={contacto} onChange={(e) => handleContactChange(idx, e.target.value)} placeholder="Ej: 555-123-4567 o cliente@email.com" className={inputClass} />
+                                                        {form.contactos.length > 1 && (
+                                                            <button type="button" onClick={() => removeContact(idx)} className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors">
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
                                         <div><label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Estado</label><select name="estado" value={form.estado} onChange={handleChange} className={inputClass}><option value="Activo">Activo</option><option value="Inactivo">Inactivo</option></select></div>
                                     </div>
                                 </div>

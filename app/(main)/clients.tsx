@@ -19,7 +19,7 @@ interface ClientItem {
     categoria: string;
     listaPrecioBase: string;
     descuentoGlobal: number;
-    contacto: string;
+    contactos: string[];
     calle: string;
     colonia: string;
     cp: string;
@@ -79,7 +79,7 @@ export default function Clients() {
             categoria: d.categoria || "General",
             listaPrecios: d.listaPrecioBase || "lista",
             descuentoGlobal: String(d.descuentoGlobal || 0),
-            contacto: d.contacto || "",
+            contactos: d.contactos || [""],
             estado: d.estado !== false ? "Activo" : "Inactivo",
             calle: d.calle || "",
             colonia: d.colonia || "",
@@ -118,19 +118,22 @@ export default function Clients() {
             const clientesDb = database.collections.get('clientes');
             const allClientes = await clientesDb.query().fetch();
 
-            const mapped: ClientItem[] = allClientes.map((c: any) => ({
-                id: c.id,
-                nombre: c.nombre || '',
-                rfc: c.rfc || '',
-                categoria: c.categoria || 'General',
-                listaPrecioBase: c.listaPrecioBase || 'lista',
-                descuentoGlobal: c.descuentoGlobal || 0,
-                contacto: c.contacto || '',
-                calle: c.calle || '',
-                colonia: c.colonia || '',
-                cp: c.cp || '',
-                ciudad: c.ciudad || '',
-                estado: c.estado,
+            const mapped: ClientItem[] = await Promise.all(allClientes.map(async (c: any) => {
+                const contactosRecords = await c.contactos.fetch();
+                return {
+                    id: c.id,
+                    nombre: c.nombre || '',
+                    rfc: c.rfc || '',
+                    categoria: c.categoria || 'General',
+                    listaPrecioBase: c.listaPrecioBase || 'lista',
+                    descuentoGlobal: c.descuentoGlobal || 0,
+                    contactos: contactosRecords.length > 0 ? contactosRecords.map((r: any) => r.contenido) : [],
+                    calle: c.calle || '',
+                    colonia: c.colonia || '',
+                    cp: c.cp || '',
+                    ciudad: c.ciudad || '',
+                    estado: c.estado,
+                };
             }));
 
             setClientsList(mapped);
@@ -148,24 +151,34 @@ export default function Clients() {
         setIsLoading(true);
         try {
             const clientesDb = database.collections.get('clientes');
+            const contactosDb = database.collections.get('contactos');
 
             const newId = Crypto.randomUUID();
 
             await database.write(async () => {
-                await clientesDb.create((c: any) => {
+                const newCliente = await clientesDb.create((c: any) => {
                     c._raw.id = newId;
                     c.nombre = formData.nombre;
                     c.rfc = formData.rfc || '';
                     c.categoria = formData.categoria || 'General';
                     c.listaPrecioBase = formData.listaPrecios || 'lista';
                     c.descuentoGlobal = parseFloat(formData.descuentoGlobal) || 0;
-                    c.contacto = formData.contacto || '';
                     c.calle = formData.calle || '';
                     c.colonia = formData.colonia || '';
                     c.cp = formData.cp || '';
                     c.ciudad = formData.ciudad || '';
                     c.estado = formData.estado === 'Activo';
                 });
+
+                for (const contactoStr of formData.contactos) {
+                    if (contactoStr.trim()) {
+                        await contactosDb.create((c: any) => {
+                            c._raw.id = Crypto.randomUUID();
+                            c.cliente.set(newCliente);
+                            c.contenido = contactoStr.trim();
+                        });
+                    }
+                }
             });
 
             setMessage({ type: 'success', text: `Cliente "${formData.nombre}" registrado exitosamente. Sincronizando...` });
@@ -193,7 +206,7 @@ export default function Clients() {
             categoria: client.categoria,
             listaPrecios: client.listaPrecioBase,
             descuentoGlobal: String(client.descuentoGlobal),
-            contacto: client.contacto,
+            contactos: client.contactos.length > 0 ? client.contactos : [''],
             estado: client.estado ? 'Activo' : 'Inactivo',
             calle: client.calle,
             colonia: client.colonia,
@@ -208,7 +221,9 @@ export default function Clients() {
         setIsLoading(true);
         try {
             const clientesDb = database.collections.get('clientes');
+            const contactosDb = database.collections.get('contactos');
             const record = await clientesDb.find(editingClientId) as any;
+            const existingContactos = await record.contactos.fetch();
 
             await database.write(async () => {
                 await record.update((c: any) => {
@@ -217,13 +232,26 @@ export default function Clients() {
                     c.categoria = formData.categoria || 'General';
                     c.listaPrecioBase = formData.listaPrecios || 'lista';
                     c.descuentoGlobal = parseFloat(formData.descuentoGlobal) || 0;
-                    c.contacto = formData.contacto || '';
                     c.calle = formData.calle || '';
                     c.colonia = formData.colonia || '';
                     c.cp = formData.cp || '';
                     c.ciudad = formData.ciudad || '';
                     c.estado = formData.estado === 'Activo';
                 });
+
+                for (const c of existingContactos) {
+                    await c.markAsDeleted();
+                }
+
+                for (const contactoStr of formData.contactos) {
+                    if (contactoStr.trim()) {
+                        await contactosDb.create((c: any) => {
+                            c._raw.id = Crypto.randomUUID();
+                            c.cliente.set(record);
+                            c.contenido = contactoStr.trim();
+                        });
+                    }
+                }
             });
 
             setMessage({ type: 'success', text: `Cliente "${formData.nombre}" actualizado correctamente. Sincronizando...` });
@@ -412,7 +440,16 @@ export default function Clients() {
                                                 <div>
                                                     <p className="text-mh-blue-dark dark:text-white font-bold">{client.nombre}</p>
                                                     <p className="text-slate-400 text-xs mt-0.5">{client.rfc || 'Sin RFC'}</p>
-                                                    {client.contacto && <p className="text-slate-400 text-xs mt-0.5">{client.contacto}</p>}
+                                                    {client.contactos && client.contactos.length > 0 && (
+                                                        <div className="flex flex-col gap-0.5 mt-1">
+                                                            {client.contactos.slice(0, 2).map((c, i) => (
+                                                                <p key={i} className="text-slate-400 text-xs">{c}</p>
+                                                            ))}
+                                                            {client.contactos.length > 2 && (
+                                                                <p className="text-blue-500 text-[10px] font-medium">+{client.contactos.length - 2} más...</p>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
@@ -485,26 +522,14 @@ export default function Clients() {
                                                                         </div>
                                                                     </div>
                                                                 )}
-                                                                <div className="flex gap-4">
-                                                                    {client.cp && (
-                                                                        <div className="flex-1">
-                                                                            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">C.P.</p>
-                                                                            <p className="text-sm text-slate-700 dark:text-slate-300 font-mono">{client.cp}</p>
-                                                                        </div>
-                                                                    )}
-                                                                    {client.ciudad && (
-                                                                        <div className="flex-1">
-                                                                            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Ciudad</p>
-                                                                            <p className="text-sm text-slate-700 dark:text-slate-300">{client.ciudad}</p>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                {client.contacto && (
+                                                                {client.contactos && client.contactos.length > 0 && (
                                                                     <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
-                                                                        <div className="flex items-center gap-2">
-                                                                            {client.contacto.includes('@') ? <Mail className="w-3.5 h-3.5 text-slate-400" /> : <Phone className="w-3.5 h-3.5 text-slate-400" />}
-                                                                            <p className="text-sm text-slate-600 dark:text-slate-300">{client.contacto}</p>
-                                                                        </div>
+                                                                        {client.contactos.map((contacto, i) => (
+                                                                            <div key={i} className="flex items-center gap-2 mb-1">
+                                                                                {contacto.includes('@') ? <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" /> : <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
+                                                                                <p className="text-sm text-slate-600 dark:text-slate-300">{contacto}</p>
+                                                                            </div>
+                                                                        ))}
                                                                     </div>
                                                                 )}
                                                             </div>

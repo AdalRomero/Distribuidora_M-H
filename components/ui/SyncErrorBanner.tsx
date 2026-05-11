@@ -1,5 +1,5 @@
-import React from "react";
 import { AlertTriangle, RotateCcw, Trash2 } from "lucide-react";
+import React from "react";
 import { errorTranslator } from "../../src/utils/errorTranslator";
 
 export interface SyncError {
@@ -41,8 +41,8 @@ export default function SyncErrorBanner({
         Problemas detectados al sincronizar
       </h3>
       <p className={`text-sm mb-4 ${textDescColor}`}>
-        Se detectaron registros que fueron creados o editados sin conexión pero rechazados por la nube. 
-        Se rescató la información; haz clic en "Recuperar y Corregir" para cargar los datos y reenviarlos.
+        Se detectaron registros que fueron creados o editados sin conexión pero rechazados por la nube.
+        Se rescató la información; haz clic en &quot;Recuperar y Corregir&quot; para cargar los datos y reenviarlos.
       </p>
       <div className="space-y-3">
         {errors.map((err) => {

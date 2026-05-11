@@ -81,6 +81,8 @@ function SearchableDropdown<T extends { id: string }>({ items, value, onChange, 
 
 export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess }: AddInvoiceProps) {
     const [form, setForm] = useState<InvoiceForm>(initialForm);
+    const [viewMode, setViewMode] = useState<'simultaneous' | 'tabular'>('simultaneous');
+    const [step, setStep] = useState<'capture' | 'preview'>('capture');
 
     // Data from DB
     const [clientes, setClientes] = useState<ClienteItem[]>([]);
@@ -252,6 +254,369 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
         return null;
     };
 
+    const renderFormCards = (isTabular: boolean) => (
+        <>
+            {/* Card 1: Datos del Comprobante */}
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 shadow-sm">
+                <div className="flex items-center gap-2 mb-3"><FileText className="w-4 h-4 text-blue-700 dark:text-blue-400" /><h4 className="font-semibold text-blue-900 dark:text-blue-300 text-sm">Datos del Comprobante</h4></div>
+                <div className={`grid gap-3 ${isTabular ? 'grid-cols-2 md:grid-cols-4 lg:grid-cols-5' : 'grid-cols-2'}`}>
+                    <div><label className={labelClass}>Serie</label><input type="text" name="serie" value={form.serie} onChange={handleChange} className={inputClass} /></div>
+                    <div><label className={labelClass}>Folio</label><input type="text" name="folio" value={form.folio} onChange={handleChange} className={inputClass} /></div>
+                    <div><label className={labelClass}>Fecha</label><input type="date" name="fecha" value={form.fecha} onChange={handleChange} className={inputClass} /></div>
+                    <div><label className={labelClass}>Hora</label><input type="time" name="hora" value={form.hora} onChange={handleChange} className={inputClass} /></div>
+                    <div><label className={labelClass}>Tipo de Comprobante</label><select name="tipoComprobante" value={form.tipoComprobante} onChange={handleChange} className={inputClass}><option value="I">I — Ingreso</option><option value="E">E — Egreso</option><option value="T">T — Traslado</option><option value="N">N — Nómina</option><option value="P">P — Pago</option></select></div>
+                    <div><label className={labelClass}>Lugar de Expedición (CP)</label><input type="text" name="lugarExpedicion" value={form.lugarExpedicion} onChange={handleChange} className={inputClass} placeholder="83554" /></div>
+                    <div><label className={labelClass}>Método de Pago</label><select name="metodoPago" value={form.metodoPago} onChange={handleChange} className={inputClass}><option value="PPD">PPD — Pago en Parcialidades o Diferido</option><option value="PUE">PUE — Pago en Una Sola Exhibición</option></select></div>
+                    <div><label className={labelClass}>Forma de Pago</label><select name="formaPago" value={form.formaPago} onChange={handleChange} className={inputClass}><option value="99">99 — Por Definir</option><option value="01">01 — Efectivo</option><option value="02">02 — Cheque nominativo</option><option value="03">03 — Transferencia electrónica</option><option value="04">04 — Tarjeta de crédito</option><option value="28">28 — Tarjeta de débito</option></select></div>
+                    <div className={isTabular ? "col-span-2 lg:col-span-2" : "col-span-2"}><label className={labelClass}>Moneda</label><select name="moneda" value={form.moneda} onChange={handleChange} className={inputClass}><option value="MXN">MXN — Peso Mexicano</option><option value="USD">USD — Dólar Americano</option><option value="EUR">EUR — Euro</option></select></div>
+                </div>
+            </div>
+
+            {/* Card 2: Datos del Receptor */}
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 shadow-sm">
+                <div className="flex items-center gap-2 mb-3"><User className="w-4 h-4 text-blue-700 dark:text-blue-400" /><h4 className="font-semibold text-blue-900 dark:text-blue-300 text-sm">Datos del Cliente (Receptor)</h4></div>
+
+                <div className="mb-3">
+                    <label className={labelClass}>Seleccionar Cliente Registrado</label>
+                    <SearchableDropdown<ClienteItem>
+                        items={clientesActivos}
+                        value={form.clienteId}
+                        onChange={handleSelectCliente}
+                        renderItem={(c) => (
+                            <div>
+                                <span className="font-semibold">{c.nombre}</span>
+                                <span className="text-slate-400 ml-2">RFC: {c.rfc || 'N/A'}</span>
+                                <span className="text-slate-400 ml-2">— {c.categoria}</span>
+                            </div>
+                        )}
+                        renderSelected={(c) => `${c.nombre} (${c.rfc || 'Sin RFC'})`}
+                        placeholder="— Seleccionar cliente —"
+                        searchPlaceholder="Buscar por nombre o RFC..."
+                        disabled={isLoadingData}
+                    />
+                    {form.clienteId && (
+                        <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                            {(() => {
+                                const cl = clientes.find(c => c.id === form.clienteId);
+                                if (!cl) return null;
+                                const lbl = cl.listaPrecioBase === 'mayoreo' ? 'Mayoreo' : cl.listaPrecioBase === 'menudeo' ? 'Menudeo' : 'Lista';
+                                return (
+                                    <>
+                                        <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded text-[10px] font-bold border border-blue-100 dark:border-blue-800">Lista: {lbl}</span>
+                                        {cl.descuentoGlobal > 0 && <span className="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 rounded text-[10px] font-bold border border-emerald-100 dark:border-emerald-800">Desc. Global: {cl.descuentoGlobal}%</span>}
+                                        {preciosEspeciales.filter(pe => pe.clienteId === cl.id).length > 0 && (
+                                            <span className="px-2 py-0.5 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded text-[10px] font-bold border border-amber-100 dark:border-amber-800">{preciosEspeciales.filter(pe => pe.clienteId === cl.id).length} precio(s) especial(es)</span>
+                                        )}
+                                    </>
+                                );
+                            })()}
+                        </div>
+                    )}
+                </div>
+
+                <div className={`grid gap-3 ${isTabular ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4' : 'grid-cols-2'}`}>
+                    <div><label className={labelClass}>Código de Cliente</label><input type="text" name="codigoCliente" value={form.codigoCliente} onChange={handleChange} className={inputClass} placeholder="000001" /></div>
+                    <div><label className={labelClass}>Nombre / Razón Social</label><input type="text" name="nombre" value={form.nombre} onChange={handleChange} className={inputClass} placeholder="Ej: Panadería La Esperanza" /></div>
+                    <div><label className={labelClass}>RFC</label><input type="text" name="rfc" value={form.rfc} onChange={handleChange} className={inputClass} placeholder="XAXX010101000" /></div>
+                    <div><label className={labelClass}>Agente</label><input type="text" name="agente" value={form.agente} onChange={handleChange} className={inputClass} placeholder="Nombre del agente" /></div>
+                    <div className={isTabular ? "col-span-2" : "col-span-2"}><label className={labelClass}>Domicilio Completo</label><input type="text" name="domicilio" value={form.domicilio} onChange={handleChange} className={inputClass} placeholder="Calle, Número, Colonia, Ciudad, Estado, CP" /></div>
+                    <div><label className={labelClass}>Uso CFDI</label><select name="usoCFDI" value={form.usoCFDI} onChange={handleChange} className={inputClass}><option value="S01">S01 — Sin efectos fiscales</option><option value="G01">G01 — Adquisición de mercancias</option><option value="G03">G03 — Gastos en general</option><option value="P01">P01 — Por definir</option><option value="CP01">CP01 — Pagos</option></select></div>
+                    <div><label className={labelClass}>Observaciones</label><input type="text" name="observaciones" value={form.observaciones} onChange={handleChange} className={inputClass} placeholder="Notas adicionales" /></div>
+                    <div><label className={labelClass}>Tipo Relación</label><select name="tipoRelacion" value={form.tipoRelacion} onChange={handleChange} className={inputClass}><option value="">— Ninguna —</option><option value="01">01 — Nota de crédito</option><option value="04">04 — Sustitución</option></select></div>
+                    <div><label className={labelClass}>CFDI Relacionado</label><input type="text" name="cfdiRelacionado" value={form.cfdiRelacionado} onChange={handleChange} className={inputClass} placeholder="UUID del comprobante" /></div>
+                </div>
+            </div>
+
+            {/* Card 3: Conceptos */}
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2"><ShoppingCart className="w-4 h-4 text-blue-700 dark:text-blue-400" /><h4 className="font-semibold text-blue-900 dark:text-blue-300 text-sm">Conceptos (Items)</h4></div>
+                    <button type="button" onClick={addConcepto} className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-200 dark:border-blue-800 rounded-lg transition-colors"><Plus className="w-3 h-3" /> Agregar</button>
+                </div>
+                {isTabular ? (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse min-w-max">
+                            <thead>
+                                <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs border-b border-slate-200 dark:border-slate-700">
+                                    <th className="p-2 font-medium min-w-[200px]">Producto</th>
+                                    <th className="p-2 font-medium w-24">Cantidad</th>
+                                    <th className="p-2 font-medium w-24">U. SAT</th>
+                                    <th className="p-2 font-medium w-28">C. SAT</th>
+                                    <th className="p-2 font-medium min-w-[200px]">Concepto</th>
+                                    <th className="p-2 font-medium w-32">V. Unitario</th>
+                                    <th className="p-2 font-medium w-28">Descuento</th>
+                                    <th className="p-2 font-medium w-24">% Imp.</th>
+                                    <th className="p-2 font-medium w-12 text-center"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {form.conceptos.map((c, idx) => (
+                                    <tr key={c.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                                        <td className="p-2 align-top">
+                                            <SearchableDropdown<ProductoItem>
+                                                items={productos}
+                                                value={c.productoId}
+                                                onChange={(prod) => handleSelectProducto(c.id, prod)}
+                                                renderItem={(p) => (
+                                                    <div className="flex justify-between items-center gap-4">
+                                                        <span><span className="font-mono text-[10px] text-slate-400 mr-1.5">{p.codigoInterno}</span>{p.descripcion}</span>
+                                                        <span className="text-slate-400 shrink-0">${p.precioLista.toFixed(2)}</span>
+                                                    </div>
+                                                )}
+                                                renderSelected={(p) => `${p.codigoInterno} — ${p.descripcion}`}
+                                                placeholder="— Buscar —"
+                                                searchPlaceholder="Código o descripción..."
+                                                disabled={isLoadingData}
+                                            />
+                                            {getPriceBadge(c.productoId) && <div className="mt-1">{getPriceBadge(c.productoId)}</div>}
+                                        </td>
+                                        <td className="p-2 align-top"><input type="number" value={c.cantidad} onChange={(e) => updateConcepto(c.id, 'cantidad', e.target.value)} className={inputClass} placeholder="1" /></td>
+                                        <td className="p-2 align-top"><input type="text" value={c.unidadSat} onChange={(e) => updateConcepto(c.id, 'unidadSat', e.target.value)} className={inputClass} placeholder="H87" /></td>
+                                        <td className="p-2 align-top"><input type="text" value={c.claveSat} onChange={(e) => updateConcepto(c.id, 'claveSat', e.target.value)} className={inputClass} placeholder="50171529" /></td>
+                                        <td className="p-2 align-top"><input type="text" value={c.concepto} onChange={(e) => updateConcepto(c.id, 'concepto', e.target.value)} className={inputClass} placeholder="Concepto" /></td>
+                                        <td className="p-2 align-top"><input type="number" value={c.valorUnitario} onChange={(e) => updateConcepto(c.id, 'valorUnitario', e.target.value)} className={inputClass} placeholder="0.00" /></td>
+                                        <td className="p-2 align-top"><input type="number" value={c.descuento} onChange={(e) => updateConcepto(c.id, 'descuento', e.target.value)} className={inputClass} placeholder="0.00" /></td>
+                                        <td className="p-2 align-top"><select value={c.porcImpuesto} onChange={(e) => updateConcepto(c.id, 'porcImpuesto', e.target.value)} className={inputClass}><option value="16">16%</option><option value="8">8%</option><option value="0">0%</option></select></td>
+                                        <td className="p-2 text-center align-top">
+                                            {form.conceptos.length > 1 && (<button type="button" onClick={() => removeConcepto(c.id)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors mt-0.5"><Trash2 className="w-4 h-4" /></button>)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {form.conceptos.map((c, idx) => (
+                            <div key={c.id} className="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50 dark:bg-slate-900">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Artículo #{idx + 1}</span>
+                                        {getPriceBadge(c.productoId)}
+                                    </div>
+                                    {form.conceptos.length > 1 && (<button type="button" onClick={() => removeConcepto(c.id)} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>)}
+                                </div>
+
+                                {/* Selector de producto */}
+                                <div className="mb-2">
+                                    <label className={labelClass}>Seleccionar Producto</label>
+                                    <SearchableDropdown<ProductoItem>
+                                        items={productos}
+                                        value={c.productoId}
+                                        onChange={(prod) => handleSelectProducto(c.id, prod)}
+                                        renderItem={(p) => (
+                                            <div className="flex justify-between items-center gap-4">
+                                                <span><span className="font-mono text-[10px] text-slate-400 mr-1.5">{p.codigoInterno}</span>{p.descripcion}</span>
+                                                <span className="text-slate-400 shrink-0">${p.precioLista.toFixed(2)}</span>
+                                            </div>
+                                        )}
+                                        renderSelected={(p) => `${p.codigoInterno} — ${p.descripcion}`}
+                                        placeholder="— Buscar producto —"
+                                        searchPlaceholder="Código o descripción..."
+                                        disabled={isLoadingData}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-2">
+                                    <div><label className={labelClass}>Cantidad</label><input type="number" value={c.cantidad} onChange={(e) => updateConcepto(c.id, 'cantidad', e.target.value)} className={inputClass} placeholder="1" /></div>
+                                    <div><label className={labelClass}>Unidad SAT</label><input type="text" value={c.unidadSat} onChange={(e) => updateConcepto(c.id, 'unidadSat', e.target.value)} className={inputClass} placeholder="H87" /></div>
+                                    <div><label className={labelClass}>Clave SAT</label><input type="text" value={c.claveSat} onChange={(e) => updateConcepto(c.id, 'claveSat', e.target.value)} className={inputClass} placeholder="50171529" /></div>
+                                    <div className="col-span-3"><label className={labelClass}>Concepto (Descripción)</label><input type="text" value={c.concepto} onChange={(e) => updateConcepto(c.id, 'concepto', e.target.value)} className={inputClass} placeholder="Describe el producto o servicio" /></div>
+                                    <div><label className={labelClass}>Valor Unitario</label><input type="number" value={c.valorUnitario} onChange={(e) => updateConcepto(c.id, 'valorUnitario', e.target.value)} className={inputClass} placeholder="0.00" /></div>
+                                    <div><label className={labelClass}>Descuento</label><input type="number" value={c.descuento} onChange={(e) => updateConcepto(c.id, 'descuento', e.target.value)} className={inputClass} placeholder="0.00" /></div>
+                                    <div><label className={labelClass}>% Impuesto</label><select value={c.porcImpuesto} onChange={(e) => updateConcepto(c.id, 'porcImpuesto', e.target.value)} className={inputClass}><option value="16">16% IVA</option><option value="8">8% IVA</option><option value="0">0% Exento</option></select></div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </>
+    );
+
+    const renderPDFPreview = () => (
+        <div className="bg-white shadow-lg mx-auto" style={{ width: 680, minHeight: 880, fontFamily: 'Arial, sans-serif', fontSize: 8, lineHeight: 1.4, color: '#000', padding: '12px 16px 20px' }}>
+
+            {/* =============== HEADER: Logo + Emisor + Factura =============== */}
+            <div style={{ display: 'flex', marginBottom: 8 }}>
+                {/* Logo */}
+                <div style={{ width: 110, flexShrink: 0, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 6 }}>
+                    <ChefHat size={72} strokeWidth={1} color="#1a6ab5" />
+                </div>
+                {/* Emisor Info */}
+                <div style={{ flex: 1, textAlign: 'center', paddingTop: 4 }}>
+                    <p style={{ fontWeight: 'bold', fontSize: 12, textTransform: 'uppercase', marginBottom: 2 }}>VIANEY OMARA MIRANDA CASTRO</p>
+                    <p style={{ marginBottom: 1 }}>MICV9209288D2</p>
+                    <p style={{ marginBottom: 1 }}>612  Personas Físicas con Actividades Empresariales y Profesionales</p>
+                    <p style={{ marginBottom: 1 }}>Blvd. Samuel Ocaña entre Puerto de Ensenada y Vicente</p>
+                    <p style={{ marginBottom: 1 }}>Suarez 400&apos;2 Col Lopez Portillo CP. 83556</p>
+                    <p style={{ marginBottom: 3 }}>Puerto Peñasco, Sonora, Mexico</p>
+                    <p style={{ marginBottom: 0 }}>Tel: 638 102 1180</p>
+                </div>
+                {/* Factura Info */}
+                <div style={{ width: 175, flexShrink: 0, textAlign: 'left', paddingTop: 2, fontSize: 7.5 }}>
+                    <p style={{ fontWeight: 'bold', fontSize: 11, marginBottom: 6 }}>Factura</p>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}><tbody>
+                        <tr><td style={{ padding: '1px 0', whiteSpace: 'nowrap' }}>Serie: {form.serie || 'MH'}</td></tr>
+                        <tr><td style={{ padding: '1px 0' }}>Folio: {form.folio || '—'}</td></tr>
+                        <tr><td style={{ padding: '1px 0' }}>Fecha: {form.fecha}</td></tr>
+                        <tr><td style={{ padding: '1px 0' }}>Hora: {form.hora}</td></tr>
+                        <tr><td style={{ padding: '1px 0', lineHeight: 1.2 }}>Tipo de compro-<br />bante: &nbsp;&nbsp;{form.tipoComprobante || 'I'}- Ingreso</td></tr>
+                        <tr><td style={{ padding: '1px 0', lineHeight: 1.2 }}>Lugar de<br />expedición CP: {form.lugarExpedicion || '83556'}</td></tr>
+                        <tr><td style={{ padding: '1px 0' }}>Versión del comprobante: 4.0</td></tr>
+                    </tbody></table>
+                </div>
+            </div>
+
+            {/* =============== DATOS DEL CLIENTE =============== */}
+            <div style={{ border: '1px solid #000', padding: '4px 8px', marginBottom: 8, fontSize: 7.5 }}>
+                <p style={{ marginBottom: 4 }}><b>Datos del cliente:</b></p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                    <span>Codigo Cliente: {form.codigoCliente || '01023'}</span>
+                    <span>Agente: {form.agente || '1'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                    <span>Cliente: {form.nombre || 'Publico en General'}</span>
+                    <span>Uso CFDI: {form.usoCFDI || 'S01'} Sin efectos fiscales</span>
+                </div>
+                <div style={{ marginBottom: 2 }}>RFC: {form.rfc || 'XAXX010101000'}</div>
+                <div style={{ marginBottom: 3 }}>Domicilio: {form.domicilio || 'AVE. PUERTO DE ENSENADA S/N LOPEZ PORTILLO  C.P. 83556 PTO. PEÑASCO, SONORA, MEXICO'}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                    <span>Método de pago: {form.metodoPago || 'PPD'}-Pago en parcialidades o diferido</span>
+                    <span>Forma de pago: {form.formaPago || '99'} - Por definir</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Moneda: {form.moneda || 'MXN'} - Peso Mexicano</span>
+                    <span>Observaciones: {form.observaciones || ''}</span>
+                </div>
+            </div>
+
+            {/* =============== TABLA DE CONCEPTOS =============== */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: 7, marginBottom: 8 }}>
+                <thead>
+                    <tr style={{ background: '#e0e0e0' }}>
+                        {[
+                            { h: 'CANT', w: 30 }, { h: 'UNIDAD\nSAT', w: 40 }, { h: 'CLAVE\nSAT', w: 45 },
+                            { h: 'CONCEPTO' }, { h: 'V.U.', w: 48 }, { h: 'DESC', w: 30 },
+                            { h: 'SUBTOT\nAL', w: 52 }, { h: 'PORC.\nIMP', w: 32 }, { h: 'IMPUESTOS', w: 65 }, { h: 'TOTAL', w: 55 }
+                        ].map(({ h, w }) => (
+                            <th key={h} style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', whiteSpace: 'pre-line', fontWeight: 'bold', width: w, verticalAlign: 'bottom' }}>{h}</th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {form.conceptos.map((c: any) => {
+                        const { subtotal, impuestos, total } = calcConcepto(c);
+                        return (
+                            <tr key={c.id}>
+                                <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center' }}>{c.cantidad || ''}</td>
+                                <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center' }}>{c.unidadSat || ''} - Pieza</td>
+                                <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', fontSize: 6.5 }}>{c.claveSat || ''}</td>
+                                <td style={{ border: '1px solid #000', padding: '2px 3px', fontSize: 7 }}>
+                                    {c.claveSat || ''} {c.concepto || '—'}
+                                    <br /><span style={{ fontSize: 6.5, color: '#555' }}>Pedimento: Aduana: Fecha:</span>
+                                </td>
+                                <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'right' }}>{c.valorUnitario ? `$${fmt(parseFloat(c.valorUnitario))}` : ''}</td>
+                                <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center' }}>{c.descuento ? `${c.descuento}%` : '0%'}</td>
+                                <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'right' }}>${fmt(subtotal)}</td>
+                                <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center' }}>{c.porcImpuesto} %</td>
+                                <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'left', fontSize: 6.5 }}>IVA - Importe: {fmt(impuestos)}</td>
+                                <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'right' }}>${fmt(total)}</td>
+                            </tr>
+                        );
+                    })}
+                    {form.conceptos.length < 4 && Array.from({ length: 4 - form.conceptos.length }).map((_, i) => (
+                        <tr key={`e${i}`} style={{ height: 18 }}>
+                            {Array.from({ length: 10 }).map((__, j) => (
+                                <td key={j} style={{ border: '1px solid #000', padding: '2px 3px' }}>&nbsp;</td>
+                            ))}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+
+            {/* =============== TOTALES: Importe con letra + QR | Montos =============== */}
+            <div style={{ display: 'flex', marginBottom: 10, fontSize: 7.5 }}>
+                {/* Lado izquierdo: Importe con letra, tipo relación, QR */}
+                <div style={{ flex: 1, paddingRight: 16 }}>
+                    <p style={{ marginBottom: 6, textDecoration: 'underline' }}>
+                        IMPORTE CON LETRA: <span style={{ textTransform: 'uppercase' }}>{toLetras(totalFinal)}</span>
+                    </p>
+                    <div style={{ marginTop: 8 }}>
+                        <p style={{ marginBottom: 3 }}>TIPO DE RELACION: {form.tipoRelacion || '-'}</p>
+                        <p style={{ marginBottom: 8 }}>CFDI RELACIONADO: {form.cfdiRelacionado || ''}</p>
+                    </div>
+                    {/* QR Code placeholder */}
+                    <div style={{ width: 100, height: 100, border: '2px solid #000', background: 'repeating-conic-gradient(#333 0% 25%, #fff 0% 50%) 0 0 / 5px 5px', position: 'relative', overflow: 'hidden' }}>
+                        <div style={{ position: 'absolute', inset: '15%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ width: 20, height: 20, background: '#000' }} />
+                        </div>
+                    </div>
+                </div>
+                {/* Lado derecho: Tabla de montos */}
+                <div style={{ width: 200, flexShrink: 0, paddingTop: 2 }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 7.5 }}><tbody>
+                        <tr><td style={{ padding: '2px 6px', textAlign: 'right' }}>Subtotal:</td><td style={{ padding: '2px 6px', textAlign: 'right', width: 80 }}>${fmt(totalSubtotal)}</td></tr>
+                        <tr><td style={{ padding: '2px 6px', textAlign: 'right' }}>IEPS:</td><td style={{ padding: '2px 6px', textAlign: 'right' }}>$0.00</td></tr>
+                        <tr><td style={{ padding: '2px 6px', textAlign: 'right' }}>IEPS C.:</td><td style={{ padding: '2px 6px', textAlign: 'right' }}>$0.00</td></tr>
+                        <tr><td style={{ padding: '2px 6px', textAlign: 'right' }}>IVA:</td><td style={{ padding: '2px 6px', textAlign: 'right' }}>${fmt(totalImpuestos)}</td></tr>
+                        <tr><td style={{ padding: '2px 6px', textAlign: 'right' }}>Descuento:</td><td style={{ padding: '2px 6px', textAlign: 'right' }}>${fmt(totalDesc)}</td></tr>
+                        <tr style={{ borderTop: '1px solid #000' }}><td style={{ padding: '2px 6px', textAlign: 'right', fontWeight: 'bold' }}>Total:</td><td style={{ padding: '2px 6px', textAlign: 'right', fontWeight: 'bold' }}>${fmt(totalFinal)}</td></tr>
+                    </tbody></table>
+                </div>
+            </div>
+
+            {/* =============== INFO FISCAL =============== */}
+            <div style={{ marginBottom: 6, fontSize: 7 }}>
+                <p style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 8, marginBottom: 6 }}>Este documento es una representación impresa de un CFDI</p>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}><tbody>
+                    <tr><td style={{ border: '1px solid #000', padding: '2px 8px' }}>Serie del Certificado del emisor: 00001000000508225085</td></tr>
+                    <tr><td style={{ border: '1px solid #000', borderTop: 'none', padding: '2px 8px' }}>Folio Fiscal: FA476ECB-C78D-42F9-A9EB-D8A9322FB87C</td></tr>
+                    <tr><td style={{ border: '1px solid #000', borderTop: 'none', padding: '2px 8px' }}>No. de serie del Certificado del SAT: 00001000000505142236</td></tr>
+                    <tr><td style={{ border: '1px solid #000', borderTop: 'none', padding: '2px 8px' }}>Fecha y hora de certificación: {form.fecha}T{form.hora}:05</td></tr>
+                </tbody></table>
+                <p style={{ textAlign: 'right', fontSize: 6.5, marginTop: 3 }}>*Efectos fiscales al pago</p>
+            </div>
+
+            {/* =============== SELLOS =============== */}
+            <div style={{ marginBottom: 6 }}>
+                {/* Sello digital del CFDI */}
+                <div style={{ border: '1px solid #000', marginBottom: 4 }}>
+                    <div style={{ background: '#d0d0d0', padding: '2px 8px', textAlign: 'center', fontSize: 7, fontWeight: 'bold' }}>Sello digital del CFDI</div>
+                    <div style={{ padding: '3px 8px', fontSize: 5.5, wordBreak: 'break-all', fontFamily: 'monospace', lineHeight: 1.3 }}>
+                        g1hVudoRwyMP3ogrEiA5orgGaWAN5WCgttza5rdFDhK5yWHssWUqqqAX+KMUwGW64dS0or9twwpBSx1eZ+MKJV7J2PmfADKv6e0fnML3prAN5EDA54uMEFDJgDAhdroFDWz0gTjG4+Qog6ZznNF1FtUfROXo20HPl9GlKjMtaOvP0v51NLUFER0mWOPHsg
+                    </div>
+                </div>
+                {/* Sello del SAT */}
+                <div style={{ border: '1px solid #000', marginBottom: 4 }}>
+                    <div style={{ background: '#d0d0d0', padding: '2px 8px', textAlign: 'center', fontSize: 7, fontWeight: 'bold' }}>Sello del SAT</div>
+                    <div style={{ padding: '3px 8px', fontSize: 5.5, wordBreak: 'break-all', fontFamily: 'monospace', lineHeight: 1.3 }}>
+                        fkzxgXrcvfXlP6apKG1sFu5tXAxLGc0xi0rp0w/R2K5BOYrD5Sc65vbRnTn1zV0vozmkMhPs58ejEcfaJ1my1xJu6ty7bWfYDBkrtpR8IuOB34Kkn7gPC5z/XfNKd6uzGj3mjyeNm0En
+                    </div>
+                </div>
+                {/* Cadena original */}
+                <div style={{ border: '1px solid #000' }}>
+                    <div style={{ background: '#d0d0d0', padding: '2px 8px', textAlign: 'center', fontSize: 7, fontWeight: 'bold' }}>Cadena original del complemento de la certificación digital del SAT</div>
+                    <div style={{ padding: '3px 8px', fontSize: 5.5, wordBreak: 'break-all', fontFamily: 'monospace', lineHeight: 1.3 }}>
+                        ||1.1|FA476ECB-C78D-42F9-A9EB-D8A9322FB87C|{form.fecha}T{form.hora}:05|INT021024I62|mnattocprdxyMAdoScrdLj6TqgrpsfM8tiSW+MuczeoegfzINIQcMovJP+Sv64Q0qqAxHKMUwGW64dS0or9twwpBSx1eZ+MKJV7J2PmfADKv6e0fnML3prAN5EDA54uMEFDJgDAhdroF||
+                    </div>
+                </div>
+            </div>
+
+            {/* =============== PAGARÉ =============== */}
+            <div style={{ border: '1px solid #000', padding: '5px 10px', marginTop: 6, fontSize: 7 }}>
+                <p style={{ textAlign: 'center', fontWeight: 'bold', textTransform: 'uppercase', textDecoration: 'underline', marginBottom: 4, fontSize: 8 }}>PAGARE</p>
+                <p style={{ textAlign: 'justify', marginBottom: 8, lineHeight: 1.5 }}>
+                    DEBO(EMOS) Y PAGARE(MOS) INCONDICIONALMENTE Y SIN PRETEXTO POR ESTE PAGARE A LA ORDEN DE VIANEY OMARA MIRANDA CASTRO LA CANTIDAD DE{' '}
+                    <span style={{ textTransform: 'uppercase' }}>{toLetras(totalFinal)}</span>{' '}
+                    ({form.moneda} ${fmt(totalFinal)}) EN LA CIUDAD DE __ EL DIA DE SU VENCIMIENTO, PAGAREMOS ADEMAS INTERESES MORATORIOS HASTA SU LIQUIDACION TOTAL A RAZON DEL 3% MENSUAL SIN QUE ESTO SE CONSIDERE EL PLAZO FIJADO PARA EL CUMPLIMIENTO DE ESTA OBLIGACION.
+                </p>
+                <p style={{ fontSize: 7.5, marginTop: 8 }}>ACEPTO Y PAGARE: _______________________</p>
+            </div>
+
+        </div>
+    );
+
     if (!isOpen) return null;
 
     return (
@@ -269,331 +634,61 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
                                 {isLoadingData && <span className="flex items-center gap-1 text-xs text-blue-500"><Loader2 className="w-3 h-3 animate-spin" />Cargando datos...</span>}
                             </div>
                         </div>
-                        <button onClick={handleClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
+                        <div className="flex items-center gap-4">
+                            <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
+                                <button onClick={() => setViewMode('simultaneous')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'simultaneous' ? 'bg-white dark:bg-slate-600 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}>Vista Dividida</button>
+                                <button onClick={() => { setViewMode('tabular'); setStep('capture'); }} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'tabular' ? 'bg-white dark:bg-slate-600 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}>Modo Tabular</button>
+                            </div>
+                            <button onClick={handleClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
+                        </div>
                     </div>
 
-                    {/* BODY (Split View) */}
-                    <div className="flex-1 grid grid-cols-2 overflow-hidden">
-
-                        {/* LEFT - Form */}
-                        <div className="overflow-y-auto p-5 pr-3 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 space-y-4">
-
-                            {/* Card 1: Datos del Comprobante */}
-                            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 shadow-sm">
-                                <div className="flex items-center gap-2 mb-3"><FileText className="w-4 h-4 text-blue-700 dark:text-blue-400" /><h4 className="font-semibold text-blue-900 dark:text-blue-300 text-sm">Datos del Comprobante</h4></div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div><label className={labelClass}>Serie</label><input type="text" name="serie" value={form.serie} onChange={handleChange} className={inputClass} /></div>
-                                    <div><label className={labelClass}>Folio</label><input type="text" name="folio" value={form.folio} onChange={handleChange} className={inputClass} /></div>
-                                    <div><label className={labelClass}>Fecha</label><input type="date" name="fecha" value={form.fecha} onChange={handleChange} className={inputClass} /></div>
-                                    <div><label className={labelClass}>Hora</label><input type="time" name="hora" value={form.hora} onChange={handleChange} className={inputClass} /></div>
-                                    <div><label className={labelClass}>Tipo de Comprobante</label><select name="tipoComprobante" value={form.tipoComprobante} onChange={handleChange} className={inputClass}><option value="I">I — Ingreso</option><option value="E">E — Egreso</option><option value="T">T — Traslado</option><option value="N">N — Nómina</option><option value="P">P — Pago</option></select></div>
-                                    <div><label className={labelClass}>Lugar de Expedición (CP)</label><input type="text" name="lugarExpedicion" value={form.lugarExpedicion} onChange={handleChange} className={inputClass} placeholder="83554" /></div>
-                                    <div><label className={labelClass}>Método de Pago</label><select name="metodoPago" value={form.metodoPago} onChange={handleChange} className={inputClass}><option value="PPD">PPD — Pago en Parcialidades o Diferido</option><option value="PUE">PUE — Pago en Una Sola Exhibición</option></select></div>
-                                    <div><label className={labelClass}>Forma de Pago</label><select name="formaPago" value={form.formaPago} onChange={handleChange} className={inputClass}><option value="99">99 — Por Definir</option><option value="01">01 — Efectivo</option><option value="02">02 — Cheque nominativo</option><option value="03">03 — Transferencia electrónica</option><option value="04">04 — Tarjeta de crédito</option><option value="28">28 — Tarjeta de débito</option></select></div>
-                                    <div className="col-span-2"><label className={labelClass}>Moneda</label><select name="moneda" value={form.moneda} onChange={handleChange} className={inputClass}><option value="MXN">MXN — Peso Mexicano</option><option value="USD">USD — Dólar Americano</option><option value="EUR">EUR — Euro</option></select></div>
-                                </div>
+                    {/* BODY */}
+                    {viewMode === 'simultaneous' ? (
+                        <div className="flex-1 grid grid-cols-2 overflow-hidden">
+                            {/* LEFT - Form */}
+                            <div className="overflow-y-auto p-5 pr-3 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 space-y-4">
+                                {renderFormCards(false)}
                             </div>
 
-                            {/* Card 2: Datos del Receptor — CON SELECTOR DE CLIENTES */}
-                            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 shadow-sm">
-                                <div className="flex items-center gap-2 mb-3"><User className="w-4 h-4 text-blue-700 dark:text-blue-400" /><h4 className="font-semibold text-blue-900 dark:text-blue-300 text-sm">Datos del Cliente (Receptor)</h4></div>
-
-                                {/* Selector de cliente */}
-                                <div className="mb-3">
-                                    <label className={labelClass}>Seleccionar Cliente Registrado</label>
-                                    <SearchableDropdown<ClienteItem>
-                                        items={clientesActivos}
-                                        value={form.clienteId}
-                                        onChange={handleSelectCliente}
-                                        renderItem={(c) => (
-                                            <div>
-                                                <span className="font-semibold">{c.nombre}</span>
-                                                <span className="text-slate-400 ml-2">RFC: {c.rfc || 'N/A'}</span>
-                                                <span className="text-slate-400 ml-2">— {c.categoria}</span>
-                                            </div>
-                                        )}
-                                        renderSelected={(c) => `${c.nombre} (${c.rfc || 'Sin RFC'})`}
-                                        placeholder="— Seleccionar cliente —"
-                                        searchPlaceholder="Buscar por nombre o RFC..."
-                                        disabled={isLoadingData}
-                                    />
-                                    {form.clienteId && (
-                                        <div className="mt-1.5 flex items-center gap-2 flex-wrap">
-                                            {(() => {
-                                                const cl = clientes.find(c => c.id === form.clienteId);
-                                                if (!cl) return null;
-                                                const lbl = cl.listaPrecioBase === 'mayoreo' ? 'Mayoreo' : cl.listaPrecioBase === 'menudeo' ? 'Menudeo' : 'Lista';
-                                                return (
-                                                    <>
-                                                        <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded text-[10px] font-bold border border-blue-100 dark:border-blue-800">Lista: {lbl}</span>
-                                                        {cl.descuentoGlobal > 0 && <span className="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 rounded text-[10px] font-bold border border-emerald-100 dark:border-emerald-800">Desc. Global: {cl.descuentoGlobal}%</span>}
-                                                        {preciosEspeciales.filter(pe => pe.clienteId === cl.id).length > 0 && (
-                                                            <span className="px-2 py-0.5 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded text-[10px] font-bold border border-amber-100 dark:border-amber-800">{preciosEspeciales.filter(pe => pe.clienteId === cl.id).length} precio(s) especial(es)</span>
-                                                        )}
-                                                    </>
-                                                );
-                                            })()}
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div><label className={labelClass}>Código de Cliente</label><input type="text" name="codigoCliente" value={form.codigoCliente} onChange={handleChange} className={inputClass} placeholder="000001" /></div>
-                                    <div><label className={labelClass}>Nombre / Razón Social</label><input type="text" name="nombre" value={form.nombre} onChange={handleChange} className={inputClass} placeholder="Ej: Panadería La Esperanza" /></div>
-                                    <div><label className={labelClass}>RFC</label><input type="text" name="rfc" value={form.rfc} onChange={handleChange} className={inputClass} placeholder="XAXX010101000" /></div>
-                                    <div><label className={labelClass}>Agente</label><input type="text" name="agente" value={form.agente} onChange={handleChange} className={inputClass} placeholder="Nombre del agente" /></div>
-                                    <div className="col-span-2"><label className={labelClass}>Domicilio Completo</label><input type="text" name="domicilio" value={form.domicilio} onChange={handleChange} className={inputClass} placeholder="Calle, Número, Colonia, Ciudad, Estado, CP" /></div>
-                                    <div><label className={labelClass}>Uso CFDI</label><select name="usoCFDI" value={form.usoCFDI} onChange={handleChange} className={inputClass}><option value="S01">S01 — Sin efectos fiscales</option><option value="G01">G01 — Adquisición de mercancias</option><option value="G03">G03 — Gastos en general</option><option value="P01">P01 — Por definir</option><option value="CP01">CP01 — Pagos</option></select></div>
-                                    <div><label className={labelClass}>Observaciones</label><input type="text" name="observaciones" value={form.observaciones} onChange={handleChange} className={inputClass} placeholder="Notas adicionales" /></div>
-                                    <div><label className={labelClass}>Tipo Relación</label><select name="tipoRelacion" value={form.tipoRelacion} onChange={handleChange} className={inputClass}><option value="">— Ninguna —</option><option value="01">01 — Nota de crédito</option><option value="04">04 — Sustitución</option></select></div>
-                                    <div><label className={labelClass}>CFDI Relacionado</label><input type="text" name="cfdiRelacionado" value={form.cfdiRelacionado} onChange={handleChange} className={inputClass} placeholder="UUID del comprobante" /></div>
-                                </div>
-                            </div>
-
-                            {/* Card 3: Conceptos — CON SELECTOR DE PRODUCTOS */}
-                            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 shadow-sm">
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="flex items-center gap-2"><ShoppingCart className="w-4 h-4 text-blue-700 dark:text-blue-400" /><h4 className="font-semibold text-blue-900 dark:text-blue-300 text-sm">Conceptos (Items)</h4></div>
-                                    <button type="button" onClick={addConcepto} className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-200 dark:border-blue-800 rounded-lg transition-colors"><Plus className="w-3 h-3" /> Agregar</button>
-                                </div>
-                                <div className="space-y-4">
-                                    {form.conceptos.map((c, idx) => (
-                                        <div key={c.id} className="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50 dark:bg-slate-900">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Artículo #{idx + 1}</span>
-                                                    {getPriceBadge(c.productoId)}
-                                                </div>
-                                                {form.conceptos.length > 1 && (<button type="button" onClick={() => removeConcepto(c.id)} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>)}
-                                            </div>
-
-                                            {/* Selector de producto */}
-                                            <div className="mb-2">
-                                                <label className={labelClass}>Seleccionar Producto</label>
-                                                <SearchableDropdown<ProductoItem>
-                                                    items={productos}
-                                                    value={c.productoId}
-                                                    onChange={(prod) => handleSelectProducto(c.id, prod)}
-                                                    renderItem={(p) => (
-                                                        <div className="flex justify-between items-center gap-4">
-                                                            <span><span className="font-mono text-[10px] text-slate-400 mr-1.5">{p.codigoInterno}</span>{p.descripcion}</span>
-                                                            <span className="text-slate-400 shrink-0">${p.precioLista.toFixed(2)}</span>
-                                                        </div>
-                                                    )}
-                                                    renderSelected={(p) => `${p.codigoInterno} — ${p.descripcion}`}
-                                                    placeholder="— Buscar producto —"
-                                                    searchPlaceholder="Código o descripción..."
-                                                    disabled={isLoadingData}
-                                                />
-                                            </div>
-
-                                            <div className="grid grid-cols-3 gap-2">
-                                                <div><label className={labelClass}>Cantidad</label><input type="number" value={c.cantidad} onChange={(e) => updateConcepto(c.id, 'cantidad', e.target.value)} className={inputClass} placeholder="1" /></div>
-                                                <div><label className={labelClass}>Unidad SAT</label><input type="text" value={c.unidadSat} onChange={(e) => updateConcepto(c.id, 'unidadSat', e.target.value)} className={inputClass} placeholder="H87" /></div>
-                                                <div><label className={labelClass}>Clave SAT</label><input type="text" value={c.claveSat} onChange={(e) => updateConcepto(c.id, 'claveSat', e.target.value)} className={inputClass} placeholder="50171529" /></div>
-                                                <div className="col-span-3"><label className={labelClass}>Concepto (Descripción)</label><input type="text" value={c.concepto} onChange={(e) => updateConcepto(c.id, 'concepto', e.target.value)} className={inputClass} placeholder="Describe el producto o servicio" /></div>
-                                                <div><label className={labelClass}>Valor Unitario</label><input type="number" value={c.valorUnitario} onChange={(e) => updateConcepto(c.id, 'valorUnitario', e.target.value)} className={inputClass} placeholder="0.00" /></div>
-                                                <div><label className={labelClass}>Descuento</label><input type="number" value={c.descuento} onChange={(e) => updateConcepto(c.id, 'descuento', e.target.value)} className={inputClass} placeholder="0.00" /></div>
-                                                <div><label className={labelClass}>% Impuesto</label><select value={c.porcImpuesto} onChange={(e) => updateConcepto(c.id, 'porcImpuesto', e.target.value)} className={inputClass}><option value="16">16% IVA</option><option value="8">8% IVA</option><option value="0">0% Exento</option></select></div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
+                            {/* RIGHT - PDF Preview (Plantilla CFDI Inline) */}
+                            <div className="w-full h-full bg-gray-200 overflow-auto" style={{ padding: 16 }}>
+                                {renderPDFPreview()}
                             </div>
                         </div>
-
-                        {/* RIGHT - PDF Preview (Plantilla CFDI Inline) */}
-                        <div className="w-full h-full bg-gray-200 overflow-auto" style={{ padding: 16 }}>
-                          <div className="bg-white shadow-lg mx-auto" style={{ width: 680, minHeight: 880, fontFamily: 'Arial, sans-serif', fontSize: 8, lineHeight: 1.4, color: '#000', padding: '12px 16px 20px' }}>
-
-                            {/* =============== HEADER: Logo + Emisor + Factura =============== */}
-                            <div style={{ display: 'flex', marginBottom: 8 }}>
-                              {/* Logo */}
-                              <div style={{ width: 110, flexShrink: 0, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 6 }}>
-                                <ChefHat size={72} strokeWidth={1} color="#1a6ab5" />
-                              </div>
-                              {/* Emisor Info */}
-                              <div style={{ flex: 1, textAlign: 'center', paddingTop: 4 }}>
-                                <p style={{ fontWeight: 'bold', fontSize: 12, textTransform: 'uppercase', marginBottom: 2 }}>VIANEY OMARA MIRANDA CASTRO</p>
-                                <p style={{ marginBottom: 1 }}>MICV9209288D2</p>
-                                <p style={{ marginBottom: 1 }}>612  Personas Físicas con Actividades Empresariales y Profesionales</p>
-                                <p style={{ marginBottom: 1 }}>Blvd. Samuel Ocaña entre Puerto de Ensenada y Vicente</p>
-                                <p style={{ marginBottom: 1 }}>Suarez 400'2 Col Lopez Portillo CP. 83556</p>
-                                <p style={{ marginBottom: 3 }}>Puerto Peñasco, Sonora, Mexico</p>
-                                <p style={{ marginBottom: 0 }}>Tel: 638 102 1180</p>
-                              </div>
-                              {/* Factura Info */}
-                              <div style={{ width: 175, flexShrink: 0, textAlign: 'left', paddingTop: 2, fontSize: 7.5 }}>
-                                <p style={{ fontWeight: 'bold', fontSize: 11, marginBottom: 6 }}>Factura</p>
-                                <table style={{ width: '100%', borderCollapse: 'collapse' }}><tbody>
-                                  <tr><td style={{ padding: '1px 0', whiteSpace: 'nowrap' }}>Serie: {form.serie || 'MH'}</td></tr>
-                                  <tr><td style={{ padding: '1px 0' }}>Folio: {form.folio || '—'}</td></tr>
-                                  <tr><td style={{ padding: '1px 0' }}>Fecha: {form.fecha}</td></tr>
-                                  <tr><td style={{ padding: '1px 0' }}>Hora: {form.hora}</td></tr>
-                                  <tr><td style={{ padding: '1px 0', lineHeight: 1.2 }}>Tipo de compro-<br/>bante: &nbsp;&nbsp;{form.tipoComprobante || 'I'}- Ingreso</td></tr>
-                                  <tr><td style={{ padding: '1px 0', lineHeight: 1.2 }}>Lugar de<br/>expedición CP: {form.lugarExpedicion || '83556'}</td></tr>
-                                  <tr><td style={{ padding: '1px 0' }}>Versión del comprobante: 4.0</td></tr>
-                                </tbody></table>
-                              </div>
-                            </div>
-
-                            {/* =============== DATOS DEL CLIENTE =============== */}
-                            <div style={{ border: '1px solid #000', padding: '4px 8px', marginBottom: 8, fontSize: 7.5 }}>
-                              <p style={{ marginBottom: 4 }}><b>Datos del cliente:</b></p>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                                <span>Codigo Cliente: {form.codigoCliente || '01023'}</span>
-                                <span>Agente: {form.agente || '1'}</span>
-                              </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                                <span>Cliente: {form.nombre || 'Publico en General'}</span>
-                                <span>Uso CFDI: {form.usoCFDI || 'S01'} Sin efectos fiscales</span>
-                              </div>
-                              <div style={{ marginBottom: 2 }}>RFC: {form.rfc || 'XAXX010101000'}</div>
-                              <div style={{ marginBottom: 3 }}>Domicilio: {form.domicilio || 'AVE. PUERTO DE ENSENADA S/N LOPEZ PORTILLO  C.P. 83556 PTO. PEÑASCO, SONORA, MEXICO'}</div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                                <span>Método de pago: {form.metodoPago || 'PPD'}-Pago en parcialidades o diferido</span>
-                                <span>Forma de pago: {form.formaPago || '99'} - Por definir</span>
-                              </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span>Moneda: {form.moneda || 'MXN'} - Peso Mexicano</span>
-                                <span>Observaciones: {form.observaciones || ''}</span>
-                              </div>
-                            </div>
-
-                            {/* =============== TABLA DE CONCEPTOS =============== */}
-                            <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: 7, marginBottom: 8 }}>
-                              <thead>
-                                <tr style={{ background: '#e0e0e0' }}>
-                                  {[
-                                    { h: 'CANT', w: 30 }, { h: 'UNIDAD\nSAT', w: 40 }, { h: 'CLAVE\nSAT', w: 45 },
-                                    { h: 'CONCEPTO' }, { h: 'V.U.', w: 48 }, { h: 'DESC', w: 30 },
-                                    { h: 'SUBTOT\nAL', w: 52 }, { h: 'PORC.\nIMP', w: 32 }, { h: 'IMPUESTOS', w: 65 }, { h: 'TOTAL', w: 55 }
-                                  ].map(({ h, w }) => (
-                                    <th key={h} style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', whiteSpace: 'pre-line', fontWeight: 'bold', width: w, verticalAlign: 'bottom' }}>{h}</th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {form.conceptos.map((c: any) => {
-                                  const { subtotal, impuestos, total } = calcConcepto(c);
-                                  return (
-                                    <tr key={c.id}>
-                                      <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center' }}>{c.cantidad || ''}</td>
-                                      <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center' }}>{c.unidadSat || ''} - Pieza</td>
-                                      <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', fontSize: 6.5 }}>{c.claveSat || ''}</td>
-                                      <td style={{ border: '1px solid #000', padding: '2px 3px', fontSize: 7 }}>
-                                        {c.claveSat || ''} {c.concepto || '—'}
-                                        <br/><span style={{ fontSize: 6.5, color: '#555' }}>Pedimento: Aduana: Fecha:</span>
-                                      </td>
-                                      <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'right' }}>{c.valorUnitario ? `$${fmt(parseFloat(c.valorUnitario))}` : ''}</td>
-                                      <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center' }}>{c.descuento ? `${c.descuento}%` : '0%'}</td>
-                                      <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'right' }}>${fmt(subtotal)}</td>
-                                      <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center' }}>{c.porcImpuesto} %</td>
-                                      <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'left', fontSize: 6.5 }}>IVA - Importe: {fmt(impuestos)}</td>
-                                      <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'right' }}>${fmt(total)}</td>
-                                    </tr>
-                                  );
-                                })}
-                                {form.conceptos.length < 4 && Array.from({ length: 4 - form.conceptos.length }).map((_, i) => (
-                                  <tr key={`e${i}`} style={{ height: 18 }}>
-                                    {Array.from({ length: 10 }).map((__, j) => (
-                                      <td key={j} style={{ border: '1px solid #000', padding: '2px 3px' }}>&nbsp;</td>
-                                    ))}
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-
-                            {/* =============== TOTALES: Importe con letra + QR | Montos =============== */}
-                            <div style={{ display: 'flex', marginBottom: 10, fontSize: 7.5 }}>
-                              {/* Lado izquierdo: Importe con letra, tipo relación, QR */}
-                              <div style={{ flex: 1, paddingRight: 16 }}>
-                                <p style={{ marginBottom: 6, textDecoration: 'underline' }}>
-                                  IMPORTE CON LETRA: <span style={{ textTransform: 'uppercase' }}>{toLetras(totalFinal)}</span>
-                                </p>
-                                <div style={{ marginTop: 8 }}>
-                                  <p style={{ marginBottom: 3 }}>TIPO DE RELACION: {form.tipoRelacion || '-'}</p>
-                                  <p style={{ marginBottom: 8 }}>CFDI RELACIONADO: {form.cfdiRelacionado || ''}</p>
+                    ) : (
+                        <div className="flex-1 overflow-hidden flex flex-col">
+                            {step === 'capture' ? (
+                                <div className="flex-1 overflow-y-auto p-5 bg-slate-50 dark:bg-slate-900 space-y-4">
+                                    {renderFormCards(true)}
                                 </div>
-                                {/* QR Code placeholder */}
-                                <div style={{ width: 100, height: 100, border: '2px solid #000', background: 'repeating-conic-gradient(#333 0% 25%, #fff 0% 50%) 0 0 / 5px 5px', position: 'relative', overflow: 'hidden' }}>
-                                  <div style={{ position: 'absolute', inset: '15%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <div style={{ width: 20, height: 20, background: '#000' }} />
-                                  </div>
+                            ) : (
+                                <div className="flex-1 w-full h-full bg-gray-200 overflow-auto flex justify-center items-start py-5">
+                                    {renderPDFPreview()}
                                 </div>
-                              </div>
-                              {/* Lado derecho: Tabla de montos */}
-                              <div style={{ width: 200, flexShrink: 0, paddingTop: 2 }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 7.5 }}><tbody>
-                                  <tr><td style={{ padding: '2px 6px', textAlign: 'right' }}>Subtotal:</td><td style={{ padding: '2px 6px', textAlign: 'right', width: 80 }}>${fmt(totalSubtotal)}</td></tr>
-                                  <tr><td style={{ padding: '2px 6px', textAlign: 'right' }}>IEPS:</td><td style={{ padding: '2px 6px', textAlign: 'right' }}>$0.00</td></tr>
-                                  <tr><td style={{ padding: '2px 6px', textAlign: 'right' }}>IEPS C.:</td><td style={{ padding: '2px 6px', textAlign: 'right' }}>$0.00</td></tr>
-                                  <tr><td style={{ padding: '2px 6px', textAlign: 'right' }}>IVA:</td><td style={{ padding: '2px 6px', textAlign: 'right' }}>${fmt(totalImpuestos)}</td></tr>
-                                  <tr><td style={{ padding: '2px 6px', textAlign: 'right' }}>Descuento:</td><td style={{ padding: '2px 6px', textAlign: 'right' }}>${fmt(totalDesc)}</td></tr>
-                                  <tr style={{ borderTop: '1px solid #000' }}><td style={{ padding: '2px 6px', textAlign: 'right', fontWeight: 'bold' }}>Total:</td><td style={{ padding: '2px 6px', textAlign: 'right', fontWeight: 'bold' }}>${fmt(totalFinal)}</td></tr>
-                                </tbody></table>
-                              </div>
-                            </div>
-
-                            {/* =============== INFO FISCAL =============== */}
-                            <div style={{ marginBottom: 6, fontSize: 7 }}>
-                              <p style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 8, marginBottom: 6 }}>Este documento es una representación impresa de un CFDI</p>
-                              <table style={{ width: '100%', borderCollapse: 'collapse' }}><tbody>
-                                <tr><td style={{ border: '1px solid #000', padding: '2px 8px' }}>Serie del Certificado del emisor: 00001000000508225085</td></tr>
-                                <tr><td style={{ border: '1px solid #000', borderTop: 'none', padding: '2px 8px' }}>Folio Fiscal: FA476ECB-C78D-42F9-A9EB-D8A9322FB87C</td></tr>
-                                <tr><td style={{ border: '1px solid #000', borderTop: 'none', padding: '2px 8px' }}>No. de serie del Certificado del SAT: 00001000000505142236</td></tr>
-                                <tr><td style={{ border: '1px solid #000', borderTop: 'none', padding: '2px 8px' }}>Fecha y hora de certificación: {form.fecha}T{form.hora}:05</td></tr>
-                              </tbody></table>
-                              <p style={{ textAlign: 'right', fontSize: 6.5, marginTop: 3 }}>*Efectos fiscales al pago</p>
-                            </div>
-
-                            {/* =============== SELLOS =============== */}
-                            <div style={{ marginBottom: 6 }}>
-                              {/* Sello digital del CFDI */}
-                              <div style={{ border: '1px solid #000', marginBottom: 4 }}>
-                                <div style={{ background: '#d0d0d0', padding: '2px 8px', textAlign: 'center', fontSize: 7, fontWeight: 'bold' }}>Sello digital del CFDI</div>
-                                <div style={{ padding: '3px 8px', fontSize: 5.5, wordBreak: 'break-all', fontFamily: 'monospace', lineHeight: 1.3 }}>
-                                  g1hVudoRwyMP3ogrEiA5orgGaWAN5WCgttza5rdFDhK5yWHssWUqqqAX+KMUwGW64dS0or9twwpBSx1eZ+MKJV7J2PmfADKv6e0fnML3prAN5EDA54uMEFDJgDAhdroFDWz0gTjG4+Qog6ZznNF1FtUfROXo20HPl9GlKjMtaOvP0v51NLUFER0mWOPHsg
-                                </div>
-                              </div>
-                              {/* Sello del SAT */}
-                              <div style={{ border: '1px solid #000', marginBottom: 4 }}>
-                                <div style={{ background: '#d0d0d0', padding: '2px 8px', textAlign: 'center', fontSize: 7, fontWeight: 'bold' }}>Sello del SAT</div>
-                                <div style={{ padding: '3px 8px', fontSize: 5.5, wordBreak: 'break-all', fontFamily: 'monospace', lineHeight: 1.3 }}>
-                                  fkzxgXrcvfXlP6apKG1sFu5tXAxLGc0xi0rp0w/R2K5BOYrD5Sc65vbRnTn1zV0vozmkMhPs58ejEcfaJ1my1xJu6ty7bWfYDBkrtpR8IuOB34Kkn7gPC5z/XfNKd6uzGj3mjyeNm0En
-                                </div>
-                              </div>
-                              {/* Cadena original */}
-                              <div style={{ border: '1px solid #000' }}>
-                                <div style={{ background: '#d0d0d0', padding: '2px 8px', textAlign: 'center', fontSize: 7, fontWeight: 'bold' }}>Cadena original del complemento de la certificación digital del SAT</div>
-                                <div style={{ padding: '3px 8px', fontSize: 5.5, wordBreak: 'break-all', fontFamily: 'monospace', lineHeight: 1.3 }}>
-                                  ||1.1|FA476ECB-C78D-42F9-A9EB-D8A9322FB87C|{form.fecha}T{form.hora}:05|INT021024I62|mnattocprdxyMAdoScrdLj6TqgrpsfM8tiSW+MuczeoegfzINIQcMovJP+Sv64Q0qqAxHKMUwGW64dS0or9twwpBSx1eZ+MKJV7J2PmfADKv6e0fnML3prAN5EDA54uMEFDJgDAhdroF||
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* =============== PAGARÉ =============== */}
-                            <div style={{ border: '1px solid #000', padding: '5px 10px', marginTop: 6, fontSize: 7 }}>
-                              <p style={{ textAlign: 'center', fontWeight: 'bold', textTransform: 'uppercase', textDecoration: 'underline', marginBottom: 4, fontSize: 8 }}>PAGARE</p>
-                              <p style={{ textAlign: 'justify', marginBottom: 8, lineHeight: 1.5 }}>
-                                DEBO(EMOS) Y PAGARE(MOS) INCONDICIONALMENTE Y SIN PRETEXTO POR ESTE PAGARE A LA ORDEN DE VIANEY OMARA MIRANDA CASTRO LA CANTIDAD DE{' '}
-                                <span style={{ textTransform: 'uppercase' }}>{toLetras(totalFinal)}</span>{' '}
-                                ({form.moneda} ${fmt(totalFinal)}) EN LA CIUDAD DE __ EL DIA DE SU VENCIMIENTO, PAGAREMOS ADEMAS INTERESES MORATORIOS HASTA SU LIQUIDACION TOTAL A RAZON DEL 3% MENSUAL SIN QUE ESTO SE CONSIDERE EL PLAZO FIJADO PARA EL CUMPLIMIENTO DE ESTA OBLIGACION.
-                              </p>
-                              <p style={{ fontSize: 7.5, marginTop: 8 }}>ACEPTO Y PAGARE: _______________________</p>
-                            </div>
-
-                          </div>
+                            )}
                         </div>
-                    </div >
+                    )}
 
                     {/* FOOTER */}
-                    < div className="px-6 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0 flex justify-end gap-3" >
+                    <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0 flex justify-between gap-3">
                         <button type="button" onClick={handleClose} className="px-6 py-2 rounded-xl text-slate-500 dark:text-slate-400 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 transition-colors">Cancelar</button>
-                        <button type="button" className="px-6 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition-all active:scale-95 shadow-md shadow-blue-500/20">Generar Factura</button>
-                    </div >
-                </div >
-            </div >
-        </div >
+
+                        <div className="flex gap-3">
+                            {viewMode === 'tabular' && step === 'preview' && (
+                                <button type="button" onClick={() => setStep('capture')} className="px-6 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all">Atrás a Captura</button>
+                            )}
+
+                            {viewMode === 'tabular' && step === 'capture' ? (
+                                <button type="button" onClick={() => setStep('preview')} className="px-6 py-2 rounded-xl bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white text-sm font-bold transition-all shadow-md">Siguiente (Vista Previa)</button>
+                            ) : (
+                                <button type="button" className="px-6 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition-all active:scale-95 shadow-md shadow-blue-500/20">Generar Factura</button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }
+

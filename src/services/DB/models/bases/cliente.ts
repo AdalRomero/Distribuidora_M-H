@@ -2,6 +2,7 @@ import { Model, Query } from '@nozbe/watermelondb'
 import { field, text, date, readonly, children } from '@nozbe/watermelondb/decorators'
 import PrecioEspecialCliente from '../catalogo/precioEspecialCliente'
 import Documento from '../registros/documento'
+import Contacto from './contacto'
 
 export default class Cliente extends Model {
   static table = 'clientes'
@@ -22,4 +23,5 @@ export default class Cliente extends Model {
 
   @children('precios_especiales_clientes') preciosEspeciales!: Query<PrecioEspecialCliente>
   @children('documentos') documentos!: Query<Documento>
+  @children('contactos') contactos!: Query<Contacto>
 }
