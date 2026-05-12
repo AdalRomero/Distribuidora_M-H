@@ -1,6 +1,6 @@
-import { ChefHat } from 'lucide-react';
 import React from 'react';
 import { BlockType } from '../../../types/invoice-builder';
+import { LOGO_MH_B64 } from '../../../constants/logo_base64';
 
 const fmt = (n: number) => n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 function toLetras(num: number): string { if (num === 0) return 'CERO PESOS 00/100 M.N.'; const entero = Math.floor(num); const dec = Math.round((num - entero) * 100); return `${entero.toLocaleString()} PESOS ${dec.toString().padStart(2, '0')}/100 M.N.`; }
@@ -26,7 +26,7 @@ export default function InvoiceBlockRenderer({ type, form, calcConcepto, totals 
       return (
         <div style={{ display: 'flex', width: '100%', height: '100%', paddingTop: 4 }}>
           <div style={{ width: 120, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', paddingTop: 10 }}>
-            <ChefHat size={60} strokeWidth={1} color="#0052cc" />
+            <img src={`data:image/svg+xml;base64,${LOGO_MH_B64}`} alt="Logo MH" style={{ width: 60, height: 60, objectFit: 'contain' }} />
           </div>
           <div style={{ flex: 1, textAlign: 'center', paddingRight: 6 }}>
             <p style={{ fontWeight: 'bold', fontSize: 11, textTransform: 'uppercase', marginBottom: 2 }}>VIANEY OMARA MIRANDA CASTRO</p>
@@ -35,9 +35,6 @@ export default function InvoiceBlockRenderer({ type, form, calcConcepto, totals 
             <p style={{ marginBottom: 1, fontSize: 8 }}>Blvd. Samuel Ocaña entre Puerto de Ensenada y Vicente Suarez 400/2 Col Lopez Portillo CP. 83556</p>
             <p style={{ marginBottom: 1, fontSize: 8 }}>Puerto Peñasco, Sonora, Mexico</p>
             <p style={{ fontSize: 8 }}>Tel: 638 102 1180</p>
-            <div style={{ border: '1px solid #ccc', margin: '8px auto', padding: 4, width: '90%', color: '#666', fontSize: 6, textAlign: 'left' }}>
-              Image: No se puede encontrar una parte de la ruta de acceso &apos;E:\Compac\Empresas\Reportes\Formatos Digitales\REPTES_Cliente\imagenes_DSCFacturaFinal\BANNER1.png&apos;.
-            </div>
           </div>
         </div>
       );

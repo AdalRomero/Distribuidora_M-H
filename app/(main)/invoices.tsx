@@ -1,57 +1,98 @@
-import { Clock, Eye, FileCheck, FileCode, FileMinus, FileText, Plus, Search, TrendingUp } from 'lucide-react';
-import { Fragment, useState, useMemo, useEffect } from 'react';
+import { Clock, Eye, FileCheck, FileCode, FileMinus, FileText, Loader2, Plus, Search, TrendingUp } from 'lucide-react';
+import { Fragment, useState, useMemo, useEffect, useCallback } from 'react';
 import AddInvoice from '../../components/ui/modals/AddInvoice';
 import SyncErrorBanner, { SyncError } from "../../components/ui/SyncErrorBanner";
 import { useSyncErrors } from "../../src/hooks/useSyncErrors";
+import { database } from '../../src/services/DB/indexBD';
+import { Q } from '@nozbe/watermelondb';
 
 interface Partida { id: string; producto: string; cantidad: number; precioUnitario: number; descuentoAplicado: number; }
 interface Invoice {
     id: string; folio: string; tipoDocumento: 'Factura' | 'Prefactura/Cotización' | 'Nota de Devolución' | 'Nota de Crédito';
-    cliente: string; versionCFDI: string; estado: 'Timbrada/Pagada' | 'En espera (Standby)' | 'Cancelada'; total: number; partidas: Partida[];
+    cliente: string; versionCFDI: string; estado: 'Timbrada/Pagada' | 'En espera (Standby)' | 'Cancelada' | 'Generada'; total: number; partidas: Partida[];
 }
-
-const mockInvoices: Invoice[] = [
-    {
-        id: '1', folio: 'FAC-2026-089', tipoDocumento: 'Factura', cliente: 'Panadería El Trigo S.A de C.V.', versionCFDI: 'CFDI v4.0', estado: 'Timbrada/Pagada', total: 12450.00, partidas: [
-            { id: 'p1', producto: 'Harina Selecta 50kg', cantidad: 5, precioUnitario: 1200, descuentoAplicado: 10 },
-            { id: 'p2', producto: 'Azúcar Refinada 25kg', cantidad: 2, precioUnitario: 800, descuentoAplicado: 0 },
-            { id: 'p3', producto: 'Levadura Fresca', cantidad: 10, precioUnitario: 450, descuentoAplicado: 5 },
-        ]
-    },
-    {
-        id: '2', folio: 'COT-2026-004', tipoDocumento: 'Prefactura/Cotización', cliente: 'Dulces La Estrella', versionCFDI: 'N/A', estado: 'En espera (Standby)', total: 5600.50, partidas: [
-            { id: 'p4', producto: 'Colorante Rojo Caramelo', cantidad: 3, precioUnitario: 700, descuentoAplicado: 0 },
-            { id: 'p5', producto: 'Esencia de Vainilla 1L', cantidad: 5, precioUnitario: 350, descuentoAplicado: 15 },
-        ]
-    },
-    {
-        id: '3', folio: 'FAC-2026-088', tipoDocumento: 'Factura', cliente: 'Bodega Aurrera - Sur', versionCFDI: 'CFDI v4.0', estado: 'Cancelada', total: 3200.00, partidas: [
-            { id: 'p6', producto: 'Cajas de Cartón Corrugado', cantidad: 100, precioUnitario: 32, descuentoAplicado: 0 },
-        ]
-    },
-    {
-        id: '4', folio: 'NC-2026-012', tipoDocumento: 'Nota de Crédito', cliente: 'Panadería Rosa', versionCFDI: 'CFDI v4.0', estado: 'Timbrada/Pagada', total: -850.00, partidas: [
-            { id: 'p7', producto: 'Devolución de Levadura (Caducada)', cantidad: 2, precioUnitario: 425, descuentoAplicado: 0 },
-        ]
-    },
-    {
-        id: '5', folio: 'COT-2026-005', tipoDocumento: 'Prefactura/Cotización', cliente: 'Restaurante El Cometa', versionCFDI: 'N/A', estado: 'En espera (Standby)', total: 18400.00, partidas: [
-            { id: 'p8', producto: 'Aceite Vegetal 20L', cantidad: 10, precioUnitario: 850, descuentoAplicado: 5 },
-            { id: 'p9', producto: 'Manteca de Cerdo 10kg', cantidad: 5, precioUnitario: 600, descuentoAplicado: 0 },
-            { id: 'p10', producto: 'Sal Yodada 50kg', cantidad: 20, precioUnitario: 150, descuentoAplicado: 0 },
-            { id: 'p11', producto: 'Sazonador Universal 5kg', cantidad: 4, precioUnitario: 975, descuentoAplicado: 10 },
-        ]
-    },
-];
 
 export default function Invoices() {
     const [searchTerm, setSearchTerm] = useState('');
     const [showAddInvoice, setShowAddInvoice] = useState(false);
     const [recoverData, setRecoverData] = useState<any>(null);
     const [recoveringErrorId, setRecoveringErrorId] = useState<string | null>(null);
+    const [invoices, setInvoices] = useState<Invoice[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
     const tablesToWatch = useMemo(() => ["documentos", "documentos_detalles"], []);
     const { syncErrors, handleDismissError } = useSyncErrors(tablesToWatch);
+
+    // ==========================================
+    // CARGAR FACTURAS DESDE DB
+    // ==========================================
+    const loadInvoices = useCallback(async () => {
+        try {
+            setIsLoading(true);
+            const docsCollection = database.collections.get('documentos');
+            const allDocs = await docsCollection.query().fetch();
+
+            const mapped: Invoice[] = await Promise.all(allDocs.map(async (doc: any) => {
+                // Cargar detalles
+                const detallesCollection = database.collections.get('documentos_detalles');
+                const detalles = await detallesCollection.query(Q.where('documento_id', doc.id)).fetch();
+
+                // Obtener nombre del cliente
+                let clienteNombre = 'Público General';
+                try {
+                    if (doc._raw.cliente_id && doc._raw.cliente_id !== 'publico_general') {
+                        const clienteRecord = await database.collections.get('clientes').find(doc._raw.cliente_id);
+                        clienteNombre = (clienteRecord as any).nombre || clienteNombre;
+                    }
+                } catch { /* cliente no encontrado */ }
+
+                // Mapear tipo
+                const tipoMap: Record<string, Invoice['tipoDocumento']> = {
+                    'factura': 'Factura',
+                    'prefactura': 'Prefactura/Cotización',
+                    'cotizacion': 'Prefactura/Cotización',
+                    'nota_devolucion': 'Nota de Devolución',
+                    'nota_credito': 'Nota de Crédito',
+                };
+
+                // Mapear estado
+                const estadoMap: Record<string, Invoice['estado']> = {
+                    'generada': 'Generada',
+                    'timbrada': 'Timbrada/Pagada',
+                    'pagada': 'Timbrada/Pagada',
+                    'cancelada': 'Cancelada',
+                    'standby': 'En espera (Standby)',
+                };
+
+                return {
+                    id: doc.id,
+                    folio: doc.folio || 'SIN-FOLIO',
+                    tipoDocumento: tipoMap[doc.tipo] || 'Factura',
+                    cliente: clienteNombre,
+                    versionCFDI: doc.tipo === 'factura' ? 'CFDI v4.0' : 'N/A',
+                    estado: estadoMap[doc.estado] || 'Generada',
+                    total: doc.total || 0,
+                    partidas: detalles.map((d: any) => ({
+                        id: d.id,
+                        producto: d.descripcionAplicada || 'Producto',
+                        cantidad: d.cantidad || 0,
+                        precioUnitario: d.precioUnitarioAplicado || 0,
+                        descuentoAplicado: d.descuentoAplicado || 0,
+                    })),
+                } as Invoice;
+            }));
+
+            setInvoices(mapped);
+        } catch (err) {
+            console.error('Error cargando facturas:', err);
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadInvoices();
+    }, [loadInvoices]);
 
     useEffect(() => {
         const autoRecoverId = new URLSearchParams(window.location.search).get("recoverErrorId");
@@ -67,7 +108,7 @@ export default function Invoices() {
         setShowAddInvoice(true);
     };
 
-    const filteredInvoices = mockInvoices.filter(inv =>
+    const filteredInvoices = invoices.filter(inv =>
         inv.folio.toLowerCase().includes(searchTerm.toLowerCase()) ||
         inv.cliente.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -86,6 +127,7 @@ export default function Invoices() {
             case 'Timbrada/Pagada': return 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50';
             case 'En espera (Standby)': return 'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700';
             case 'Cancelada': return 'bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/50';
+            case 'Generada': return 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800/50';
             default: return 'bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700';
         }
     };
@@ -119,19 +161,19 @@ export default function Invoices() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                         <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
                             <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-mh-blue dark:text-blue-500"><TrendingUp className="w-6 h-6" /></div>
-                            <div><p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ventas del Mes</p><p className="text-xl font-bold text-mh-blue-dark dark:text-white">$145,230.00</p></div>
+                            <div><p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Facturado</p><p className="text-xl font-bold text-mh-blue-dark dark:text-white">{formatCurrency(invoices.filter(i => i.total > 0).reduce((s, i) => s + i.total, 0))}</p></div>
                         </div>
                         <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
                             <div className="w-12 h-12 rounded-xl bg-slate-50 dark:bg-slate-900 flex items-center justify-center text-slate-500 dark:text-slate-400"><Clock className="w-6 h-6" /></div>
-                            <div><p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Cotizaciones en Espera</p><p className="text-xl font-bold text-mh-blue-dark dark:text-white">12</p></div>
+                            <div><p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Documentos Generados</p><p className="text-xl font-bold text-mh-blue-dark dark:text-white">{invoices.filter(i => i.estado === 'Generada').length}</p></div>
                         </div>
                         <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
                             <div className="w-12 h-12 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-500"><FileMinus className="w-6 h-6" /></div>
-                            <div><p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Notas de Crédito</p><p className="text-xl font-bold text-mh-blue-dark dark:text-white">3</p></div>
+                            <div><p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Notas de Crédito</p><p className="text-xl font-bold text-mh-blue-dark dark:text-white">{invoices.filter(i => i.tipoDocumento === 'Nota de Crédito').length}</p></div>
                         </div>
                         <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
                             <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-500"><FileCheck className="w-6 h-6" /></div>
-                            <div><p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Timbrados SAT</p><p className="text-xl font-bold text-mh-blue-dark dark:text-white">89</p></div>
+                            <div><p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Documentos</p><p className="text-xl font-bold text-mh-blue-dark dark:text-white">{invoices.length}</p></div>
                         </div>
                     </div>
 
@@ -201,8 +243,11 @@ export default function Invoices() {
                                             </tr>
                                         );
                                     })}
-                                    {filteredInvoices.length === 0 && (
-                                        <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400">No se encontraron documentos relacionados a la búsqueda.</td></tr>
+                                    {isLoading && (
+                                        <tr><td colSpan={6} className="px-6 py-12 text-center"><div className="flex items-center justify-center gap-2 text-slate-400"><Loader2 className="w-5 h-5 animate-spin" /><span>Cargando documentos...</span></div></td></tr>
+                                    )}
+                                    {!isLoading && filteredInvoices.length === 0 && (
+                                        <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400">{searchTerm ? 'No se encontraron documentos relacionados a la búsqueda.' : 'Aún no hay documentos generados. Crea tu primera factura.'}</td></tr>
                                     )}
                                 </tbody>
                             </table>
@@ -216,6 +261,7 @@ export default function Invoices() {
                     setRecoveringErrorId(null);
                     setRecoverData(null);
                 }
+                loadInvoices();
             }} />
         </Fragment>
     );

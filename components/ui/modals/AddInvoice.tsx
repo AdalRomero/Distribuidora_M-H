@@ -1,6 +1,9 @@
-import { ChefHat, ChevronDown, FileText, Loader2, Plus, Search, ShoppingCart, Trash2, User, X } from 'lucide-react';
+import { AlertCircle, Check, ChevronDown, FileText, Loader2, Plus, Printer, Search, ShoppingCart, Trash2, User, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { database } from '../../../src/services/DB/indexBD';
+import { useAuth } from '../../../src/context/AuthContext';
+import * as Crypto from 'expo-crypto';
+import { LOGO_MH_B64 } from '../../../constants/logo_base64';
 
 interface AddInvoiceProps { isOpen: boolean; onClose: () => void; recoverData?: any; onSaveSuccess?: () => void; }
 interface Concepto { id: string; cantidad: string; unidadSat: string; claveSat: string; concepto: string; valorUnitario: string; descuento: string; porcImpuesto: string; productoId: string; }
@@ -16,7 +19,7 @@ const initialForm: InvoiceForm = { serie: 'A', folio: '1', fecha: new Date().toI
 const inputClass = 'w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors';
 const labelClass = 'block text-xs font-medium text-slate-600 dark:text-slate-300 mb-0.5';
 
-function calcConcepto(c: Concepto) { const cant = parseFloat(c.cantidad) || 0; const vu = parseFloat(c.valorUnitario) || 0; const desc = parseFloat(c.descuento) || 0; const porc = parseFloat(c.porcImpuesto) || 0; const subtotal = cant * vu; const impuestos = subtotal * (porc / 100); const total = subtotal - desc + impuestos; return { subtotal, impuestos, total }; }
+function calcConcepto(c: Concepto) { const cant = parseFloat(c.cantidad) || 0; const vu = parseFloat(c.valorUnitario) || 0; const descPorc = parseFloat(c.descuento) || 0; const porc = parseFloat(c.porcImpuesto) || 0; const subtotal = cant * vu; const descMonto = subtotal * (descPorc / 100); const baseGravable = subtotal - descMonto; const impuestos = baseGravable * (porc / 100); const total = baseGravable + impuestos; return { subtotal, descMonto, impuestos, total }; }
 const fmt = (n: number) => n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 function toLetras(num: number): string { if (num === 0) return 'CERO PESOS 00/100 M.N.'; const entero = Math.floor(num); const dec = Math.round((num - entero) * 100); return `${entero.toLocaleString()} PESOS ${dec.toString().padStart(2, '0')}/100 M.N.`; }
 
@@ -80,15 +83,20 @@ function SearchableDropdown<T extends { id: string }>({ items, value, onChange, 
 }
 
 export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess }: AddInvoiceProps) {
+    const { userId } = useAuth();
     const [form, setForm] = useState<InvoiceForm>(initialForm);
     const [viewMode, setViewMode] = useState<'simultaneous' | 'tabular'>('simultaneous');
     const [step, setStep] = useState<'capture' | 'preview'>('capture');
+    const previewRef = useRef<HTMLDivElement>(null);
 
     // Data from DB
     const [clientes, setClientes] = useState<ClienteItem[]>([]);
     const [productos, setProductos] = useState<ProductoItem[]>([]);
     const [preciosEspeciales, setPreciosEspeciales] = useState<PrecioEspecial[]>([]);
     const [isLoadingData, setIsLoadingData] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
+    const [saveSuccess, setSaveSuccess] = useState(false);
 
     // ==========================================
     // CARGAR DATOS AL ABRIR
@@ -128,6 +136,16 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
                 id: pe.id, clienteId: pe._raw.cliente_id || '', productoId: pe._raw.producto_id || '',
                 descuentoPorcentaje: pe.descuentoPorcentaje || 0, precioFijo: pe.precioFijo || 0,
             })));
+
+            // Auto-generar folio si es nueva factura (no recovery)
+            if (!recoverData) {
+                try {
+                    const docsDb = database.collections.get('documentos');
+                    const allDocs = await docsDb.query().fetch();
+                    const nextFolio = String(allDocs.length + 1).padStart(3, '0');
+                    setForm(prev => ({ ...prev, folio: nextFolio }));
+                } catch { /* keep default folio */ }
+            }
         } catch (err) {
             console.error('Error cargando datos para factura:', err);
         } finally {
@@ -225,13 +243,122 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => { const { name, value } = e.target; setForm(prev => ({ ...prev, [name]: value })); };
-    const handleClose = () => { setForm(initialForm); onClose(); };
+    const handleClose = () => { setForm(initialForm); setSaveError(null); setSaveSuccess(false); onClose(); };
     const updateConcepto = (id: string, field: keyof Concepto, value: string) => { setForm(prev => ({ ...prev, conceptos: prev.conceptos.map(c => c.id === id ? { ...c, [field]: value } : c) })); };
     const addConcepto = () => setForm(prev => ({ ...prev, conceptos: [...prev.conceptos, newConcepto()] }));
+
+    // ==========================================
+    // GENERAR FACTURA: Guardar en DB + PDF
+    // ==========================================
+    const handleGenerateInvoice = async () => {
+        setSaveError(null);
+        setSaveSuccess(false);
+
+        // Validaciones
+        const conceptosValidos = form.conceptos.filter(c => c.concepto.trim() && parseFloat(c.cantidad) > 0 && parseFloat(c.valorUnitario) > 0);
+        if (conceptosValidos.length === 0) {
+            setSaveError('Agrega al menos un concepto con cantidad y valor unitario.');
+            return;
+        }
+        if (!form.nombre.trim()) {
+            setSaveError('Selecciona o escribe el nombre del cliente.');
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const folioCompleto = `${form.serie}-${form.folio}`;
+
+            await database.write(async () => {
+                const docId = Crypto.randomUUID();
+
+                // 1. Crear documento principal
+                const docsCollection = database.collections.get('documentos');
+                await docsCollection.create((doc: any) => {
+                    doc._raw.id = docId;
+                    doc._raw.cliente_id = form.clienteId || 'publico_general';
+                    doc._raw.usuario_id = userId || 'unknown';
+                    doc.tipo = 'factura';
+                    doc.folio = folioCompleto;
+                    doc.estado = 'generada';
+                    doc.subtotal = totalSubtotal;
+                    doc.totalImpuestos = totalImpuestos;
+                    doc.total = totalFinal;
+                });
+
+                // 2. Crear detalles por cada concepto válido
+                const detallesCollection = database.collections.get('documentos_detalles');
+                for (const concepto of conceptosValidos) {
+                    const detalleId = Crypto.randomUUID();
+                    const calc = calcConcepto(concepto);
+                    await detallesCollection.create((det: any) => {
+                        det._raw.id = detalleId;
+                        det._raw.documento_id = docId;
+                        det._raw.producto_id = concepto.productoId || 'manual';
+                        det.cantidad = parseFloat(concepto.cantidad);
+                        det.descripcionAplicada = concepto.concepto;
+                        det.precioUnitarioAplicado = parseFloat(concepto.valorUnitario);
+                        det.descuentoAplicado = calc.descMonto;
+                        det.jsonImpuestosAplicados = JSON.stringify({
+                            iva: parseFloat(concepto.porcImpuesto) || 0,
+                            montoIva: calc.impuestos,
+                        });
+                    });
+                }
+            });
+
+            setSaveSuccess(true);
+            if (onSaveSuccess) onSaveSuccess();
+
+            // Generar y descargar PDF
+            await handleDownloadPDF();
+
+        } catch (err: any) {
+            console.error('Error al guardar factura:', err);
+            setSaveError('Error al guardar: ' + (err.message || 'Error desconocido'));
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    // ==========================================
+    // DESCARGAR PDF
+    // ==========================================
+    const handleDownloadPDF = async () => {
+        if (!previewRef.current) return;
+
+        try {
+            // @ts-ignore — html2pdf.js no tiene types oficiales
+            const html2pdf = (await import('html2pdf.js')).default;
+
+            const element = previewRef.current;
+            const folioName = `Factura_${form.serie}-${form.folio}_${form.nombre.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30)}`;
+
+            const opt = {
+                margin: [4, 4, 4, 4] as [number, number, number, number],
+                filename: `${folioName}.pdf`,
+                image: { type: 'jpeg' as const, quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true, logging: false },
+                jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' as const },
+            };
+
+            await html2pdf().set(opt).from(element).save();
+        } catch (err) {
+            console.error('Error al generar PDF:', err);
+            // Fallback: abrir ventana de impresión
+            const printWindow = window.open('', '_blank', 'width=800,height=1000');
+            if (printWindow && previewRef.current) {
+                printWindow.document.write(`<html><head><title>Factura ${form.serie}-${form.folio}</title><style>body{margin:0;padding:16px;font-family:Arial,sans-serif;}</style></head><body>${previewRef.current.innerHTML}</body></html>`);
+                printWindow.document.close();
+                printWindow.focus();
+                printWindow.print();
+            }
+        }
+    };
     const removeConcepto = (id: string) => setForm(prev => ({ ...prev, conceptos: prev.conceptos.filter(c => c.id !== id) }));
 
     const totalSubtotal = form.conceptos.reduce((s, c) => s + calcConcepto(c).subtotal, 0);
-    const totalDesc = form.conceptos.reduce((s, c) => s + (parseFloat(c.descuento) || 0), 0);
+    const totalDesc = form.conceptos.reduce((s, c) => s + calcConcepto(c).descMonto, 0);
     const totalImpuestos = form.conceptos.reduce((s, c) => s + calcConcepto(c).impuestos, 0);
     const totalFinal = form.conceptos.reduce((s, c) => s + calcConcepto(c).total, 0);
 
@@ -435,13 +562,13 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
     );
 
     const renderPDFPreview = () => (
-        <div className="bg-white shadow-lg mx-auto" style={{ width: 680, minHeight: 880, fontFamily: 'Arial, sans-serif', fontSize: 8, lineHeight: 1.4, color: '#000', padding: '12px 16px 20px' }}>
+        <div ref={previewRef} className="bg-white shadow-lg mx-auto" style={{ width: 680, minHeight: 880, fontFamily: 'Arial, sans-serif', fontSize: 8, lineHeight: 1.4, color: '#000', padding: '12px 16px 20px' }}>
 
             {/* =============== HEADER: Logo + Emisor + Factura =============== */}
             <div style={{ display: 'flex', marginBottom: 8 }}>
                 {/* Logo */}
                 <div style={{ width: 110, flexShrink: 0, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 6 }}>
-                    <ChefHat size={72} strokeWidth={1} color="#1a6ab5" />
+                    <img src={`data:image/svg+xml;base64,${LOGO_MH_B64}`} alt="Logo MH" style={{ width: 72, height: 72, objectFit: 'contain' }} />
                 </div>
                 {/* Emisor Info */}
                 <div style={{ flex: 1, textAlign: 'center', paddingTop: 4 }}>
@@ -671,8 +798,20 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
                     )}
 
                     {/* FOOTER */}
-                    <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0 flex justify-between gap-3">
-                        <button type="button" onClick={handleClose} className="px-6 py-2 rounded-xl text-slate-500 dark:text-slate-400 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 transition-colors">Cancelar</button>
+                    <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0 flex justify-between items-center gap-3">
+                        <div className="flex items-center gap-3">
+                            <button type="button" onClick={handleClose} className="px-6 py-2 rounded-xl text-slate-500 dark:text-slate-400 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 transition-colors">Cancelar</button>
+                            {saveError && (
+                                <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400 text-xs font-medium bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800">
+                                    <AlertCircle className="w-3.5 h-3.5" />{saveError}
+                                </span>
+                            )}
+                            {saveSuccess && (
+                                <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 text-xs font-bold bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                                    <Check className="w-3.5 h-3.5" />Factura guardada y PDF generado
+                                </span>
+                            )}
+                        </div>
 
                         <div className="flex gap-3">
                             {viewMode === 'tabular' && step === 'preview' && (
@@ -682,7 +821,15 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
                             {viewMode === 'tabular' && step === 'capture' ? (
                                 <button type="button" onClick={() => setStep('preview')} className="px-6 py-2 rounded-xl bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white text-sm font-bold transition-all shadow-md">Siguiente (Vista Previa)</button>
                             ) : (
-                                <button type="button" className="px-6 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition-all active:scale-95 shadow-md shadow-blue-500/20">Generar Factura</button>
+                                <button
+                                    type="button"
+                                    onClick={handleGenerateInvoice}
+                                    disabled={isSaving}
+                                    className={`flex items-center gap-2 px-6 py-2 rounded-xl text-white text-sm font-bold transition-all active:scale-95 shadow-md shadow-blue-500/20 ${isSaving ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                                >
+                                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+                                    {isSaving ? 'Guardando...' : 'Generar Factura'}
+                                </button>
                             )}
                         </div>
                     </div>

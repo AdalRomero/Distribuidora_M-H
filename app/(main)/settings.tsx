@@ -64,9 +64,9 @@ export default function Settings() {
             { id: '2', cantidad: '5', unidadSat: 'H87', claveSat: '50161500', concepto: 'Azúcar Refinada 25kg', valorUnitario: '800.00', descuento: '50', porcImpuesto: '16' },
         ]
     };
-    const calcConcepto = (c: any) => { const cant = parseFloat(c.cantidad) || 0; const vu = parseFloat(c.valorUnitario) || 0; const desc = parseFloat(c.descuento) || 0; const porc = parseFloat(c.porcImpuesto) || 0; const subtotal = cant * vu; const impuestos = subtotal * (porc / 100); const total = subtotal - desc + impuestos; return { subtotal, impuestos, total }; };
+    const calcConcepto = (c: any) => { const cant = parseFloat(c.cantidad) || 0; const vu = parseFloat(c.valorUnitario) || 0; const descPorc = parseFloat(c.descuento) || 0; const porc = parseFloat(c.porcImpuesto) || 0; const subtotal = cant * vu; const descMonto = subtotal * (descPorc / 100); const baseGravable = subtotal - descMonto; const impuestos = baseGravable * (porc / 100); const total = baseGravable + impuestos; return { subtotal, descMonto, impuestos, total }; };
     const totalSubtotal = dummyForm.conceptos.reduce((s, c) => s + calcConcepto(c).subtotal, 0);
-    const totalDesc = dummyForm.conceptos.reduce((s, c) => s + (parseFloat(c.descuento) || 0), 0);
+    const totalDesc = dummyForm.conceptos.reduce((s, c) => s + calcConcepto(c).descMonto, 0);
     const totalImpuestos = dummyForm.conceptos.reduce((s, c) => s + calcConcepto(c).impuestos, 0);
     const totalFinal = dummyForm.conceptos.reduce((s, c) => s + calcConcepto(c).total, 0);
 
