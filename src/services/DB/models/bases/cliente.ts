@@ -6,6 +6,11 @@ import Contacto from './contacto'
 
 export default class Cliente extends Model {
   static table = 'clientes'
+  static associations = {
+    precios_especiales_clientes: { type: 'has_many' as const, foreignKey: 'cliente_id' },
+    documentos: { type: 'has_many' as const, foreignKey: 'cliente_id' },
+    contactos: { type: 'has_many' as const, foreignKey: 'cliente_id' },
+  };
 
   @text('nombre') nombre!: string
   @text('rfc') rfc!: string

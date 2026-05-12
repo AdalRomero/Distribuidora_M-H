@@ -3,12 +3,13 @@ import withObservables from "@nozbe/with-observables";
 import * as Crypto from "expo-crypto";
 import {
   AlertTriangle,
+  ChevronDown,
   Clock,
   DollarSign,
   Download,
   Package,
   Plus,
-  Search,
+  Search
 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import AddEntry from "../../components/ui/modals/AddEntry";
@@ -16,11 +17,12 @@ import AddInventory from "../../components/ui/modals/AddInventory";
 import EditLote from "../../components/ui/modals/EditLote";
 import WarningModal from "../../components/ui/modals/WarningModal";
 import ProductLotsView from "../../components/ui/ProductLotsView";
-import ProductRow from "../../components/ui/ProductRow";
+import ProductRow, { calculateAlertLevel, AlertLevel } from "../../components/ui/ProductRow";
 import SyncErrorBanner, {
   SyncError,
 } from "../../components/ui/SyncErrorBanner";
 import { useSyncErrors } from "../../src/hooks/useSyncErrors";
+import { useLocalSearchParams } from "expo-router";
 import { database } from "../../src/services/DB/indexBD";
 import FamiliaModel from "../../src/services/DB/models/bases/familia";
 import LoteModel from "../../src/services/DB/models/catalogo/lote";
@@ -30,10 +32,12 @@ import { syncApp } from "../../src/sync";
 interface InventoryProps {
   productos: ProductoModel[];
   familias: FamiliaModel[];
+  allLotes: LoteModel[];
 }
 
-function InventoryContent({ productos, familias }: InventoryProps) {
-  const [searchTerm, setSearchTerm] = useState("");
+function InventoryContent({ productos, familias, allLotes }: InventoryProps) {
+  const params = useLocalSearchParams();
+  const [searchTerm, setSearchTerm] = useState((params.search as string) || "");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAddEntryOpen, setIsAddEntryOpen] = useState(false);
   const [filterFamilia, setFilterFamilia] = useState("");
@@ -41,6 +45,12 @@ function InventoryContent({ productos, familias }: InventoryProps) {
   const [deleteProduct, setDeleteProduct] = useState<ProductoModel | null>(
     null,
   );
+  const [selectedAlertFilters, setSelectedAlertFilters] = useState<AlertLevel[]>([]);
+  const [matchingProductIdsByLote, setMatchingProductIdsByLote] = useState<
+    Set<string>
+  >(new Set());
+  const [isFamiliaDropdownOpen, setIsFamiliaDropdownOpen] = useState(false);
+  const [familiaSearchTerm, setFamiliaSearchTerm] = useState("");
 
   const handleDelete = (producto: ProductoModel) => {
     setDeleteProduct(producto);
@@ -68,14 +78,47 @@ function InventoryContent({ productos, familias }: InventoryProps) {
     syncApp().catch(console.error);
   };
 
+  const productAlertLevels = useMemo(() => {
+    const map: Record<string, AlertLevel> = {};
+    
+    // Agrupar lotes por producto para encontrar el nivel de alerta más crítico
+    allLotes.forEach(lote => {
+      const prodId = (lote as any)._raw.producto_id;
+      const prod = productos.find(p => p.id === prodId);
+      if (!prod || !lote.estado) return;
+
+      const { level } = calculateAlertLevel(
+        lote.fechaCaducidad, 
+        prod.umbralVerdeDias ?? 90, 
+        prod.umbralAmarilloDias ?? 30
+      );
+
+      const current = map[prodId];
+      // Orden de prioridad: black > red > yellow > green
+      if (level === 'black') map[prodId] = 'black';
+      else if (level === 'red' && current !== 'black') map[prodId] = 'red';
+      else if (level === 'yellow' && !['black', 'red'].includes(current || '')) map[prodId] = 'yellow';
+      else if (level === 'green' && !current) map[prodId] = 'green';
+    });
+
+    return map;
+  }, [allLotes, productos]);
+
   const filteredProductos = productos
     .filter((p) => {
       const matchesSearch =
         p.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.codigoInterno.toLowerCase().includes(searchTerm.toLowerCase());
+        p.codigoInterno.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        matchingProductIdsByLote.has(p.id);
+      
       const matchesFamilia =
         !filterFamilia || (p as any)._raw.familia_id === filterFamilia;
-      return matchesSearch && matchesFamilia;
+
+      // Filtro de Alertas
+      const alertLevel = productAlertLevels[p.id] || "none";
+      const matchesAlert = selectedAlertFilters.length === 0 || selectedAlertFilters.includes(alertLevel);
+
+      return matchesSearch && matchesFamilia && matchesAlert;
     })
     .sort((a, b) => {
       // Activos primero, inactivos (elimiandos lógicos) al final
@@ -102,9 +145,13 @@ function InventoryContent({ productos, familias }: InventoryProps) {
   } | null>(null);
 
   useEffect(() => {
-    const autoRecoverId = new URLSearchParams(window.location.search).get(
-      "recoverErrorId",
-    );
+    if (params.search) {
+      setSearchTerm(params.search as string);
+    }
+  }, [params.search]);
+
+  useEffect(() => {
+    const autoRecoverId = params.recoverErrorId as string;
     if (autoRecoverId && syncErrors.length > 0) {
       const err = syncErrors.find((e) => e.id === autoRecoverId);
       if (err) triggerRecoveryWrapper(err);
@@ -130,6 +177,54 @@ function InventoryContent({ productos, familias }: InventoryProps) {
   const [selectedProduct, setSelectedProduct] = useState<ProductoModel | null>(
     null,
   );
+
+  // Search by Lote logic
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setMatchingProductIdsByLote(new Set());
+      return;
+    }
+
+    const findLotes = async () => {
+      try {
+        const lotes = await database.collections
+          .get("lotes")
+          .query(
+            Q.where(
+              "identificador_lote",
+              Q.like(`%${Q.sanitizeLikeString(searchTerm.trim())}%`),
+            ),
+            Q.where("estado", true),
+          )
+          .fetch();
+        setMatchingProductIdsByLote(
+          new Set(lotes.map((l) => (l as any)._raw.producto_id)),
+        );
+      } catch (error) {
+        console.error("Error searching lotes:", error);
+      }
+    };
+
+    const timer = setTimeout(findLotes, 300); // Debounce
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const selectedFamilia = useMemo(
+    () => familias.find((f) => f.id === filterFamilia),
+    [familias, filterFamilia],
+  );
+
+  const filteredFamiliasOptions = useMemo(() => {
+    return familias
+      .filter((f) => f.estado)
+      .filter(
+        (f) =>
+          f.nombre.toLowerCase().includes(familiaSearchTerm.toLowerCase()) ||
+          f.codigoFamilia
+            .toLowerCase()
+            .includes(familiaSearchTerm.toLowerCase()),
+      );
+  }, [familias, familiaSearchTerm]);
   const [editLoteData, setEditLoteData] = useState<LoteModel | null>(null);
   const [deleteLote, setDeleteLote] = useState<LoteModel | null>(null);
 
@@ -318,52 +413,148 @@ function InventoryContent({ productos, familias }: InventoryProps) {
               />
             </div>
             <div className="flex gap-3">
-              <select
-                value={filterFamilia}
-                onChange={(e) => setFilterFamilia(e.target.value)}
-                className="px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border-none rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
-              >
-                <option value="">Todas las Familias</option>
-                {familias
-                  .filter((f) => f.estado)
-                  .map((fam) => (
-                    <option key={fam.id} value={fam.id}>
-                      {fam.codigoFamilia}-{fam.nombre}
-                    </option>
-                  ))}
-              </select>
+              <div className="relative min-w-[200px]">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setIsFamiliaDropdownOpen(!isFamiliaDropdownOpen)
+                  }
+                  className="w-full flex items-center justify-between gap-3 px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border-none rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 focus:ring-2 focus:ring-blue-500 outline-none transition-all hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <span className="truncate">
+                    {selectedFamilia
+                      ? `${selectedFamilia.codigoFamilia}-${selectedFamilia.nombre}`
+                      : "Todas las Familias"}
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 transition-transform ${isFamiliaDropdownOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                {isFamiliaDropdownOpen && (
+                  <>
+                    {/* Backdrop for closing */}
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setIsFamiliaDropdownOpen(false)}
+                    />
+
+                    <div className="absolute top-full right-0 mt-2 w-full min-w-[240px] bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
+                      <div className="p-2 border-b border-slate-50 dark:border-slate-700">
+                        <div className="relative">
+                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                          <input
+                            type="text"
+                            className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-900 border-none rounded-lg text-xs outline-none focus:ring-1 focus:ring-blue-500"
+                            placeholder="Buscar familia..."
+                            value={familiaSearchTerm}
+                            onChange={(e) =>
+                              setFamiliaSearchTerm(e.target.value)
+                            }
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-[300px] overflow-y-auto p-1 custom-scrollbar">
+                        <button
+                          onClick={() => {
+                            setFilterFamilia("");
+                            setIsFamiliaDropdownOpen(false);
+                            setFamiliaSearchTerm("");
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors ${!filterFamilia ? "bg-blue-50 text-blue-600 dark:bg-blue-900/30" : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50"}`}
+                        >
+                          Todas las Familias
+                        </button>
+                        <div className="h-px bg-slate-50 dark:bg-slate-700 my-1" />
+                        {filteredFamiliasOptions.length === 0 ? (
+                          <div className="px-3 py-4 text-center text-[10px] text-slate-400">
+                            No se encontraron familias
+                          </div>
+                        ) : (
+                          filteredFamiliasOptions.map((fam) => (
+                            <button
+                              key={fam.id}
+                              onClick={() => {
+                                setFilterFamilia(fam.id);
+                                setIsFamiliaDropdownOpen(false);
+                                setFamiliaSearchTerm("");
+                              }}
+                              className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors mb-0.5 ${filterFamilia === fam.id ? "bg-blue-50 text-blue-600 dark:bg-blue-900/30" : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50"}`}
+                            >
+                              <div className="flex flex-col">
+                                <span className="text-[10px] opacity-60 uppercase tracking-tighter font-bold">
+                                  {fam.codigoFamilia}
+                                </span>
+                                <span className="truncate">{fam.nombre}</span>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         )}
 
-        {/* Alert Legend */}
+        {/* Alert Legend / Filters */}
         {!selectedProduct && (
           <div className="flex flex-wrap items-center gap-3 mb-4 px-1">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Avisos:
+              Filtrar por estado:
             </span>
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 rounded-full border border-emerald-200">
-              <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-              <span className="text-[10px] font-bold text-emerald-700">OK</span>
-            </div>
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-50 rounded-full border border-amber-200">
-              <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-              <span className="text-[10px] font-bold text-amber-700">
-                Precaución
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-rose-50 rounded-full border border-rose-200">
-              <div className="w-2 h-2 rounded-full bg-rose-500"></div>
-              <span className="text-[10px] font-bold text-rose-700">
-                Urgente
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-900 rounded-full border border-gray-700">
-              <div className="w-2 h-2 rounded-full bg-white"></div>
-              <span className="text-[10px] font-bold text-white">
-                Vencido/Inactivo
-              </span>
-            </div>
+            
+            <button 
+              onClick={() => setSelectedAlertFilters(prev => 
+                prev.includes('green') ? prev.filter(f => f !== 'green') : [...prev, 'green']
+              )}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border transition-all ${selectedAlertFilters.includes('green') ? 'bg-emerald-500 border-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20' : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'}`}
+            >
+              <div className={`w-2 h-2 rounded-full ${selectedAlertFilters.includes('green') ? 'bg-white' : 'bg-emerald-500'}`}></div>
+              <span className="text-[10px] font-bold">SEGURO</span>
+            </button>
+
+            <button 
+              onClick={() => setSelectedAlertFilters(prev => 
+                prev.includes('yellow') ? prev.filter(f => f !== 'yellow') : [...prev, 'yellow']
+              )}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border transition-all ${selectedAlertFilters.includes('yellow') ? 'bg-amber-400 border-amber-500 text-amber-900 shadow-sm ring-2 ring-amber-500/20' : 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'}`}
+            >
+              <div className={`w-2 h-2 rounded-full ${selectedAlertFilters.includes('yellow') ? 'bg-amber-900' : 'bg-amber-500'}`}></div>
+              <span className="text-[10px] font-bold">PRECAUCIÓN</span>
+            </button>
+
+            <button 
+              onClick={() => setSelectedAlertFilters(prev => 
+                prev.includes('red') ? prev.filter(f => f !== 'red') : [...prev, 'red']
+              )}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border transition-all ${selectedAlertFilters.includes('red') ? 'bg-rose-500 border-rose-600 text-white shadow-sm ring-2 ring-rose-500/20' : 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100'}`}
+            >
+              <div className={`w-2 h-2 rounded-full ${selectedAlertFilters.includes('red') ? 'bg-white' : 'bg-rose-500'}`}></div>
+              <span className="text-[10px] font-bold">RIESGO</span>
+            </button>
+
+            <button 
+              onClick={() => setSelectedAlertFilters(prev => 
+                prev.includes('black') ? prev.filter(f => f !== 'black') : [...prev, 'black']
+              )}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border transition-all ${selectedAlertFilters.includes('black') ? 'bg-slate-900 border-black text-white shadow-sm ring-2 ring-slate-900/20' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'}`}
+            >
+              <div className={`w-2 h-2 rounded-full ${selectedAlertFilters.includes('black') ? 'bg-white' : 'bg-slate-900'}`}></div>
+              <span className="text-[10px] font-bold">VENCIDO</span>
+            </button>
+
+            {selectedAlertFilters.length > 0 && (
+              <button 
+                onClick={() => setSelectedAlertFilters([])}
+                className="text-[10px] font-bold text-slate-400 hover:text-slate-600 underline underline-offset-4 ml-1"
+              >
+                Limpiar filtros
+              </button>
+            )}
           </div>
         )}
 
@@ -385,7 +576,7 @@ function InventoryContent({ productos, familias }: InventoryProps) {
                     <th className="px-6 py-4">Producto</th>
                     <th className="px-6 py-4">Clasificación</th>
                     <th className="px-6 py-4">Fiscal y Finanzas</th>
-                    <th className="px-6 py-4">Lote y Origen</th>
+
                     <th className="px-6 py-4">Existencia y Cad</th>
                     <th className="px-6 py-4 text-center">Acciones</th>
                   </tr>
@@ -498,5 +689,9 @@ export default withObservables([], () => ({
   familias: database.collections
     .get<FamiliaModel>("familias")
     .query()
+    .observe(),
+  allLotes: database.collections
+    .get<LoteModel>("lotes")
+    .query(Q.where("estado", true))
     .observe(),
 }))(InventoryContent);
