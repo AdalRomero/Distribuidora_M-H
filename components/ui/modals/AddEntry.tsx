@@ -53,7 +53,8 @@ function AddEntryInner({
   const [costo, setCosto] = useState("");
   const [unidad, setUnidad] = useState("pzas");
   const [caducidad, setCaducidad] = useState("");
-  const [codigoAlterno, setCodigoAlterno] = useState("");
+  const [codigosAlternos, setCodigosAlternos] = useState<string[]>([]);
+  const [currentBarcode, setCurrentBarcode] = useState("");
 
   const [ultimoCosto, setUltimoCosto] = useState<number | null>(null);
   const [productoMargen, setProductoMargen] = useState<MargenModel | null>(
@@ -161,7 +162,8 @@ function AddEntryInner({
     setCosto("");
     setUnidad("pzas");
     setCaducidad("");
-    setCodigoAlterno("");
+    setCodigosAlternos([]);
+    setCurrentBarcode("");
     setUltimoCosto(null);
     setProductoMargen(null);
     setProductoImpuestosTasas([]);
@@ -206,14 +208,14 @@ function AddEntryInner({
             mi.cantidad = parseInt(cantidad, 10);
           });
 
-        // 3. Create CodigoAlterno if provided
-        if (codigoAlterno.trim()) {
+        // 3. Create CodigoAlterno records if provided
+        for (const code of codigosAlternos) {
           await database
             .get<CodigoAlterno>("codigos_alternos")
             .create((ca) => {
               (ca as any)._raw.id = Crypto.randomUUID();
               (ca as any)._raw.producto_id = productoId;
-              ca.codigoBarras = codigoAlterno.trim();
+              ca.codigoBarras = code.trim();
             });
         }
       });
@@ -377,30 +379,62 @@ function AddEntryInner({
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-2">
                     <Barcode className="w-4 h-4 text-indigo-500" />
-                    Código Alterno (Barras)
+                    Códigos Alternos (Escanear + Enter)
                   </label>
-                  <input
-                    type="text"
-                    className={inputClass}
-                    placeholder="Ej. 7501234567890"
-                    value={codigoAlterno}
-                    onChange={(e) => setCodigoAlterno(e.target.value)}
-                  />
-                  <p className="text-xs text-slate-400 mt-1">
-                    Código del proveedor o de barras para este lote
-                  </p>
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      className={inputClass}
+                      placeholder="Escanea o escribe y pulsa Enter..."
+                      value={currentBarcode}
+                      onChange={(e) => setCurrentBarcode(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const code = currentBarcode.trim();
+                          if (code && !codigosAlternos.includes(code)) {
+                            setCodigosAlternos([...codigosAlternos, code]);
+                            setCurrentBarcode("");
+                          }
+                        }
+                      }}
+                    />
+                    
+                    {/* Tags Display */}
+                    <div className="flex flex-wrap gap-2">
+                      {codigosAlternos.map((code, idx) => (
+                        <div 
+                          key={`${code}-${idx}`}
+                          className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-3 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-800 animate-in zoom-in-95 duration-200"
+                        >
+                          <span className="text-xs font-bold tracking-tight">{code}</span>
+                          <button
+                            type="button"
+                            onClick={() => setCodigosAlternos(prev => prev.filter(c => c !== code))}
+                            className="hover:text-indigo-900 dark:hover:text-white transition-colors"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      {codigosAlternos.length === 0 && (
+                        <p className="text-[10px] text-slate-400 font-medium italic">
+                          No hay códigos adicionales registrados
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {productoId &&
                   caducidad &&
                   (() => {
                     const prod = productos.find((p) => p.id === productoId);
-                    const fam = prod
-                      ? familias.find(
-                          (f) => f.id === (prod as any)._raw?.familia_id,
-                        )
-                      : null;
-                    if (!fam) return null;
+                    if (!prod) return null;
+
+                    const umbralVerde = prod.umbralVerdeDias ?? 90;
+                    const umbralAmarillo = prod.umbralAmarilloDias ?? 30;
+
                     const today = new Date();
                     const expDate = new Date(caducidad);
                     const daysRemaining = Math.ceil(
@@ -410,21 +444,21 @@ function AddEntryInner({
                     let levelColor = "emerald";
                     let levelText = "OK — Verde";
                     if (daysRemaining <= 0) {
-                      levelColor = "gray";
+                      levelColor = "slate";
                       levelText = "VENCIDO — Negro";
-                    } else if (daysRemaining <= fam.umbralAmarilloDias) {
+                    } else if (daysRemaining <= umbralAmarillo) {
                       levelColor = "rose";
-                      levelText = `Urgente — Rojo (${daysRemaining} días)`;
-                    } else if (daysRemaining <= fam.umbralVerdeDias) {
+                      levelText = `RIESGO — Rojo (${daysRemaining} días)`;
+                    } else if (daysRemaining <= umbralVerde) {
                       levelColor = "amber";
-                      levelText = `Precaución — Amarillo (${daysRemaining} días)`;
+                      levelText = `PRECAUCIÓN — Amarillo (${daysRemaining} días)`;
                     } else {
-                      levelText = `OK — Verde (${daysRemaining} días)`;
+                      levelText = `SEGURO — Verde (${daysRemaining} días)`;
                     }
 
                     return (
                       <div
-                        className={`mt-2 px-4 py-3 rounded-xl border ${daysRemaining <= 0 ? "bg-gray-900 border-gray-700" : `bg-${levelColor}-50 border-${levelColor}-200`}`}
+                        className={`mt-2 px-4 py-3 rounded-xl border ${daysRemaining <= 0 ? "bg-slate-900 border-black" : `bg-${levelColor}-50 border-${levelColor}-200`}`}
                       >
                         <p
                           className={`text-xs font-bold ${daysRemaining <= 0 ? "text-white" : `text-${levelColor}-700`}`}

@@ -32,6 +32,8 @@ export interface NotificationItem {
   actionUrl?: string; // a dónde redirigir al dar click
 }
 
+const ACKNOWLEDGED_LOTS_KEY = "dist_mh_acknowledged_lots";
+
 /* ─── Priority helpers ─── */
 const priorityConfig: Record<
   NotificationPriority,
@@ -195,30 +197,67 @@ export default function NotificationFlyoutMenu() {
         };
       });
 
-      // ---- Aquí podríamos agregar logic para consultar la tabla de "lotes" cuya fecha de caducidad venció ----
-      // Como mock representativo para "lotes vencidos" si no está disponible la fecha todavía
+      // ---- Lotes Vencidos y Próximos a Vencer ----
       const lotesDb = database.collections.get("lotes");
       const lotes = (await lotesDb.query().fetch()) as any[];
+      const prodsDb = database.collections.get("productos");
+      const productos = (await prodsDb.query().fetch()) as any[];
+      
       const now = Date.now();
-      const expiredLotes = lotes.filter(
-        (l) => l.fechaCaducidad && l.fechaCaducidad < now,
-      );
+      const oneDay = 1000 * 60 * 60 * 24;
 
-      expiredLotes.forEach((l) => {
-        newItems.push({
-          id: `lote_vencido_${l.id}`,
-          title: "Lote Vencido Encontrado",
-          message: `El lote ${l.identificadorLote} ya expiró. Fue encontrado el inventario.`,
-          timestamp: timeAgo(l.fechaCaducidad),
-          priority: "critica",
-          status: "unread",
-          type: "lote_vencido",
-          actionUrl: "/inventory",
-        });
+      // Cargar IDs ya reconocidos (Enterado)
+      let acknowledgedIds: string[] = [];
+      try {
+        const stored = localStorage.getItem(ACKNOWLEDGED_LOTS_KEY);
+        if (stored) acknowledgedIds = JSON.parse(stored);
+      } catch (e) {}
+
+      lotes.forEach((l) => {
+        if (!l.fechaCaducidad || !l.estado || acknowledgedIds.includes(l.id)) return;
+
+        const prod = productos.find(p => p.id === l._raw.producto_id);
+        if (!prod) return;
+
+        const umbralVerde = prod.umbralVerdeDias ?? 90;
+        const umbralAmarillo = prod.umbralAmarilloDias ?? 30;
+        
+        const daysRemaining = Math.ceil((l.fechaCaducidad - now) / oneDay);
+        
+        let priority: NotificationPriority | null = null;
+        let title = "";
+        let message = "";
+
+        if (daysRemaining <= 0) {
+          priority = "critica";
+          title = "Lote Vencido Encontrado";
+          message = `El lote ${l.identificadorLote} ya expiró. Fue encontrado en el inventario.`;
+        } else if (daysRemaining <= umbralAmarillo) {
+          priority = "alta";
+          title = "Lote con Riesgo Crítico";
+          message = `El lote ${l.identificadorLote} vence en ${daysRemaining} días. Requiere atención inmediata.`;
+        } else if (daysRemaining <= umbralVerde) {
+          priority = "media";
+          title = "Próxima Caducidad";
+          message = `El lote ${l.identificadorLote} vence en ${daysRemaining} días. Considera su rotación.`;
+        }
+
+        if (priority) {
+          newItems.push({
+            id: `lote_${priority}_${l.id}`,
+            title,
+            message,
+            timestamp: timeAgo(l.fechaCaducidad),
+            priority,
+            status: "unread",
+            type: "lote_vencido", // Usamos este tipo para manejar el dismiss de lotes
+            actionUrl: `/inventory?search=${l.identificadorLote}`,
+          });
+        }
       });
 
       // Sort by newest
-      setItems(newItems.reverse()); // Reverse para mostrar al final de inserción (simulando los ultimos)
+      setItems(newItems.reverse()); 
     } catch (e) {
       console.error("Error cargando notificaciones de la base de datos:", e);
     }
@@ -264,11 +303,30 @@ export default function NotificationFlyoutMenu() {
           await record.destroyPermanently();
         });
       }
-      setItems((prev) => prev.filter((n) => n.id !== id));
+    setItems((prev) => prev.filter((n) => n.id !== id));
     } catch (e) {
       console.error(e);
       setItems((prev) => prev.filter((n) => n.id !== id));
     }
+  };
+
+  const acknowledgeLot = (notifId: string) => {
+    // Extraer el id del lote del id de la notificación (lote_priority_id)
+    const parts = notifId.split('_');
+    const loteId = parts[parts.length - 1];
+    
+    try {
+      const stored = localStorage.getItem(ACKNOWLEDGED_LOTS_KEY);
+      const acknowledgedIds: string[] = stored ? JSON.parse(stored) : [];
+      if (!acknowledgedIds.includes(loteId)) {
+        acknowledgedIds.push(loteId);
+        localStorage.setItem(ACKNOWLEDGED_LOTS_KEY, JSON.stringify(acknowledgedIds));
+      }
+    } catch (e) {
+      console.error("Error saving acknowledgment", e);
+    }
+    
+    setItems((prev) => prev.filter((n) => n.id !== notifId));
   };
 
   const handleNotificationClick = (notif: NotificationItem) => {
@@ -482,6 +540,21 @@ export default function NotificationFlyoutMenu() {
                             className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
                             onClick={(e) => e.stopPropagation()}
                           >
+                            {notif.type === "lote_vencido" && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  acknowledgeLot(notif.id);
+                                }}
+                                className="flex items-center gap-1.5 px-2 py-1 rounded-md text-emerald-500 hover:bg-emerald-50 transition-colors"
+                                title="Marcar como enterado"
+                              >
+                                <CheckCheck size={13} />
+                                <span className="text-[10px] font-bold uppercase">
+                                  Enterado
+                                </span>
+                              </button>
+                            )}
                             {notif.type === "error_sync" && (
                               <button
                                 onClick={() => dismissError(notif.id)}

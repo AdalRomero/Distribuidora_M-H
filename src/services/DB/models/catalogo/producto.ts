@@ -41,8 +41,16 @@ export default class Producto extends Model {
   @field("precio_lista") precioLista!: number;
   @field("precio_mayoreo") precioMayoreo!: number;
   @field("precio_menudeo") precioMenudeo!: number;
+  @field("costo_base") costoBase!: number;
+  @field("ultimo_costo_base") ultimoCostoBase!: number;
   @text("imagen") imagen?: string;
   @field("estado") estado!: boolean;
+  
+  // Umbrales de aviso de caducidad (en días)
+  @field("umbral_verde_dias") umbralVerdeDias!: number;
+  @field("umbral_amarillo_dias") umbralAmarilloDias!: number;
+  @field("umbral_rojo_dias") umbralRojoDias!: number;
+
   @readonly @date("created_at") createdAt!: number;
   @readonly @date("updated_at") updatedAt!: number;
 

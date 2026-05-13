@@ -5,6 +5,7 @@ import * as Crypto from "expo-crypto";
 import * as ImagePicker from "expo-image-picker";
 import {
   Apple,
+  Barcode,
   Box,
   Cake,
   CakeSlice,
@@ -30,6 +31,7 @@ import { database } from "../../../src/services/DB/indexBD";
 import FamiliaModel from "../../../src/services/DB/models/bases/familia";
 import ImpuestoModel from "../../../src/services/DB/models/bases/impuesto";
 import MargenModel from "../../../src/services/DB/models/bases/margen";
+import CodigoAlterno from "../../../src/services/DB/models/catalogo/codigoAlterno";
 import Producto from "../../../src/services/DB/models/catalogo/producto";
 import ProductoImpuesto from "../../../src/services/DB/models/catalogo/productoImpuesto";
 import { syncApp } from "../../../src/sync";
@@ -67,14 +69,19 @@ function AddInventoryInner({
   const [familiaId, setFamiliaId] = useState("");
   const [codigoInterno, setCodigoInterno] = useState("");
   const [margenId, setMargenId] = useState("");
-  const [costoPromedio, setCostoPromedio] = useState("");
+  const [costoBase, setCostoBase] = useState("");
+  const [ultimoCostoBase, setUltimoCostoBase] = useState(0);
   const [sat, setSat] = useState("");
   const [selectedImpuestos, setSelectedImpuestos] = useState<string[]>([]);
+  const [codigosAlternos, setCodigosAlternos] = useState<string[]>([]);
+  const [currentBarcode, setCurrentBarcode] = useState("");
 
-  // Precios editables — inicialmente vacíos hasta que el usuario los defina
   const [precioListaManual, setPrecioListaManual] = useState("");
   const [precioMayoreoManual, setPrecioMayoreoManual] = useState("");
   const [precioMenudeoManual, setPrecioMenudeoManual] = useState("");
+
+  const [umbralVerde, setUmbralVerde] = useState("90");
+  const [umbralAmarillo, setUmbralAmarillo] = useState("30");
 
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
@@ -92,6 +99,8 @@ function AddInventoryInner({
       if (data.precio_lista !== undefined) setPrecioListaManual(String(data.precio_lista));
       if (data.precio_mayoreo !== undefined) setPrecioMayoreoManual(String(data.precio_mayoreo));
       if (data.precio_menudeo !== undefined) setPrecioMenudeoManual(String(data.precio_menudeo));
+      setUmbralVerde(data.umbral_verde_dias ? String(data.umbral_verde_dias) : "90");
+      setUmbralAmarillo(data.umbral_amarillo_dias ? String(data.umbral_amarillo_dias) : "30");
 
       if (data.imagen) {
         if (data.imagen.startsWith("icon:")) {
@@ -110,6 +119,10 @@ function AddInventoryInner({
       setPrecioListaManual(String(editProduct.precioLista || ""));
       setPrecioMayoreoManual(String(editProduct.precioMayoreo || ""));
       setPrecioMenudeoManual(String(editProduct.precioMenudeo || ""));
+      setCostoBase(String(editProduct.costoBase || ""));
+      setUltimoCostoBase(editProduct.ultimoCostoBase || 0);
+      setUmbralVerde(String(editProduct.umbralVerdeDias ?? 90));
+      setUmbralAmarillo(String(editProduct.umbralAmarilloDias ?? 30));
       if (editProduct.imagen) {
         if (editProduct.imagen.startsWith("icon:")) {
           setSelectedIcon(editProduct.imagen.replace("icon:", ""));
@@ -118,11 +131,15 @@ function AddInventoryInner({
         }
       }
 
-      const loadImpuestos = async () => {
-        const links = await editProduct.impuestosMultiples.fetch();
+      const loadData = async () => {
+        const [links, codes] = await Promise.all([
+          editProduct.impuestosMultiples.fetch(),
+          database.collections.get<CodigoAlterno>('codigos_alternos').query(Q.where('producto_id', editProduct.id)).fetch()
+        ]);
         setSelectedImpuestos(links.map((link: any) => link._raw.impuesto_id));
+        setCodigosAlternos(codes.map(c => c.codigoBarras));
       };
-      loadImpuestos();
+      loadData();
     } else if (!isOpen) {
       resetForm();
     }
@@ -182,7 +199,7 @@ function AddInventoryInner({
 
   // ── Calculadora Fiscal (solo referencia) ──
   const selectedMargenObj = margenes.find((m) => m.id === margenId);
-  const costoNum = parseFloat(costoPromedio) || 0;
+  const costoNum = parseFloat(costoBase) || 0;
   const margenPorcentaje = selectedMargenObj?.porcentaje || 0;
   const impuestosTasas = selectedImpuestos
     .map((id) => impuestos.find((i) => i.id === id))
@@ -261,12 +278,15 @@ function AddInventoryInner({
     setFamiliaId("");
     setCodigoInterno("");
     setMargenId("");
-    setCostoPromedio("");
+    setCostoBase("");
+    setUltimoCostoBase(0);
     setSat("");
     setSelectedImpuestos([]);
     setPrecioListaManual("");
     setPrecioMayoreoManual("");
     setPrecioMenudeoManual("");
+    setUmbralVerde("90");
+    setUmbralAmarillo("30");
     setImageUri(null);
     setImageBase64(null);
     setSelectedIcon(null);
@@ -338,6 +358,15 @@ function AddInventoryInner({
             p.precioLista = pLista;
             p.precioMayoreo = pMayoreo || pLista;
             p.precioMenudeo = pMenudeo || pLista;
+            p.umbralVerdeDias = parseInt(umbralVerde) || 90;
+            p.umbralAmarilloDias = parseInt(umbralAmarillo) || 30;
+            p.umbralRojoDias = parseInt(umbralAmarillo) || 30;
+            
+            const newCosto = parseFloat(costoBase) || 0;
+            if (newCosto !== editProduct.costoBase) {
+              p.ultimoCostoBase = editProduct.costoBase;
+              p.costoBase = newCosto;
+            }
           });
           savedProductoId = editProduct.id;
 
@@ -365,11 +394,16 @@ function AddInventoryInner({
               p.precioLista = pLista;
               p.precioMayoreo = pMayoreo || pLista;
               p.precioMenudeo = pMenudeo || pLista;
+              p.costoBase = parseFloat(costoBase) || 0;
+              p.ultimoCostoBase = 0;
+              p.umbralVerdeDias = parseInt(umbralVerde) || 90;
+              p.umbralAmarilloDias = parseInt(umbralAmarillo) || 30;
+              p.umbralRojoDias = parseInt(umbralAmarillo) || 30;
             });
           savedProductoId = nuevoProducto.id;
         }
 
-        // Create ProductoImpuesto junction records
+        // 3. Create ProductoImpuesto junction records
         for (const impId of selectedImpuestos) {
           await database
             .get<ProductoImpuesto>("producto_impuestos")
@@ -378,6 +412,23 @@ function AddInventoryInner({
               (pi as any)._raw.producto_id = savedProductoId;
               (pi as any)._raw.impuesto_id = impId;
             });
+        }
+
+        // 4. Create CodigoAlterno records
+        // Si estamos editando, borramos los anteriores para simplificar la sincronización del set
+        if (editProduct) {
+          const existingCodes = await database.collections.get<CodigoAlterno>('codigos_alternos').query(Q.where('producto_id', editProduct.id)).fetch();
+          for (const c of existingCodes) {
+            await c.destroyPermanently(); // O markAsDeleted si se prefiere persistencia de borrado
+          }
+        }
+
+        for (const code of codigosAlternos) {
+          await database.collections.get<CodigoAlterno>('codigos_alternos').create(ca => {
+            (ca as any)._raw.id = Crypto.randomUUID();
+            (ca as any)._raw.producto_id = savedProductoId;
+            ca.codigoBarras = code;
+          });
         }
       });
 
@@ -497,6 +548,57 @@ function AddInventoryInner({
                     ))}
                   </select>
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" title="Días antes de caducar para que sea considerado Verde/Seguro">
+                      🟢 Umbral Seguro (días)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      className={`${inputClass} focus:ring-emerald-500 focus:border-emerald-500`}
+                      placeholder="90"
+                      value={umbralVerde}
+                      onChange={(e) => setUmbralVerde(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" title="Días antes de caducar para que sea considerado Precaución/Urgente">
+                      🟡 Umbral Riesgo (días)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      className={`${inputClass} focus:ring-amber-500 focus:border-amber-500`}
+                      placeholder="30"
+                      value={umbralAmarillo}
+                      onChange={(e) => setUmbralAmarillo(e.target.value)}
+                    />
+                  </div>
+                </div>
+                
+                {/* Visual Legend for Expiry Thresholds */}
+                <div className="mt-1 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Vista previa de colores en inventario:</p>
+                  <div className="flex flex-col gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 border border-emerald-600 shadow-sm"></span>
+                      <span>Mayor a <strong>{umbralVerde || "90"}</strong> días (Seguro)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-400 border border-amber-500 shadow-sm"></span>
+                      <span>Entre <strong>{umbralAmarillo || "30"}</strong> y <strong>{umbralVerde || "90"}</strong> días (Precaución)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500 border border-rose-600 shadow-sm"></span>
+                      <span>Menor a <strong>{umbralAmarillo || "30"}</strong> días (Riesgo)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-slate-900 border border-black shadow-sm"></span>
+                      <span><strong>0 días</strong> o menos (Vencido / Caducado)</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Fotografía — 2 columns */}
@@ -595,11 +697,25 @@ function AddInventoryInner({
                         min="0"
                         className="w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:bg-white dark:bg-slate-800 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400"
                         placeholder="0.00"
-                        value={costoPromedio}
-                        onChange={(e) => setCostoPromedio(e.target.value)}
+                        value={costoBase}
+                        onChange={(e) => setCostoBase(e.target.value)}
                       />
                     </div>
                     <p className="text-xs text-slate-400 mt-1">Costo unitario del producto para calcular márgenes</p>
+                    
+                    {ultimoCostoBase > 0 && (
+                      <div className="mt-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30 rounded-xl px-4 py-2.5 flex items-center gap-3 animate-in fade-in slide-in-from-top-1">
+                        <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-800/40 flex items-center justify-center">
+                          <DollarSign className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Último Costo Base</p>
+                          <p className="text-sm font-bold text-blue-700 dark:text-blue-300">
+                            ${ultimoCostoBase.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
@@ -612,6 +728,57 @@ function AddInventoryInner({
                       value={sat}
                       onChange={(e) => setSat(e.target.value)}
                     />
+                  </div>
+                </div>
+
+                {/* Códigos Alternos */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-2">
+                    <Barcode className="w-4 h-4 text-indigo-500" />
+                    Códigos Alternos (Escanear + Enter)
+                  </label>
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      className={inputClass}
+                      placeholder="Escanea o escribe y pulsa Enter..."
+                      value={currentBarcode}
+                      onChange={(e) => setCurrentBarcode(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const code = currentBarcode.trim();
+                          if (code && !codigosAlternos.includes(code)) {
+                            setCodigosAlternos([...codigosAlternos, code]);
+                            setCurrentBarcode("");
+                          }
+                        }
+                      }}
+                    />
+                    
+                    {/* Tags Display */}
+                    <div className="flex flex-wrap gap-2">
+                      {codigosAlternos.map((code, idx) => (
+                        <div 
+                          key={`${code}-${idx}`}
+                          className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-3 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-800 animate-in zoom-in-95 duration-200"
+                        >
+                          <span className="text-xs font-bold tracking-tight">{code}</span>
+                          <button
+                            type="button"
+                            onClick={() => setCodigosAlternos(prev => prev.filter(c => c !== code))}
+                            className="hover:text-indigo-900 dark:hover:text-white transition-colors"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      {codigosAlternos.length === 0 && (
+                        <p className="text-[10px] text-slate-400 font-medium italic">
+                          No hay códigos adicionales registrados
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
 

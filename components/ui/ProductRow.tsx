@@ -5,7 +5,8 @@ import {
   Edit2,
   Image as ImageIcon,
   RefreshCw,
-  Trash2,
+  ToggleLeft,
+  ToggleRight,
   Package,
   Box,
   ShoppingBag,
@@ -34,7 +35,10 @@ export interface LoteAlert {
   lote: LoteModel;
   level: AlertLevel;
   daysRemaining: number;
+  isAcknowledged?: boolean;
 }
+
+const ACKNOWLEDGED_LOTS_KEY = "dist_mh_acknowledged_lots";
 
 // ─── Alert Calculation Logic ────────────────────────────────
 export function calculateAlertLevel(
@@ -81,9 +85,9 @@ const alertStyles: Record<
     icon: "text-rose-500",
   },
   black: {
-    bg: "bg-gray-900",
+    bg: "bg-gray-900 shadow-lg shadow-gray-200/50",
     text: "text-white",
-    border: "border-gray-700",
+    border: "border-gray-800",
     icon: "text-gray-400",
   },
   none: {
@@ -134,6 +138,21 @@ function ProductRowInner({
   onClick,
 }: ProductRowProps) {
   const [impuestoNames, setImpuestoNames] = useState<string[]>([]);
+  const [acknowledgedIds, setAcknowledgedIds] = useState<string[]>([]);
+
+  // Cargar IDs reconocidos (Enterado)
+  useEffect(() => {
+    const loadAcknowledged = () => {
+      try {
+        const stored = localStorage.getItem(ACKNOWLEDGED_LOTS_KEY);
+        if (stored) setAcknowledgedIds(JSON.parse(stored));
+      } catch (e) {}
+    };
+    loadAcknowledged();
+    // Escuchar cambios en localStorage (por si se marca desde el flyout o el detalle)
+    window.addEventListener('storage', loadAcknowledged);
+    return () => window.removeEventListener('storage', loadAcknowledged);
+  }, []);
 
   // Fetch actual impuesto names from junction records
   useEffect(() => {
@@ -157,8 +176,8 @@ function ProductRowInner({
   }, [impuestosLinks]);
 
   // Calculate worst alert across all lots
-  const umbralVerde = familia?.umbralVerdeDias ?? 90;
-  const umbralAmarillo = familia?.umbralAmarilloDias ?? 30;
+  const umbralVerde = producto.umbralVerdeDias ?? 90;
+  const umbralAmarillo = producto.umbralAmarilloDias ?? 30;
 
   const loteAlerts: LoteAlert[] = lotes.map((lote) => {
     const result = calculateAlertLevel(
@@ -166,32 +185,35 @@ function ProductRowInner({
       umbralVerde,
       umbralAmarillo,
     );
-    return { lote, ...result };
+    
+    const isAcknowledged = acknowledgedIds.includes(lote.id);
+    
+    return { lote, ...result, isAcknowledged };
   });
 
-  // Find worst alert (black > red > yellow > green > none)
-  const priorityOrder: AlertLevel[] = [
-    "black",
-    "red",
-    "yellow",
-    "green",
-    "none",
-  ];
-  const worstAlert =
-    loteAlerts.length > 0
-      ? loteAlerts.reduce((worst, current) =>
-          priorityOrder.indexOf(current.level) <
-          priorityOrder.indexOf(worst.level)
-            ? current
-            : worst,
-        )
-      : null;
+  // Priority logic for the summary badge:
+  const priorityOrder: AlertLevel[] = ["red", "yellow", "green", "none"];
 
+  // 1. If there's any UNACKNOWLEDGED expired lot, it takes absolute priority (Black)
+  const unacknowledgedBlack = loteAlerts.find(la => la.level === 'black' && !la.isAcknowledged);
+  
+  // 2. Otherwise, find the worst alert among non-expired lots
+  const nonExpiredAlerts = loteAlerts.filter(la => la.level !== 'black');
+  const bestNonExpired = nonExpiredAlerts.length > 0
+    ? nonExpiredAlerts.reduce((worst, current) =>
+        priorityOrder.indexOf(current.level) <
+        priorityOrder.indexOf(worst.level)
+          ? current
+          : worst,
+      )
+    : null;
+
+  const worstAlert = unacknowledgedBlack || bestNonExpired;
   const worstLevel: AlertLevel = worstAlert?.level ?? "none";
   const style = alertStyles[worstLevel];
 
   const isLowStock = stockGlobal <= 10;
-  const blackLotes = loteAlerts.filter((la) => la.level === "black");
+  const blackLotes = loteAlerts.filter((la) => la.level === "black" && !la.isAcknowledged);
 
   // Format date nicely
   const formatDate = (timestamp: number | null | undefined) => {
@@ -241,7 +263,7 @@ function ProductRowInner({
               className="text-slate-900 dark:text-white font-bold max-w-xs truncate"
               title={producto.descripcion}
             >
-              {producto.descripcion} {!producto.estado && "(INACTIVO)"}
+              {producto.descripcion}
             </p>
             <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
               {producto.codigoInterno}
@@ -287,36 +309,34 @@ function ProductRowInner({
                 Sin impuestos
               </span>
             )}
+            {producto.claveSat && (
+               <span className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-[10px] rounded-md font-bold">
+                SAT: {producto.claveSat}
+              </span>
+            )}
+          </div>
+          
+          <div className="mt-2 flex flex-col gap-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Costo Ref:</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                ${(producto.costoBase || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            
+            {producto.ultimoCostoBase > 0 && (
+              <div className="bg-blue-50/80 dark:bg-blue-900/10 border border-blue-100/50 dark:border-blue-800/20 rounded-lg px-2 py-1 flex items-center gap-2 w-fit">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
+                <p className="text-[9px] font-bold text-blue-600 dark:text-blue-400">
+                  Último: ${producto.ultimoCostoBase.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </td>
 
-      {/* Lote y Origen */}
-      <td className="px-6 py-4">
-        <div>
-          {lotes.length > 0 ? (
-            <div className="space-y-1">
-              {lotes.slice(0, 2).map((l) => (
-                <p
-                  key={l.id}
-                  className="text-slate-700 dark:text-slate-300 text-xs font-medium"
-                >
-                  {l.identificadorLote}
-                </p>
-              ))}
-              {lotes.length > 2 && (
-                <p className="text-slate-400 text-[10px]">
-                  +{lotes.length - 2} más
-                </p>
-              )}
-            </div>
-          ) : (
-            <p className="text-slate-500 dark:text-slate-400 text-xs">
-              Sin lotes
-            </p>
-          )}
-        </div>
-      </td>
+
 
       {/* Existencia y Caducidad con Avisos */}
       <td className="px-6 py-4">
@@ -330,41 +350,25 @@ function ProductRowInner({
             </span>
           </p>
 
-          {/* Alert badges */}
-          {blackLotes.length > 0 ? (
-            <div className="mt-1 space-y-1">
-              {blackLotes.map((bl) => (
-                <div
-                  key={bl.lote.id}
-                  className="flex items-center gap-1.5 px-2 py-1 bg-gray-900 rounded-lg border border-gray-700"
-                >
-                  <AlertOctagon className="w-3 h-3 text-white animate-pulse" />
-                  <span className="text-[10px] font-extrabold text-white tracking-wide">
-                    LOTE VENCIDO: {bl.lote.identificadorLote}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : worstAlert ? (
+          {/* Primary Alert Badge */}
+          {worstAlert ? (
             <div
-              className={`flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-lg border ${style.bg} ${style.border}`}
+              className={`flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-lg border ${style.bg} ${style.border} shadow-sm`}
             >
               <Clock className={`w-3 h-3 ${style.icon}`} />
-              <span className={`text-[10px] font-bold ${style.text}`}>
+              <span className={`text-[10px] font-extrabold ${style.text} tracking-tight`}>
                 {worstAlert.daysRemaining === Infinity
                   ? "Sin fecha"
-                  : worstLevel === "green"
-                    ? `${worstAlert.daysRemaining}d — OK`
-                    : worstLevel === "yellow"
-                      ? `${worstAlert.daysRemaining}d — Precaución`
-                      : `${worstAlert.daysRemaining}d — ¡Urgente!`}
+                  : worstLevel === "black"
+                    ? `VENCIDO — ${worstAlert.lote.identificadorLote}`
+                    : `${worstAlert.daysRemaining}d — ${worstAlert.lote.identificadorLote}`}
               </span>
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 mt-0.5">
+            <div className="flex items-center gap-1.5 mt-0.5 opacity-50">
               <Clock className="w-3 h-3 text-slate-400" />
-              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                N/A
+              <span className="text-xs font-medium text-slate-500">
+                {lotes.length > 0 ? 'REVISADO' : 'N/A'}
               </span>
             </div>
           )}
@@ -395,9 +399,9 @@ function ProductRowInner({
             }
           >
             {producto.estado ? (
-              <Trash2 className="w-4 h-4" />
+              <ToggleRight className="w-5 h-5 text-emerald-500" />
             ) : (
-              <RefreshCw className="w-4 h-4" />
+              <ToggleLeft className="w-5 h-5 text-slate-400" />
             )}
           </button>
         </div>

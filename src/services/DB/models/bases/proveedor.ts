@@ -4,6 +4,9 @@ import ProveedorProducto from '../catalogo/proveedorProducto'
 
 export default class Proveedor extends Model {
   static table = 'proveedores'
+  static associations = {
+    proveedor_productos: { type: 'has_many' as const, foreignKey: 'proveedor_id' },
+  };
 
   @text('nombre_comercial') nombreComercial!: string
   @text('razon_social') razonSocial?: string

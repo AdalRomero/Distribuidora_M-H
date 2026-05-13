@@ -1,4 +1,5 @@
 import * as Crypto from "expo-crypto";
+import { Q } from "@nozbe/watermelondb";
 import withObservables from "@nozbe/with-observables";
 import {
   Check,
@@ -268,14 +269,10 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
   // Add form state
   const [codigo, setCodigo] = useState("");
   const [nombre, setNombre] = useState("");
-  const [umbralVerde, setUmbralVerde] = useState("90");
-  const [umbralAmarillo, setUmbralAmarillo] = useState("30");
 
   // Edit state
   const [editNombre, setEditNombre] = useState("");
   const [editCodigo, setEditCodigo] = useState("");
-  const [editUmbralVerde, setEditUmbralVerde] = useState("");
-  const [editUmbralAmarillo, setEditUmbralAmarillo] = useState("");
 
   useEffect(() => {
     if (recoverData?.tabla === "familias") {
@@ -283,8 +280,6 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
        setShowAdd(true);
        setCodigo(fd.codigoFamilia || fd.codigo_familia || "");
        setNombre(fd.nombre || "");
-       setUmbralVerde(fd.umbralVerdeDias ? String(fd.umbralVerdeDias) : "90");
-       setUmbralAmarillo(fd.umbralAmarilloDias ? String(fd.umbralAmarilloDias) : "30");
        window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }, [recoverData]);
@@ -309,15 +304,10 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
           f.codigoFamilia = codigo.trim();
           f.nombre = nombre.trim();
           f.estado = true;
-          f.umbralVerdeDias = parseInt(umbralVerde) || 90;
-          f.umbralAmarilloDias = parseInt(umbralAmarillo) || 30;
-          f.umbralRojoDias = parseInt(umbralAmarillo) || 30;
         });
       });
       setCodigo("");
       setNombre("");
-      setUmbralVerde("90");
-      setUmbralAmarillo("30");
       setShowAdd(false);
       showSuccess("Familia creada", `La familia "${nombre}" se ha guardado correctamente.`);
       if (onRecoverSaveSuccess) onRecoverSaveSuccess();
@@ -331,10 +321,7 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
     setEditId(f.id);
     setEditNombre(f.nombre);
     setEditCodigo(f.codigoFamilia);
-    setEditUmbralVerde(String(f.umbralVerdeDias || 90));
-    setEditUmbralAmarillo(String(f.umbralAmarilloDias || 30));
   };
-
   const handleSaveEdit = async (f: FamiliaModel) => {
     // Validar código único (excluyendo el registro actual)
     const codigoDuplicado = familias.find(
@@ -349,9 +336,6 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
         await f.update((record) => {
           record.nombre = editNombre.trim();
           record.codigoFamilia = editCodigo.trim();
-          record.umbralVerdeDias = parseInt(editUmbralVerde) || 90;
-          record.umbralAmarilloDias = parseInt(editUmbralAmarillo) || 30;
-          record.umbralRojoDias = parseInt(editUmbralAmarillo) || 30;
         });
       });
       setEditId(null);
@@ -364,38 +348,35 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
 
   const toggleEstado = async (f: FamiliaModel) => {
     const nuevoEstado = !f.estado;
-    try {
-      await database.write(async () => {
-        await f.update((record) => {
-          record.estado = nuevoEstado;
-        });
-      });
-      showSuccess(
-        nuevoEstado ? "Familia activada" : "Familia desactivada",
-        `"${f.nombre}" ahora está ${nuevoEstado ? "activa" : "inactiva"}.`
-      );
-      await syncAfterOp();
-    } catch (e: any) {
-      showError("Error", e.message || "No se pudo cambiar el estado.");
-    }
-  };
-
-  const handleDelete = (f: FamiliaModel) => {
-    showWarning(
-      "Eliminar familia",
-      `¿Estás seguro de eliminar la familia "${f.nombre}"? Esta acción no se puede deshacer.`,
-      async () => {
-        try {
-          await database.write(async () => {
-            await f.markAsDeleted();
+    const doToggle = async () => {
+      try {
+        await database.write(async () => {
+          await f.update((record) => {
+            record.estado = nuevoEstado;
           });
-          showSuccess("Familia eliminada", `"${f.nombre}" ha sido eliminada correctamente.`);
-          await syncAfterOp();
-        } catch (e: any) {
-          showError("Error al eliminar", e.message || "No se pudo eliminar la familia.");
-        }
+        });
+        showSuccess(
+          nuevoEstado ? "Familia activada" : "Familia desactivada",
+          `"${f.nombre}" ahora está ${nuevoEstado ? "activa" : "inactiva"}.`
+        );
+        await syncAfterOp();
+      } catch (e: any) {
+        showError("Error", e.message || "No se pudo cambiar el estado.");
       }
-    );
+    };
+
+    if (!nuevoEstado) {
+      const count = await database.collections.get("productos").query(Q.where("familia_id", f.id)).fetchCount();
+      if (count > 0) {
+        showWarning(
+          "Aviso de Afectación",
+          `Al desactivar esta familia, hay ${count} producto(s) asociado(s) que se verán afectados y requerirán actualización. ¿Deseas continuar?`,
+          doToggle
+        );
+        return;
+      }
+    }
+    doToggle();
   };
 
   return (
@@ -443,87 +424,7 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
                 onChange={(e) => setNombre(e.target.value)}
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
-                🟢 ¿Cuántos días antes es "seguro"?
-              </label>
-              <input
-                type="number"
-                min="1"
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                placeholder="90"
-                value={umbralVerde}
-                onChange={(e) => setUmbralVerde(e.target.value)}
-              />
-              <p className="text-[10px] text-slate-400 mt-1">Ej: 90 = más de 3 meses</p>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
-                🟡 ¿Cuándo empieza el riesgo?
-              </label>
-              <input
-                type="number"
-                min="1"
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none"
-                placeholder="30"
-                value={umbralAmarillo}
-                onChange={(e) => setUmbralAmarillo(e.target.value)}
-              />
-              <p className="text-[10px] text-slate-400 mt-1">Ej: 30 = menos de 1 mes</p>
-            </div>
-          </div>
-          {/* ── Vista previa visual de avisos ── */}
-          <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-            <div className="bg-slate-100 dark:bg-slate-800/50 px-4 py-2">
-              <p className="text-xs font-bold text-slate-600 dark:text-slate-300">📋 Así se verán los avisos de esta familia:</p>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-0 divide-x divide-slate-100">
-              {/* Seguro */}
-              <div className="bg-emerald-50 dark:bg-emerald-900/10 p-4 flex flex-col items-center text-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                  <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-500" />
-                </div>
-                <p className="text-sm font-extrabold text-emerald-700 dark:text-emerald-400">Seguro</p>
-                <p className="text-[11px] text-emerald-600 dark:text-emerald-500 font-medium leading-tight">
-                  Más de <strong>{umbralVerde || 90} días</strong>
-                </p>
-                <div className="w-full h-1.5 rounded-full bg-emerald-300 dark:bg-emerald-800/50 mt-1"></div>
-              </div>
-              {/* Atención */}
-              <div className="bg-amber-50 dark:bg-amber-500/10 p-4 flex flex-col items-center text-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                  <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-500" />
-                </div>
-                <p className="text-sm font-extrabold text-amber-700 dark:text-amber-400">Atención</p>
-                <p className="text-[11px] text-amber-600 dark:text-amber-500 font-medium leading-tight">
-                  De <strong>{umbralAmarillo || 30}</strong> a <strong>{umbralVerde || 90} días</strong>
-                </p>
-                <div className="w-full h-1.5 rounded-full bg-amber-300 dark:bg-amber-800/50 mt-1"></div>
-              </div>
-              {/* Peligro */}
-              <div className="bg-rose-50 dark:bg-rose-900/10 p-4 flex flex-col items-center text-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
-                  <ShieldX className="w-5 h-5 text-rose-600 dark:text-rose-500" />
-                </div>
-                <p className="text-sm font-extrabold text-rose-700 dark:text-rose-400">Peligro</p>
-                <p className="text-[11px] text-rose-600 dark:text-rose-500 font-medium leading-tight">
-                  Menos de <strong>{umbralAmarillo || 30} días</strong>
-                </p>
-                <div className="w-full h-1.5 rounded-full bg-rose-300 dark:bg-rose-800/50 mt-1"></div>
-              </div>
-              {/* Caducado */}
-              <div className="bg-gray-900 dark:bg-slate-900 p-4 flex flex-col items-center text-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center">
-                  <Skull className="w-5 h-5 text-gray-300" />
-                </div>
-                <p className="text-sm font-extrabold text-white">Caducado</p>
-                <p className="text-[11px] text-gray-400 font-medium leading-tight">
-                  Ya <strong>venció</strong> la fecha
-                </p>
-                <div className="w-full h-1.5 rounded-full bg-gray-600 mt-1"></div>
-              </div>
-            </div>
-          </div>
           <div className="flex justify-end gap-3">
             <button
               onClick={() => setShowAdd(false)}
@@ -548,7 +449,6 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
             <tr>
               <th className="px-6 py-4">Código</th>
               <th className="px-6 py-4">Nombre</th>
-              <th className="px-6 py-4">Avisos Caducidad</th>
               <th className="px-6 py-4">Estado</th>
               <th className="px-6 py-4 text-center">Acciones</th>
             </tr>
@@ -587,32 +487,6 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
                           onChange={(e) => setEditNombre(e.target.value)}
                         />
                       </td>
-                      <td className="px-6 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                            <input
-                              type="number"
-                              className="px-2 py-1 border border-slate-200 dark:border-slate-700 rounded-md text-xs w-14 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                              value={editUmbralVerde}
-                              onChange={(e) =>
-                                setEditUmbralVerde(e.target.value)
-                              }
-                            />
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                            <input
-                              type="number"
-                              className="px-2 py-1 border border-slate-200 dark:border-slate-700 rounded-md text-xs w-14 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                              value={editUmbralAmarillo}
-                              onChange={(e) =>
-                                setEditUmbralAmarillo(e.target.value)
-                              }
-                            />
-                          </div>
-                        </div>
-                      </td>
                       <td className="px-6 py-3"></td>
                       <td className="px-6 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">
@@ -640,22 +514,6 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
                       </td>
                       <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">
                         {f.nombre}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50 rounded-lg text-[11px] font-bold text-emerald-700 dark:text-emerald-400" title={`Seguro: más de ${f.umbralVerdeDias || 90} días`}>
-                            <ShieldCheck className="w-3.5 h-3.5" />
-                            Seguro &gt;{f.umbralVerdeDias || 90}d
-                          </span>
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800/50 rounded-lg text-[11px] font-bold text-amber-700 dark:text-amber-400" title={`Atención: ${f.umbralAmarilloDias || 30} a ${f.umbralVerdeDias || 90} días`}>
-                            <ShieldAlert className="w-3.5 h-3.5" />
-                            Atención {f.umbralAmarilloDias || 30}d
-                          </span>
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800/50 rounded-lg text-[11px] font-bold text-rose-700 dark:text-rose-400" title={`Peligro: menos de ${f.umbralAmarilloDias || 30} días`}>
-                            <ShieldX className="w-3.5 h-3.5" />
-                            Peligro &lt;{f.umbralAmarilloDias || 30}d
-                          </span>
-                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <button
@@ -689,12 +547,6 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
                             className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           >
                             <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(f)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -774,38 +626,35 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
 
   const toggleEstado = async (a: AlmacenModel) => {
     const nuevoEstado = !a.estado;
-    try {
-      await database.write(async () => {
-        await a.update((record) => {
-          record.estado = nuevoEstado;
-        });
-      });
-      showSuccess(
-        nuevoEstado ? "Almacén activado" : "Almacén desactivado",
-        `"${a.nombre}" ahora está ${nuevoEstado ? "activo" : "inactivo"}.`
-      );
-      await syncAfterOp();
-    } catch (e: any) {
-      showError("Error", e.message || "No se pudo cambiar el estado.");
-    }
-  };
-
-  const handleDelete = (a: AlmacenModel) => {
-    showWarning(
-      "Eliminar almacén",
-      `¿Estás seguro de eliminar el almacén "${a.nombre}"? Esta acción no se puede deshacer.`,
-      async () => {
-        try {
-          await database.write(async () => {
-            await a.markAsDeleted();
+    const doToggle = async () => {
+      try {
+        await database.write(async () => {
+          await a.update((record) => {
+            record.estado = nuevoEstado;
           });
-          showSuccess("Almacén eliminado", `"${a.nombre}" ha sido eliminado correctamente.`);
-          await syncAfterOp();
-        } catch (e: any) {
-          showError("Error al eliminar", e.message || "No se pudo eliminar el almacén.");
-        }
+        });
+        showSuccess(
+          nuevoEstado ? "Almacén activado" : "Almacén desactivado",
+          `"${a.nombre}" ahora está ${nuevoEstado ? "activo" : "inactivo"}.`
+        );
+        await syncAfterOp();
+      } catch (e: any) {
+        showError("Error", e.message || "No se pudo cambiar el estado.");
       }
-    );
+    };
+
+    if (!nuevoEstado) {
+      const count = await database.collections.get("movimientos_inventario").query(Q.where("almacen_id", a.id)).fetchCount();
+      if (count > 0) {
+        showWarning(
+          "Aviso de Afectación",
+          `Al desactivar este almacén, hay ${count} movimiento(s) de inventario asociado(s). ¿Deseas continuar?`,
+          doToggle
+        );
+        return;
+      }
+    }
+    doToggle();
   };
 
   return (
@@ -956,12 +805,6 @@ function AlmacenesTab({ almacenes, showSuccess, showError, showWarning, syncAfte
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => handleDelete(a)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
                         </div>
                       </td>
                     </>
@@ -1046,38 +889,35 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
 
   const toggleActivo = async (i: ImpuestoModel) => {
     const nuevoEstado = !i.activo;
-    try {
-      await database.write(async () => {
-        await i.update((record) => {
-          record.activo = nuevoEstado;
-        });
-      });
-      showSuccess(
-        nuevoEstado ? "Impuesto activado" : "Impuesto desactivado",
-        `"${i.nombre}" ahora está ${nuevoEstado ? "activo" : "inactivo"}.`
-      );
-      await syncAfterOp();
-    } catch (e: any) {
-      showError("Error", e.message || "No se pudo cambiar el estado.");
-    }
-  };
-
-  const handleDelete = (i: ImpuestoModel) => {
-    showWarning(
-      "Eliminar impuesto",
-      `¿Estás seguro de eliminar el impuesto "${i.nombre}"? Esta acción no se puede deshacer.`,
-      async () => {
-        try {
-          await database.write(async () => {
-            await i.markAsDeleted();
+    const doToggle = async () => {
+      try {
+        await database.write(async () => {
+          await i.update((record) => {
+            record.activo = nuevoEstado;
           });
-          showSuccess("Impuesto eliminado", `"${i.nombre}" ha sido eliminado correctamente.`);
-          await syncAfterOp();
-        } catch (e: any) {
-          showError("Error al eliminar", e.message || "No se pudo eliminar el impuesto.");
-        }
+        });
+        showSuccess(
+          nuevoEstado ? "Impuesto activado" : "Impuesto desactivado",
+          `"${i.nombre}" ahora está ${nuevoEstado ? "activo" : "inactivo"}.`
+        );
+        await syncAfterOp();
+      } catch (e: any) {
+        showError("Error", e.message || "No se pudo cambiar el estado.");
       }
-    );
+    };
+
+    if (!nuevoEstado) {
+      const count = await database.collections.get("producto_impuestos").query(Q.where("impuesto_id", i.id)).fetchCount();
+      if (count > 0) {
+        showWarning(
+          "Aviso de Afectación",
+          `Al desactivar este impuesto, hay ${count} producto(s) asociado(s) que dejarán de aplicarlo. ¿Deseas continuar?`,
+          doToggle
+        );
+        return;
+      }
+    }
+    doToggle();
   };
 
   return (
@@ -1260,12 +1100,6 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => handleDelete(i)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
                         </div>
                       </td>
                     </>
@@ -1350,38 +1184,35 @@ function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterO
 
   const toggleEstado = async (m: MargenModel) => {
     const nuevoEstado = !m.estado;
-    try {
-      await database.write(async () => {
-        await m.update((record) => {
-          record.estado = nuevoEstado;
-        });
-      });
-      showSuccess(
-        nuevoEstado ? "Margen activado" : "Margen desactivado",
-        `"${m.nombre}" ahora está ${nuevoEstado ? "activo" : "inactivo"}.`
-      );
-      await syncAfterOp();
-    } catch (e: any) {
-      showError("Error", e.message || "No se pudo cambiar el estado.");
-    }
-  };
-
-  const handleDelete = (m: MargenModel) => {
-    showWarning(
-      "Eliminar margen",
-      `¿Estás seguro de eliminar el margen "${m.nombre}"?`,
-      async () => {
-        try {
-          await database.write(async () => {
-            await m.markAsDeleted();
+    const doToggle = async () => {
+      try {
+        await database.write(async () => {
+          await m.update((record) => {
+            record.estado = nuevoEstado;
           });
-          showSuccess("Margen eliminado", `"${m.nombre}" ha sido eliminado correctamente.`);
-          await syncAfterOp();
-        } catch (e: any) {
-          showError("Error al eliminar", e.message || "No se pudo eliminar el margen.");
-        }
+        });
+        showSuccess(
+          nuevoEstado ? "Margen activado" : "Margen desactivado",
+          `"${m.nombre}" ahora está ${nuevoEstado ? "activo" : "inactivo"}.`
+        );
+        await syncAfterOp();
+      } catch (e: any) {
+        showError("Error", e.message || "No se pudo cambiar el estado.");
       }
-    );
+    };
+
+    if (!nuevoEstado) {
+      const count = await database.collections.get("productos").query(Q.where("margen_id", m.id)).fetchCount();
+      if (count > 0) {
+        showWarning(
+          "Aviso de Afectación",
+          `Al desactivar este margen, hay ${count} producto(s) asociado(s) que podrían verse afectados. ¿Deseas continuar?`,
+          doToggle
+        );
+        return;
+      }
+    }
+    doToggle();
   };
 
   return (
@@ -1563,12 +1394,6 @@ function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterO
                             className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           >
                             <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(m)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>

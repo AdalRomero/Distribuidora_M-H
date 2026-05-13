@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from "@nozbe/watermelondb";
 
 export const mySchema = appSchema({
-  version: 15,
+  version: 17,
   tables: [
     // ==================
     // 1. USUARIOS Y PERMISOS
@@ -51,9 +51,6 @@ export const mySchema = appSchema({
         { name: "codigo_familia", type: "string" },
         { name: "nombre", type: "string" },
         { name: "estado", type: "boolean" },
-        { name: "umbral_verde_dias", type: "number" },
-        { name: "umbral_amarillo_dias", type: "number" },
-        { name: "umbral_rojo_dias", type: "number" },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
@@ -145,9 +142,14 @@ export const mySchema = appSchema({
         { name: "precio_lista", type: "number" },
         { name: "precio_mayoreo", type: "number" },
         { name: "precio_menudeo", type: "number" },
+        { name: "costo_base", type: "number" },
+        { name: "ultimo_costo_base", type: "number" },
         { name: "clave_sat", type: "string", isOptional: true },
         { name: "imagen", type: "string", isOptional: true },
         { name: "estado", type: "boolean" }, // BORRADO LÓGICO
+        { name: "umbral_verde_dias", type: "number" },
+        { name: "umbral_amarillo_dias", type: "number" },
+        { name: "umbral_rojo_dias", type: "number" },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
