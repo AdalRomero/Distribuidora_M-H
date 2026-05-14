@@ -15,6 +15,7 @@ import {
   User as UserIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { usePagination } from "../../src/hooks/usePagination";
 
 // Importamos tus modales
 import ErrorModal from "../../components/ui/modals/ErrorModal";
@@ -596,6 +597,9 @@ export default function Users() {
     );
   }, [usersList, searchTerm]);
 
+  const { visible: visibleUsers, hasMore: hasMoreUsers, loadMore: loadMoreUsers, reset: resetUsersPage } = usePagination(filteredUsers, 8);
+  useEffect(() => { resetUsersPage(); }, [searchTerm]);
+
   const StatusBadge = ({ active }: { active: boolean }) => (
     <span
       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${active ? "bg-emerald-100/80 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50" : "bg-rose-100/80 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 border border-rose-200/50 dark:border-rose-800/50"}`}
@@ -724,7 +728,7 @@ export default function Users() {
                         </td>
                       </tr>
                     ) : (
-                      filteredUsers.map((user) => (
+                      visibleUsers.map((user) => (
                         <tr
                           key={user.id}
                           className={`transition-colors group ${editingUserId === user.id ? "bg-blue-50/50 dark:bg-blue-900/10" : "hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900/80"}`}
@@ -825,6 +829,18 @@ export default function Users() {
                 </table>
               </div>
             </div>
+
+            {/* Load More */}
+            {hasMoreUsers && (
+              <div className="flex justify-center mt-4">
+                <button
+                  onClick={loadMoreUsers}
+                  className="px-8 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors shadow-sm"
+                >
+                  Cargar más ({filteredUsers.length - visibleUsers.length} restantes)
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Panel Derecho: Formulario de Captura */}

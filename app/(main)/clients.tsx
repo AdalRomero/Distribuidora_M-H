@@ -1,7 +1,9 @@
 import * as Crypto from 'expo-crypto';
 import { MapPin, Plus, Search, Tag, Edit2, Loader2, Trash2, ToggleRight, ToggleLeft, X, Phone, Mail, Navigation } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import AddClient, { ClientData } from '../../components/ui/modals/AddClient';
+import { usePagination } from '../../src/hooks/usePagination';
+import { Q } from '@nozbe/watermelondb';
+import AddClient, { ClientData, DiscountRule } from '../../components/ui/modals/AddClient';
 
 import ErrorModal from '../../components/ui/modals/ErrorModal';
 import SuccessModal from '../../components/ui/modals/SuccessModal';
@@ -19,6 +21,7 @@ interface ClientItem {
     categoria: string;
     listaPrecioBase: string;
     descuentoGlobal: number;
+    discountRules: DiscountRule[];
     contactos: string[];
     calle: string;
     colonia: string;
@@ -79,6 +82,7 @@ export default function Clients() {
             categoria: d.categoria || "General",
             listaPrecios: d.listaPrecioBase || "lista",
             descuentoGlobal: String(d.descuentoGlobal || 0),
+            discountRules: [],
             contactos: d.contactos || [""],
             estado: d.estado !== false ? "Activo" : "Inactivo",
             calle: d.calle || "",
@@ -120,6 +124,41 @@ export default function Clients() {
 
             const mapped: ClientItem[] = await Promise.all(allClientes.map(async (c: any) => {
                 const contactosRecords = await c.contactos.fetch();
+                
+                const discountRules: DiscountRule[] = [];
+                
+                if (c.descuentoGlobal > 0) {
+                    discountRules.push({
+                        id: Crypto.randomUUID(),
+                        type: 'global',
+                        targetId: '',
+                        targetName: '',
+                        percentage: String(c.descuentoGlobal)
+                    });
+                }
+                
+                const famRules = await database.collections.get('precios_especiales_familias_clientes').query(Q.where('cliente_id', c.id)).fetch();
+                for (const fr of famRules as any[]) {
+                    discountRules.push({
+                        id: Crypto.randomUUID(),
+                        type: 'familia',
+                        targetId: fr.familiaId,
+                        targetName: '',
+                        percentage: String(fr.descuentoPorcentaje)
+                    });
+                }
+                
+                const prodRules = await database.collections.get('precios_especiales_clientes').query(Q.where('cliente_id', c.id)).fetch();
+                for (const pr of prodRules as any[]) {
+                    discountRules.push({
+                        id: Crypto.randomUUID(),
+                        type: 'producto',
+                        targetId: pr.productoId,
+                        targetName: '',
+                        percentage: String(pr.descuentoPorcentaje)
+                    });
+                }
+
                 return {
                     id: c.id,
                     nombre: c.nombre || '',
@@ -127,6 +166,7 @@ export default function Clients() {
                     categoria: c.categoria || 'General',
                     listaPrecioBase: c.listaPrecioBase || 'lista',
                     descuentoGlobal: c.descuentoGlobal || 0,
+                    discountRules,
                     contactos: contactosRecords.length > 0 ? contactosRecords.map((r: any) => r.contenido) : [],
                     calle: c.calle || '',
                     colonia: c.colonia || '',
@@ -152,17 +192,29 @@ export default function Clients() {
         try {
             const clientesDb = database.collections.get('clientes');
             const contactosDb = database.collections.get('contactos');
+            const especialProdDb = database.collections.get('precios_especiales_clientes');
+            const especialFamDb = database.collections.get('precios_especiales_familias_clientes');
 
             const newId = Crypto.randomUUID();
 
             await database.write(async () => {
+                let globalDiscount = parseFloat(formData.descuentoGlobal) || 0;
+                
+                // Extraer regla global si existe en discountRules y sobrescribir el descuentoGlobal
+                if (formData.discountRules && formData.discountRules.length > 0) {
+                    const globalRule = formData.discountRules.find(r => r.type === 'global');
+                    if (globalRule) {
+                        globalDiscount = parseFloat(globalRule.percentage) || 0;
+                    }
+                }
+
                 const newCliente = await clientesDb.create((c: any) => {
                     c._raw.id = newId;
                     c.nombre = formData.nombre;
                     c.rfc = formData.rfc || '';
                     c.categoria = formData.categoria || 'General';
                     c.listaPrecioBase = formData.listaPrecios || 'lista';
-                    c.descuentoGlobal = parseFloat(formData.descuentoGlobal) || 0;
+                    c.descuentoGlobal = globalDiscount;
                     c.calle = formData.calle || '';
                     c.colonia = formData.colonia || '';
                     c.cp = formData.cp || '';
@@ -177,6 +229,28 @@ export default function Clients() {
                             c.cliente.set(newCliente);
                             c.contenido = contactoStr.trim();
                         });
+                    }
+                }
+
+                // Guardar reglas de excepciones
+                if (formData.discountRules) {
+                    for (const rule of formData.discountRules) {
+                        if (rule.type === 'producto' && rule.targetId) {
+                            await especialProdDb.create((p: any) => {
+                                p._raw.id = Crypto.randomUUID();
+                                p.cliente.set(newCliente);
+                                p.productoId = rule.targetId;
+                                p.descuentoPorcentaje = parseFloat(rule.percentage) || 0;
+                                p.precioFijo = 0;
+                            });
+                        } else if (rule.type === 'familia' && rule.targetId) {
+                            await especialFamDb.create((f: any) => {
+                                f._raw.id = Crypto.randomUUID();
+                                f.cliente.set(newCliente);
+                                f.familiaId = rule.targetId;
+                                f.descuentoPorcentaje = parseFloat(rule.percentage) || 0;
+                            });
+                        }
                     }
                 }
             });
@@ -206,6 +280,7 @@ export default function Clients() {
             categoria: client.categoria,
             listaPrecios: client.listaPrecioBase,
             descuentoGlobal: String(client.descuentoGlobal),
+            discountRules: client.discountRules || [],
             contactos: client.contactos.length > 0 ? client.contactos : [''],
             estado: client.estado ? 'Activo' : 'Inactivo',
             calle: client.calle,
@@ -222,16 +297,30 @@ export default function Clients() {
         try {
             const clientesDb = database.collections.get('clientes');
             const contactosDb = database.collections.get('contactos');
+            const especialProdDb = database.collections.get('precios_especiales_clientes');
+            const especialFamDb = database.collections.get('precios_especiales_familias_clientes');
+            
             const record = await clientesDb.find(editingClientId) as any;
             const existingContactos = await record.contactos.fetch();
+            
+            const existingProdRules = await especialProdDb.query(Q.where('cliente_id', editingClientId)).fetch();
+            const existingFamRules = await especialFamDb.query(Q.where('cliente_id', editingClientId)).fetch();
 
             await database.write(async () => {
+                let globalDiscount = parseFloat(formData.descuentoGlobal) || 0;
+                if (formData.discountRules && formData.discountRules.length > 0) {
+                    const globalRule = formData.discountRules.find(r => r.type === 'global');
+                    if (globalRule) {
+                        globalDiscount = parseFloat(globalRule.percentage) || 0;
+                    }
+                }
+
                 await record.update((c: any) => {
                     c.nombre = formData.nombre;
                     c.rfc = formData.rfc || '';
                     c.categoria = formData.categoria || 'General';
                     c.listaPrecioBase = formData.listaPrecios || 'lista';
-                    c.descuentoGlobal = parseFloat(formData.descuentoGlobal) || 0;
+                    c.descuentoGlobal = globalDiscount;
                     c.calle = formData.calle || '';
                     c.colonia = formData.colonia || '';
                     c.cp = formData.cp || '';
@@ -242,6 +331,13 @@ export default function Clients() {
                 for (const c of existingContactos) {
                     await c.markAsDeleted();
                 }
+                
+                for (const pr of existingProdRules) {
+                    await pr.markAsDeleted();
+                }
+                for (const fr of existingFamRules) {
+                    await fr.markAsDeleted();
+                }
 
                 for (const contactoStr of formData.contactos) {
                     if (contactoStr.trim()) {
@@ -250,6 +346,27 @@ export default function Clients() {
                             c.cliente.set(record);
                             c.contenido = contactoStr.trim();
                         });
+                    }
+                }
+                
+                if (formData.discountRules) {
+                    for (const rule of formData.discountRules) {
+                        if (rule.type === 'producto' && rule.targetId) {
+                            await especialProdDb.create((p: any) => {
+                                p._raw.id = Crypto.randomUUID();
+                                p.cliente.set(record);
+                                p.productoId = rule.targetId;
+                                p.descuentoPorcentaje = parseFloat(rule.percentage) || 0;
+                                p.precioFijo = 0;
+                            });
+                        } else if (rule.type === 'familia' && rule.targetId) {
+                            await especialFamDb.create((f: any) => {
+                                f._raw.id = Crypto.randomUUID();
+                                f.cliente.set(record);
+                                f.familiaId = rule.targetId;
+                                f.descuentoPorcentaje = parseFloat(rule.percentage) || 0;
+                            });
+                        }
                     }
                 }
             });
@@ -344,6 +461,10 @@ export default function Clients() {
         );
     }, [clientsList, searchTerm]);
 
+    const { visible: visibleClients, hasMore: hasMoreClients, loadMore: loadMoreClients, reset: resetClientsPage } = usePagination(filteredClients, 5);
+
+    useEffect(() => { resetClientsPage(); }, [searchTerm]);
+
     // ==========================================
     // HELPERS DE UI
     // ==========================================
@@ -361,6 +482,7 @@ export default function Clients() {
             case 'lista': return 'Precio Lista';
             case 'mayoreo': return 'Mayoreo';
             case 'menudeo': return 'Menudeo';
+            case 'personalizada': return 'Lista Personalizada';
             default: return key;
         }
     };
@@ -429,12 +551,12 @@ export default function Clients() {
                                     <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400">
                                         <div className="flex items-center justify-center gap-2"><Loader2 className="w-5 h-5 animate-spin" /> Cargando clientes...</div>
                                     </td></tr>
-                                ) : filteredClients.length === 0 ? (
+                                ) : visibleClients.length === 0 ? (
                                     <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400">
                                         {searchTerm ? 'No se encontraron clientes que coincidan con la búsqueda.' : 'No hay clientes registrados. ¡Agrega el primero!'}
                                     </td></tr>
                                 ) : (
-                                    filteredClients.map((client) => (
+                                    visibleClients.map((client) => (
                                         <tr key={client.id} className={`hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900/50 transition-colors group ${!client.estado ? 'opacity-50 bg-slate-50 dark:bg-slate-900/30' : ''}`}>
                                             <td className="px-6 py-4">
                                                 <div>
@@ -589,6 +711,18 @@ export default function Clients() {
                         </table>
                     </div>
                 </div>
+
+                {/* Load More */}
+                {hasMoreClients && (
+                    <div className="flex justify-center mt-6">
+                        <button
+                            onClick={loadMoreClients}
+                            className="px-8 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors shadow-sm"
+                        >
+                            Cargar más ({filteredClients.length - visibleClients.length} restantes)
+                        </button>
+                    </div>
+                )}
 
                 <AddClient
                     isOpen={isClientModalOpen}

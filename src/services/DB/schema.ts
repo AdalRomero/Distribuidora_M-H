@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from "@nozbe/watermelondb";
 
 export const mySchema = appSchema({
-  version: 17,
+  version: 19,
   tables: [
     // ==================
     // 1. USUARIOS Y PERMISOS
@@ -98,6 +98,15 @@ export const mySchema = appSchema({
       ],
     }),
     tableSchema({
+      name: "categorias_clientes",
+      columns: [
+        { name: "nombre", type: "string" },
+        { name: "estado", type: "boolean" },
+        { name: "created_at", type: "number" },
+        { name: "updated_at", type: "number" },
+      ],
+    }),
+    tableSchema({
       name: "clientes",
       columns: [
         { name: "nombre", type: "string" },
@@ -123,6 +132,17 @@ export const mySchema = appSchema({
         { name: "created_at", type: "number" },
       ],
     }),
+    tableSchema({
+      name: "precios_especiales_familias_clientes",
+      columns: [
+        { name: "cliente_id", type: "string", isIndexed: true },
+        { name: "familia_id", type: "string", isIndexed: true },
+        { name: "descuento_porcentaje", type: "number" },
+        { name: "created_at", type: "number" },
+        { name: "updated_at", type: "number" },
+      ],
+    }),
+
 
     // ==================
     // 3. PRODUCTOS Y DEPENDENCIAS
@@ -278,6 +298,26 @@ export const mySchema = appSchema({
         { name: "name", type: "string" },
         { name: "layout_json", type: "string" },
         { name: "is_default", type: "boolean" },
+        { name: "created_at", type: "number" },
+        { name: "updated_at", type: "number" },
+      ],
+    }),
+    tableSchema({
+      name: "plantillas_precios",
+      columns: [
+        { name: "nombre", type: "string" },
+        { name: "created_at", type: "number" },
+        { name: "updated_at", type: "number" },
+      ],
+    }),
+    tableSchema({
+      name: "reglas_plantilla",
+      columns: [
+        { name: "plantilla_id", type: "string", isIndexed: true },
+        { name: "tipo", type: "string" },
+        { name: "target_id", type: "string" },
+        { name: "descuento_porcentaje", type: "number" },
+        { name: "precio_fijo", type: "number" },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],

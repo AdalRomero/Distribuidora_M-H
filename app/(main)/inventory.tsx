@@ -12,6 +12,7 @@ import {
   Search
 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
+import { usePagination } from "../../src/hooks/usePagination";
 import AddEntry from "../../components/ui/modals/AddEntry";
 import AddInventory from "../../components/ui/modals/AddInventory";
 import EditLote from "../../components/ui/modals/EditLote";
@@ -121,10 +122,12 @@ function InventoryContent({ productos, familias, allLotes }: InventoryProps) {
       return matchesSearch && matchesFamilia && matchesAlert;
     })
     .sort((a, b) => {
-      // Activos primero, inactivos (elimiandos lógicos) al final
       if (a.estado === b.estado) return 0;
       return a.estado ? -1 : 1;
     });
+
+  const { visible: visibleProductos, hasMore: hasMoreProductos, loadMore: loadMoreProductos, reset: resetInvPage } = usePagination(filteredProductos, 10);
+  useEffect(() => { resetInvPage(); }, [searchTerm, filterFamilia, selectedAlertFilters]);
 
   const tablesToWatch = useMemo(
     () => [
@@ -601,7 +604,7 @@ function InventoryContent({ productos, familias, allLotes }: InventoryProps) {
                       </td>
                     </tr>
                   ) : (
-                    filteredProductos.map((item) => (
+                    visibleProductos.map((item) => (
                       <ProductRow
                         key={item.id}
                         producto={item}
@@ -614,6 +617,18 @@ function InventoryContent({ productos, familias, allLotes }: InventoryProps) {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* Load More */}
+        {!selectedProduct && hasMoreProductos && (
+          <div className="flex justify-center mt-6">
+            <button
+              onClick={loadMoreProductos}
+              className="px-8 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors shadow-sm"
+            >
+              Cargar más ({filteredProductos.length - visibleProductos.length} restantes)
+            </button>
           </div>
         )}
 

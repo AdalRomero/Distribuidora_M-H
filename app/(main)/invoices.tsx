@@ -1,5 +1,6 @@
 import { Clock, Eye, FileCheck, FileCode, FileMinus, FileText, Loader2, Plus, Search, TrendingUp } from 'lucide-react';
 import { Fragment, useState, useMemo, useEffect, useCallback } from 'react';
+import { usePagination } from '../../src/hooks/usePagination';
 import AddInvoice from '../../components/ui/modals/AddInvoice';
 import SyncErrorBanner, { SyncError } from "../../components/ui/SyncErrorBanner";
 import { useSyncErrors } from "../../src/hooks/useSyncErrors";
@@ -113,6 +114,9 @@ export default function Invoices() {
         inv.cliente.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    const { visible: visibleInvoices, hasMore: hasMoreInvoices, loadMore: loadMoreInvoices, reset: resetInvPricePage } = usePagination(filteredInvoices, 8);
+    useEffect(() => { resetInvPricePage(); }, [searchTerm]);
+
     const getTipoDocumentoBadge = (tipo: string) => {
         switch (tipo) {
             case 'Factura': return 'bg-blue-50 dark:bg-blue-900/30 text-mh-blue dark:text-blue-400 border-blue-100 dark:border-blue-800/50';
@@ -200,7 +204,7 @@ export default function Invoices() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50 text-sm">
-                                    {filteredInvoices.map((inv) => {
+                                    {visibleInvoices.map((inv) => {
                                         const firstProduct = inv.partidas[0];
                                         const extraItemsAmount = inv.partidas.length - 1;
                                         return (
@@ -253,6 +257,18 @@ export default function Invoices() {
                             </table>
                         </div>
                     </div>
+
+                     {/* Load More */}
+                     {hasMoreInvoices && (
+                         <div className="flex justify-center mt-6">
+                             <button
+                                 onClick={loadMoreInvoices}
+                                 className="px-8 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors shadow-sm"
+                             >
+                                 Cargar más ({filteredInvoices.length - visibleInvoices.length} restantes)
+                             </button>
+                         </div>
+                     )}
                 </div>
             </div>
             <AddInvoice isOpen={showAddInvoice} onClose={() => { setShowAddInvoice(false); setRecoverData(null); setRecoveringErrorId(null); }} recoverData={recoverData} onSaveSuccess={() => {

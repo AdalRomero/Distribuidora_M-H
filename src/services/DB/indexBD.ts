@@ -4,6 +4,7 @@ import { getAdapter } from "./databaseAdapter";
 
 import Almacen from "./models/bases/almacen";
 import Cliente from "./models/bases/cliente";
+import CategoriaCliente from "./models/bases/categoriaCliente";
 import Familia from "./models/bases/familia";
 import Impuesto from "./models/bases/impuesto";
 import Margen from "./models/bases/margen";
@@ -13,9 +14,12 @@ import Contacto from "./models/bases/contacto";
 import CodigoAlterno from "./models/catalogo/codigoAlterno";
 import Lote from "./models/catalogo/lote";
 import PrecioEspecialCliente from "./models/catalogo/precioEspecialCliente";
+import PrecioEspecialFamiliaCliente from "./models/catalogo/precioEspecialFamiliaCliente";
 import Producto from "./models/catalogo/producto";
 import ProductoImpuesto from "./models/catalogo/productoImpuesto";
 import ProveedorProducto from "./models/catalogo/proveedorProducto";
+import PlantillaPrecio from "./models/catalogo/plantillaPrecio";
+import ReglaPlantilla from "./models/catalogo/reglaPlantilla";
 
 import BitacoraError from "./models/registros/bitacoraError";
 import Documento from "./models/registros/documento";
@@ -41,6 +45,7 @@ export const database = new Database({
     Proveedor,
     Margen,
     Cliente,
+    CategoriaCliente,
     Contacto,
 
     Producto,
@@ -49,6 +54,9 @@ export const database = new Database({
     ProductoImpuesto,
     ProveedorProducto,
     PrecioEspecialCliente,
+    PrecioEspecialFamiliaCliente,
+    PlantillaPrecio,
+    ReglaPlantilla,
 
     MovimientoInventario,
     Documento,
