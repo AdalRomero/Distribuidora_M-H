@@ -1,6 +1,7 @@
 import * as Crypto from 'expo-crypto';
 import { MapPin, Plus, Search, Tag, Edit2, Loader2, Trash2, ToggleRight, ToggleLeft, X, Phone, Mail, Navigation } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocalSearchParams, router } from 'expo-router';
 import { usePagination } from '../../src/hooks/usePagination';
 import { Q } from '@nozbe/watermelondb';
 import AddClient, { ClientData, DiscountRule } from '../../components/ui/modals/AddClient';
@@ -73,6 +74,19 @@ export default function Clients() {
         }
     }, [syncErrors]);
 
+    // Listener para hotkey de acción
+    useEffect(() => {
+        const handleActionHotkey = (e: any) => {
+            if (e.detail?.actionId === 'action_add_client') {
+                setEditingClientId(null);
+                setEditData(null);
+                setIsClientModalOpen(true);
+            }
+        };
+        window.addEventListener('action_hotkey', handleActionHotkey);
+        return () => window.removeEventListener('action_hotkey', handleActionHotkey);
+    }, []);
+
     const handleRecoverWrapper = (err: SyncError) => {
         // Mapear los datos atrapados al modal de edición
         const d = err.datosAtrapados;
@@ -102,6 +116,17 @@ export default function Clients() {
             return () => clearTimeout(timer);
         }
     }, [message]);
+
+    const params = useLocalSearchParams();
+
+    useEffect(() => {
+        if (params.openModal === 'action_add_client') {
+            setEditingClientId(null);
+            setEditData(null);
+            setIsClientModalOpen(true);
+            router.setParams({ openModal: '' });
+        }
+    }, [params.openModal]);
 
     // Close flyout on outside click
     useEffect(() => {

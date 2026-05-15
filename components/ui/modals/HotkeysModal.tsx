@@ -17,10 +17,20 @@ const PAGE_HOTKEYS: HotkeyOption[] = [
     { id: 'nav_home', label: 'Inicio', description: 'Ir al panel de inicio' },
     { id: 'nav_inventory', label: 'Inventario', description: 'Abrir gestión de inventario' },
     { id: 'nav_clients', label: 'Clientes', description: 'Ver directorio de clientes' },
+    { id: 'nav_suppliers', label: 'Proveedores', description: 'Ver directorio de proveedores' },
     { id: 'nav_catalogs', label: 'Catálogos', description: 'Ver catálogos de productos' },
     { id: 'nav_prices', label: 'Precios', description: 'Administrar listas de precios' },
     { id: 'nav_invoices', label: 'Facturas', description: 'Ir a facturación e informes' },
+    { id: 'nav_users', label: 'Usuarios', description: 'Gestión de usuarios' },
     { id: 'nav_settings', label: 'Configuraciones', description: 'Abrir esta página' },
+];
+
+const ACTION_HOTKEYS: HotkeyOption[] = [
+    { id: 'action_add_client', label: 'Nuevo Cliente', description: 'Abrir modal de nuevo cliente' },
+    { id: 'action_add_supplier', label: 'Nuevo Proveedor', description: 'Abrir modal de nuevo proveedor' },
+    { id: 'action_add_product', label: 'Nuevo Producto', description: 'Abrir modal de nuevo producto' },
+    { id: 'action_add_invoice', label: 'Nueva Factura', description: 'Abrir modal de nueva factura' },
+    { id: 'action_add_user', label: 'Nuevo Usuario', description: 'Abrir modal de nuevo usuario' },
 ];
 
 export default function HotkeysModal({ isOpen, onClose }: HotkeysModalProps) {
@@ -48,8 +58,15 @@ export default function HotkeysModal({ isOpen, onClose }: HotkeysModalProps) {
         if (e.metaKey) keys.push('Cmd');
         
         // Evitamos registrar solo teclas modificadoras
-        if (!['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) {
-            keys.push(e.key.toUpperCase());
+        if (e.key && typeof e.key === 'string' && !['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) {
+            let mainKey = e.key.toUpperCase();
+            if (e.code && e.code.startsWith('Key')) {
+                mainKey = e.code.replace('Key', '');
+            } else if (e.code && e.code.startsWith('Digit')) {
+                mainKey = e.code.replace('Digit', '');
+            }
+
+            keys.push(mainKey);
             const combination = keys.join(' + ');
             setLocalHotkeys(prev => ({ ...prev, [id]: combination }));
             setRecordingId(null);
@@ -97,40 +114,88 @@ export default function HotkeysModal({ isOpen, onClose }: HotkeysModalProps) {
 
                         {/* Content */}
                         <div className="p-6 overflow-y-auto max-h-[60vh]">
-                            <div className="space-y-4">
-                                {PAGE_HOTKEYS.map((item) => {
-                                    const isRecording = recordingId === item.id;
-                                    const currentKey = localHotkeys[item.id];
+                            <div className="space-y-8">
+                                
+                                {/* Navegación */}
+                                <div>
+                                    <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">Navegación</h4>
+                                    <div className="space-y-4">
+                                        {PAGE_HOTKEYS.map((item) => {
+                                            const isRecording = recordingId === item.id;
+                                            const currentKey = localHotkeys[item.id];
 
-                                    return (
-                                        <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900 transition-colors">
-                                            <div>
-                                                <p className="font-semibold text-slate-800 dark:text-white text-sm">{item.label}</p>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{item.description}</p>
-                                            </div>
-                                            
-                                            <button 
-                                                onClick={() => setRecordingId(isRecording ? null : item.id)}
-                                                onKeyDown={(e) => isRecording && handleKeyDown(e, item.id)}
-                                                className={`relative w-full sm:w-48 px-4 py-2.5 rounded-lg text-sm font-mono flex items-center justify-center overflow-hidden transition-all outline-none
-                                                    ${isRecording 
-                                                        ? 'bg-indigo-50 dark:bg-indigo-500/10 border-2 border-indigo-500 text-indigo-700 dark:text-indigo-400 shadow-inner' 
-                                                        : 'bg-white dark:bg-slate-800 border text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-300 focus:border-indigo-500 shadow-sm'
-                                                    }`}
-                                            >
-                                                {isRecording ? (
-                                                    <span className="flex items-center gap-2 animate-pulse">
-                                                        <Command className="w-4 h-4" /> Presiona teclas...
-                                                    </span>
-                                                ) : (
-                                                    <span className="tracking-widest font-bold">
-                                                        {currentKey || 'Asignar atajo'}
-                                                    </span>
-                                                )}
-                                            </button>
-                                        </div>
-                                    );
-                                })}
+                                            return (
+                                                <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900 transition-colors">
+                                                    <div>
+                                                        <p className="font-semibold text-slate-800 dark:text-white text-sm">{item.label}</p>
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{item.description}</p>
+                                                    </div>
+                                                    
+                                                    <button 
+                                                        onClick={() => setRecordingId(isRecording ? null : item.id)}
+                                                        onKeyDown={(e) => isRecording && handleKeyDown(e, item.id)}
+                                                        className={`relative w-full sm:w-48 px-4 py-2.5 rounded-lg text-sm font-mono flex items-center justify-center overflow-hidden transition-all outline-none
+                                                            ${isRecording 
+                                                                ? 'bg-indigo-50 dark:bg-indigo-500/10 border-2 border-indigo-500 text-indigo-700 dark:text-indigo-400 shadow-inner' 
+                                                                : 'bg-white dark:bg-slate-800 border text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-300 focus:border-indigo-500 shadow-sm'
+                                                            }`}
+                                                    >
+                                                        {isRecording ? (
+                                                            <span className="flex items-center gap-2 animate-pulse">
+                                                                <Command className="w-4 h-4" /> Presiona teclas...
+                                                            </span>
+                                                        ) : (
+                                                            <span className="tracking-widest font-bold">
+                                                                {currentKey || 'Asignar atajo'}
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Acciones de Captura */}
+                                <div>
+                                    <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">Acciones (Captura)</h4>
+                                    <div className="space-y-4">
+                                        {ACTION_HOTKEYS.map((item) => {
+                                            const isRecording = recordingId === item.id;
+                                            const currentKey = localHotkeys[item.id];
+
+                                            return (
+                                                <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900 transition-colors">
+                                                    <div>
+                                                        <p className="font-semibold text-slate-800 dark:text-white text-sm">{item.label}</p>
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{item.description}</p>
+                                                    </div>
+                                                    
+                                                    <button 
+                                                        onClick={() => setRecordingId(isRecording ? null : item.id)}
+                                                        onKeyDown={(e) => isRecording && handleKeyDown(e, item.id)}
+                                                        className={`relative w-full sm:w-48 px-4 py-2.5 rounded-lg text-sm font-mono flex items-center justify-center overflow-hidden transition-all outline-none
+                                                            ${isRecording 
+                                                                ? 'bg-indigo-50 dark:bg-indigo-500/10 border-2 border-indigo-500 text-indigo-700 dark:text-indigo-400 shadow-inner' 
+                                                                : 'bg-white dark:bg-slate-800 border text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-300 focus:border-indigo-500 shadow-sm'
+                                                            }`}
+                                                    >
+                                                        {isRecording ? (
+                                                            <span className="flex items-center gap-2 animate-pulse">
+                                                                <Command className="w-4 h-4" /> Presiona teclas...
+                                                            </span>
+                                                        ) : (
+                                                            <span className="tracking-widest font-bold">
+                                                                {currentKey || 'Asignar atajo'}
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
                             </div>
                         </div>
 

@@ -49,10 +49,18 @@ export const DEFAULT_HOTKEYS: HotkeyMap = {
     nav_home: "Ctrl + H",
     nav_inventory: "Ctrl + I",
     nav_clients: "Ctrl + C",
+    nav_suppliers: "Ctrl + O",
     nav_prices: "Ctrl + P",
     nav_invoices: "Ctrl + F",
     nav_settings: "Ctrl + S",
     nav_catalogs: "Ctrl + T",
+    nav_users: "Ctrl + U",
+
+    action_add_client: "Alt + C",
+    action_add_supplier: "Alt + O",
+    action_add_product: "Alt + I",
+    action_add_invoice: "Alt + F",
+    action_add_user: "Alt + U",
 };
 
 const DEFAULT_NOTIFICATIONS: NotificationPreferences = {
@@ -90,10 +98,10 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
 
                 const loadedTheme: ThemeMode = (themeStr as ThemeMode) || "light";
                 const loadedNotif: NotificationPreferences = notifStr
-                    ? JSON.parse(notifStr)
+                    ? { ...DEFAULT_NOTIFICATIONS, ...JSON.parse(notifStr) }
                     : DEFAULT_NOTIFICATIONS;
                 const loadedHotkeys: HotkeyMap = hotkeyStr
-                    ? JSON.parse(hotkeyStr)
+                    ? { ...DEFAULT_HOTKEYS, ...JSON.parse(hotkeyStr) }
                     : DEFAULT_HOTKEYS;
 
                 setThemeState(loadedTheme);

@@ -1,6 +1,7 @@
 import * as Crypto from 'expo-crypto';
 import { Building2, Plus, Search, Edit2, Loader2, Trash2, ToggleRight, ToggleLeft, Phone, Mail, Package, ChevronDown, ChevronUp, Contact } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useLocalSearchParams, router } from 'expo-router';
 import { usePagination } from '../../src/hooks/usePagination';
 import { Q } from '@nozbe/watermelondb';
 import AddSupplier, { SupplierData, SupplierProductRow, SupplierContactRow } from '../../components/ui/modals/AddSupplier';
@@ -60,6 +61,30 @@ export default function Suppliers() {
             return () => clearTimeout(timer);
         }
     }, [message]);
+
+    const params = useLocalSearchParams();
+
+    useEffect(() => {
+        if (params.openModal === 'action_add_supplier') {
+            setEditingId(null);
+            setEditData(null);
+            setIsModalOpen(true);
+            router.setParams({ openModal: '' });
+        }
+    }, [params.openModal]);
+
+    // Listener para hotkey de acción
+    useEffect(() => {
+        const handleActionHotkey = (e: any) => {
+            if (e.detail?.actionId === 'action_add_supplier') {
+                setEditingId(null);
+                setEditData(null);
+                setIsModalOpen(true);
+            }
+        };
+        window.addEventListener('action_hotkey', handleActionHotkey);
+        return () => window.removeEventListener('action_hotkey', handleActionHotkey);
+    }, []);
 
     // ==========================================
     // CARGAR PROVEEDORES DESDE WATERMELONDB
