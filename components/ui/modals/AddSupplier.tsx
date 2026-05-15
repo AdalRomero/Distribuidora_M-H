@@ -14,14 +14,21 @@ export interface SupplierProductRow {
     tiempoEntregaDias: string;
 }
 
+export interface SupplierContactRow {
+    id: string;
+    nombre: string;
+    telefono: string;
+    correo: string;
+    cargo: string;
+}
+
 export interface SupplierData {
     nombreComercial: string;
     razonSocial: string;
     rfc: string;
-    telefono: string;
-    correoContacto: string;
     estado: string;
     productos: SupplierProductRow[];
+    contactos: SupplierContactRow[];
 }
 
 // ==========================================
@@ -127,10 +134,12 @@ const initialState: SupplierData = {
     nombreComercial: '',
     razonSocial: '',
     rfc: '',
-    telefono: '',
-    correoContacto: '',
     estado: 'Activo',
     productos: [],
+    contactos: [
+        { id: Math.random().toString(), nombre: '', telefono: '', correo: '', cargo: '' },
+        { id: Math.random().toString(), nombre: '', telefono: '', correo: '', cargo: '' }
+    ]
 };
 
 const inputClass = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors';
@@ -213,9 +222,56 @@ export default function AddSupplier({ isOpen, onClose, onSave, isLoading = false
         }));
     };
 
+    // ==========================================
+    // GESTIÓN DE CONTACTOS
+    // ==========================================
+    const addContactRow = () => {
+        setForm(prev => ({
+            ...prev,
+            contactos: [...prev.contactos, {
+                id: Math.random().toString(),
+                nombre: '',
+                telefono: '',
+                correo: '',
+                cargo: '',
+            }]
+        }));
+    };
+
+    const removeContactRow = (id: string) => {
+        setForm(prev => {
+            if (prev.contactos.length <= 2) {
+                alert('Debe mantener al menos 2 contactos.');
+                return prev;
+            }
+            return {
+                ...prev,
+                contactos: prev.contactos.filter(c => c.id !== id)
+            };
+        });
+    };
+
+    const updateContactRow = (id: string, field: string, value: string) => {
+        setForm(prev => ({
+            ...prev,
+            contactos: prev.contactos.map(c => c.id === id ? { ...c, [field]: value } : c)
+        }));
+    };
+
     const handleSave = async () => {
         if (!form.nombreComercial.trim()) {
             alert('El nombre comercial es obligatorio.');
+            return;
+        }
+
+        if (form.contactos.length < 2) {
+            alert('Debe ingresar al menos 2 contactos.');
+            return;
+        }
+
+        const invalidContacts = form.contactos.some(c => !c.nombre.trim());
+        if (invalidContacts) {
+            alert('Todos los contactos deben tener al menos un nombre.');
             return;
         }
         if (onSave) {
@@ -250,10 +306,10 @@ export default function AddSupplier({ isOpen, onClose, onSave, isLoading = false
                         <div className="p-6 bg-slate-50 dark:bg-slate-900/50 overflow-y-auto flex-1">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-                                {/* Card 1: Información General */}
-                                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm">
+                                {/* Información General */}
+                                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm md:col-span-2">
                                     <div className="flex items-center gap-2 mb-4"><Building2 className="w-5 h-5 text-blue-800" /><h4 className="font-semibold text-blue-900 text-sm">Información General</h4></div>
-                                    <div className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nombre Comercial *</label>
                                             <input type="text" name="nombreComercial" value={form.nombreComercial} onChange={handleChange} placeholder="Ej: Harinas del Norte" className={inputClass} required />
@@ -266,29 +322,96 @@ export default function AddSupplier({ isOpen, onClose, onSave, isLoading = false
                                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">RFC</label>
                                             <input type="text" name="rfc" value={form.rfc} onChange={handleChange} placeholder="Ej: HNO850101AAA" className={inputClass} />
                                         </div>
-                                    </div>
-                                </div>
-
-                                {/* Card 2: Contacto y Estado */}
-                                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm">
-                                    <div className="flex items-center gap-2 mb-4"><Contact className="w-5 h-5 text-blue-800" /><h4 className="font-semibold text-blue-900 text-sm">Contacto y Estado</h4></div>
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Teléfono</label>
-                                            <input type="text" name="telefono" value={form.telefono} onChange={handleChange} placeholder="Ej: 555-123-4567" className={inputClass} />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Correo de Contacto</label>
-                                            <input type="email" name="correoContacto" value={form.correoContacto} onChange={handleChange} placeholder="Ej: ventas@harinas.com" className={inputClass} />
-                                        </div>
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Estado</label>
                                             <select name="estado" value={form.estado} onChange={handleChange} className={inputClass}>
                                                 <option value="Activo">Activo</option>
                                                 <option value="Inactivo">Inactivo</option>
                                             </select>
-                                            <p className="text-[10px] text-slate-400 mt-1">Los proveedores inactivos no aparecerán en compras nuevas.</p>
                                         </div>
+                                    </div>
+                                </div>
+
+                                {/* Contactos */}
+                                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm md:col-span-2">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <Contact className="w-5 h-5 text-blue-800" />
+                                            <h4 className="font-semibold text-blue-900 text-sm">Contactos (Mínimo 2)</h4>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={addContactRow}
+                                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-400 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors border border-blue-200 dark:border-blue-800"
+                                        >
+                                            <Plus className="w-3 h-3" /> Agregar Contacto
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="space-y-3">
+                                        {/* Encabezados Contactos */}
+                                        <div className="hidden md:grid md:grid-cols-12 gap-2 px-3 pb-2 border-b border-slate-100 dark:border-slate-700">
+                                            <div className="col-span-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nombre *</div>
+                                            <div className="col-span-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cargo</div>
+                                            <div className="col-span-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Teléfono</div>
+                                            <div className="col-span-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Correo</div>
+                                            <div className="col-span-1"></div>
+                                        </div>
+
+                                        {form.contactos.map((row, index) => (
+                                            <div key={row.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm hover:border-blue-300 dark:hover:border-blue-700 transition-colors items-center">
+                                                <div className="md:col-span-3">
+                                                    <label className="md:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Nombre *</label>
+                                                    <input
+                                                        type="text"
+                                                        value={row.nombre}
+                                                        onChange={(e) => updateContactRow(row.id, 'nombre', e.target.value)}
+                                                        placeholder="Nombre completo"
+                                                        className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-2 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                                                    />
+                                                </div>
+                                                <div className="md:col-span-3">
+                                                    <label className="md:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Cargo</label>
+                                                    <input
+                                                        type="text"
+                                                        value={row.cargo}
+                                                        onChange={(e) => updateContactRow(row.id, 'cargo', e.target.value)}
+                                                        placeholder="Ventas, Soporte..."
+                                                        className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-2 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                                                    />
+                                                </div>
+                                                <div className="md:col-span-3">
+                                                    <label className="md:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Teléfono</label>
+                                                    <input
+                                                        type="text"
+                                                        value={row.telefono}
+                                                        onChange={(e) => updateContactRow(row.id, 'telefono', e.target.value)}
+                                                        placeholder="Teléfono"
+                                                        className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-2 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                                                    />
+                                                </div>
+                                                <div className="md:col-span-2">
+                                                    <label className="md:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Correo</label>
+                                                    <input
+                                                        type="email"
+                                                        value={row.correo}
+                                                        onChange={(e) => updateContactRow(row.id, 'correo', e.target.value)}
+                                                        placeholder="correo@ejemplo.com"
+                                                        className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-2 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                                                    />
+                                                </div>
+                                                <div className="md:col-span-1 flex justify-end">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeContactRow(row.id)}
+                                                        disabled={form.contactos.length <= 2}
+                                                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-md transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
 

@@ -1,11 +1,13 @@
 import { Model, Query } from '@nozbe/watermelondb'
 import { field, text, date, readonly, children } from '@nozbe/watermelondb/decorators'
 import ProveedorProducto from '../catalogo/proveedorProducto'
+import ProveedorContacto from './proveedorContacto'
 
 export default class Proveedor extends Model {
   static table = 'proveedores'
   static associations = {
     proveedor_productos: { type: 'has_many' as const, foreignKey: 'proveedor_id' },
+    proveedor_contactos: { type: 'has_many' as const, foreignKey: 'proveedor_id' },
   };
 
   @text('nombre_comercial') nombreComercial!: string
@@ -18,4 +20,5 @@ export default class Proveedor extends Model {
   @readonly @date('updated_at') updatedAt!: number
 
   @children('proveedor_productos') productosOfertados!: Query<ProveedorProducto>
+  @children('proveedor_contactos') contactos!: Query<ProveedorContacto>
 }

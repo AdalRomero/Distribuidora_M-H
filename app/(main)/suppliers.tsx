@@ -1,9 +1,9 @@
 import * as Crypto from 'expo-crypto';
-import { Building2, Plus, Search, Edit2, Loader2, Trash2, ToggleRight, ToggleLeft, Phone, Mail, Package, ChevronDown, ChevronUp } from 'lucide-react';
+import { Building2, Plus, Search, Edit2, Loader2, Trash2, ToggleRight, ToggleLeft, Phone, Mail, Package, ChevronDown, ChevronUp, Contact } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { usePagination } from '../../src/hooks/usePagination';
 import { Q } from '@nozbe/watermelondb';
-import AddSupplier, { SupplierData, SupplierProductRow } from '../../components/ui/modals/AddSupplier';
+import AddSupplier, { SupplierData, SupplierProductRow, SupplierContactRow } from '../../components/ui/modals/AddSupplier';
 
 import ErrorModal from '../../components/ui/modals/ErrorModal';
 import SuccessModal from '../../components/ui/modals/SuccessModal';
@@ -28,10 +28,9 @@ interface SupplierItem {
     nombreComercial: string;
     razonSocial: string;
     rfc: string;
-    telefono: string;
-    correoContacto: string;
     estado: boolean;
     productos: SupplierProduct[];
+    contactos: SupplierContactRow[];
 }
 
 export default function Suppliers() {
@@ -49,7 +48,7 @@ export default function Suppliers() {
     const [editData, setEditData] = useState<SupplierData | null>(null);
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
-    const tablesToWatch = useMemo(() => ["proveedores", "proveedor_productos"], []);
+    const tablesToWatch = useMemo(() => ["proveedores", "proveedor_productos", "proveedor_contactos"], []);
     const { syncErrors, handleDismissError } = useSyncErrors(tablesToWatch);
     const [recoveringErrorId, setRecoveringErrorId] = useState<string | null>(null);
 
@@ -90,15 +89,23 @@ export default function Suppliers() {
                         };
                     })
                 );
+                const contactosRelations = await p.contactos.fetch();
+                const contactos: SupplierContactRow[] = contactosRelations.map((c: any) => ({
+                    id: c.id,
+                    nombre: c.nombre,
+                    telefono: c.telefono || '',
+                    correo: c.correo || '',
+                    cargo: c.cargo || '',
+                }));
+
                 return {
                     id: p.id,
                     nombreComercial: p.nombreComercial || '',
                     razonSocial: p.razonSocial || '',
                     rfc: p.rfc || '',
-                    telefono: p.telefono || '',
-                    correoContacto: p.correoContacto || '',
                     estado: p.estado,
                     productos,
+                    contactos,
                 };
             }));
             setSuppliersList(mapped);
@@ -117,6 +124,7 @@ export default function Suppliers() {
         try {
             const provDb = database.collections.get('proveedores');
             const ppDb = database.collections.get('proveedor_productos');
+            const pcDb = database.collections.get('proveedor_contactos');
             const newId = Crypto.randomUUID();
 
             await database.write(async () => {
@@ -125,8 +133,6 @@ export default function Suppliers() {
                     p.nombreComercial = formData.nombreComercial;
                     p.razonSocial = formData.razonSocial || '';
                     p.rfc = formData.rfc || '';
-                    p.telefono = formData.telefono || '';
-                    p.correoContacto = formData.correoContacto || '';
                     p.estado = formData.estado === 'Activo';
                 });
 
@@ -141,6 +147,17 @@ export default function Suppliers() {
                             pp.tiempoEntregaDias = parseInt(prod.tiempoEntregaDias) || 0;
                         });
                     }
+                }
+                
+                for (const contacto of formData.contactos) {
+                    await pcDb.create((pc: any) => {
+                        pc._raw.id = Crypto.randomUUID();
+                        pc.proveedor.set(newProv);
+                        pc.nombre = contacto.nombre;
+                        pc.telefono = contacto.telefono;
+                        pc.correo = contacto.correo;
+                        pc.cargo = contacto.cargo;
+                    });
                 }
             });
 
@@ -164,8 +181,6 @@ export default function Suppliers() {
             nombreComercial: supplier.nombreComercial,
             razonSocial: supplier.razonSocial,
             rfc: supplier.rfc,
-            telefono: supplier.telefono,
-            correoContacto: supplier.correoContacto,
             estado: supplier.estado ? 'Activo' : 'Inactivo',
             productos: supplier.productos.map(p => ({
                 id: p.id,
@@ -174,6 +189,13 @@ export default function Suppliers() {
                 codigoProveedor: p.codigoProveedor,
                 precioCompra: String(p.precioCompra),
                 tiempoEntregaDias: String(p.tiempoEntregaDias),
+            })),
+            contactos: supplier.contactos.map(c => ({
+                id: c.id,
+                nombre: c.nombre,
+                telefono: c.telefono,
+                correo: c.correo,
+                cargo: c.cargo,
             })),
         });
         setIsModalOpen(true);
@@ -185,20 +207,21 @@ export default function Suppliers() {
         try {
             const provDb = database.collections.get('proveedores');
             const ppDb = database.collections.get('proveedor_productos');
+            const pcDb = database.collections.get('proveedor_contactos');
             const record = await provDb.find(editingId) as any;
             const existingProds = await ppDb.query(Q.where('proveedor_id', editingId)).fetch();
+            const existingContacts = await pcDb.query(Q.where('proveedor_id', editingId)).fetch();
 
             await database.write(async () => {
                 await record.update((p: any) => {
                     p.nombreComercial = formData.nombreComercial;
                     p.razonSocial = formData.razonSocial || '';
                     p.rfc = formData.rfc || '';
-                    p.telefono = formData.telefono || '';
-                    p.correoContacto = formData.correoContacto || '';
                     p.estado = formData.estado === 'Activo';
                 });
 
                 for (const ep of existingProds) { await ep.markAsDeleted(); }
+                for (const ec of existingContacts) { await ec.markAsDeleted(); }
 
                 for (const prod of formData.productos) {
                     if (prod.productoId) {
@@ -211,6 +234,17 @@ export default function Suppliers() {
                             pp.tiempoEntregaDias = parseInt(prod.tiempoEntregaDias) || 0;
                         });
                     }
+                }
+                
+                for (const contacto of formData.contactos) {
+                    await pcDb.create((pc: any) => {
+                        pc._raw.id = Crypto.randomUUID();
+                        pc.proveedor.set(record);
+                        pc.nombre = contacto.nombre;
+                        pc.telefono = contacto.telefono;
+                        pc.correo = contacto.correo;
+                        pc.cargo = contacto.cargo;
+                    });
                 }
             });
 
@@ -277,7 +311,7 @@ export default function Suppliers() {
             p.nombreComercial.toLowerCase().includes(s) ||
             p.razonSocial.toLowerCase().includes(s) ||
             p.rfc.toLowerCase().includes(s) ||
-            p.correoContacto.toLowerCase().includes(s)
+            p.contactos.some(c => c.nombre.toLowerCase().includes(s) || c.correo.toLowerCase().includes(s) || c.telefono.toLowerCase().includes(s))
         );
     }, [suppliersList, searchTerm]);
 
@@ -301,10 +335,12 @@ export default function Suppliers() {
             nombreComercial: d.nombre_comercial || d.nombreComercial || "",
             razonSocial: d.razon_social || d.razonSocial || "",
             rfc: d.rfc || "",
-            telefono: d.telefono || "",
-            correoContacto: d.correo_contacto || d.correoContacto || "",
             estado: d.estado !== false ? "Activo" : "Inactivo",
             productos: [],
+            contactos: [
+                { id: Math.random().toString(), nombre: '', telefono: '', correo: '', cargo: '' },
+                { id: Math.random().toString(), nombre: '', telefono: '', correo: '', cargo: '' }
+            ]
         });
         setEditingId(d.id || null);
         setRecoveringErrorId(err.id);
@@ -377,20 +413,36 @@ export default function Suppliers() {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex flex-col gap-1">
-                                                        {supplier.telefono && (
-                                                            <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
-                                                                <Phone className="w-3.5 h-3.5 text-slate-400" />
-                                                                <span className="text-xs">{supplier.telefono}</span>
-                                                            </div>
-                                                        )}
-                                                        {supplier.correoContacto && (
-                                                            <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
-                                                                <Mail className="w-3.5 h-3.5 text-slate-400" />
-                                                                <span className="text-xs">{supplier.correoContacto}</span>
-                                                            </div>
-                                                        )}
-                                                        {!supplier.telefono && !supplier.correoContacto && (
-                                                            <span className="text-xs text-slate-400">Sin contacto</span>
+                                                        {supplier.contactos.length > 0 ? (
+                                                            <>
+                                                                <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+                                                                    <Contact className="w-3.5 h-3.5 text-slate-400" />
+                                                                    <span className="text-xs font-semibold">{supplier.contactos[0].nombre}</span>
+                                                                </div>
+                                                                {(supplier.contactos[0].telefono || supplier.contactos[0].correo) && (
+                                                                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+                                                                        {supplier.contactos[0].telefono && (
+                                                                            <div className="flex items-center gap-1">
+                                                                                <Phone className="w-3 h-3" />
+                                                                                <span className="text-[10px]">{supplier.contactos[0].telefono}</span>
+                                                                            </div>
+                                                                        )}
+                                                                        {supplier.contactos[0].correo && (
+                                                                            <div className="flex items-center gap-1">
+                                                                                <Mail className="w-3 h-3" />
+                                                                                <span className="text-[10px]">{supplier.contactos[0].correo}</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                                {supplier.contactos.length > 1 && (
+                                                                    <div className="text-[10px] text-blue-500 dark:text-blue-400 font-medium mt-0.5">
+                                                                        + {supplier.contactos.length - 1} contacto{supplier.contactos.length > 2 ? 's' : ''} más
+                                                                    </div>
+                                                                )}
+                                                            </>
+                                                        ) : (
+                                                            <span className="text-xs text-slate-400">Sin contactos</span>
                                                         )}
                                                     </div>
                                                 </td>
