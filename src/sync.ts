@@ -1,9 +1,32 @@
+import * as Crypto from "expo-crypto";
 import { synchronize } from "@nozbe/watermelondb/sync";
 import { database } from "./services/DB/indexBD";
 import { supabase } from "./services/api/supabaseClient";
 
 export async function syncApp() {
   try {
+    // LIMPIEZA DE EMERGENCIA: Eliminar registros locales con IDs corruptos que bloquean el sync
+    await database.write(async () => {
+      const collectionsToClean = [
+        "plantillas_precios",
+        "reglas_plantilla",
+        "bitacora_errores",
+        "clientes_plantillas"
+      ];
+      for (const col of collectionsToClean) {
+        try {
+          const records = await database.get(col).query().fetch();
+          for (const r of records) {
+            if (r.id.length !== 36) {
+              await (r as any).destroyPermanently();
+            }
+          }
+        } catch (e) {
+          // Si la tabla no existe o falla, la ignoramos
+        }
+      }
+    });
+
     await synchronize({
       database,
       pullChanges: async ({ lastPulledAt }) => {
@@ -33,6 +56,7 @@ export async function syncApp() {
             for (const item of data.rechazados) {
               // A. Guardamos la evidencia en la bitácora
               await database.get("bitacora_errores").create((entry: any) => {
+                entry._raw.id = Crypto.randomUUID();
                 entry.tablaOrigen = item.tabla;
                 entry.registroId = item.id;
 

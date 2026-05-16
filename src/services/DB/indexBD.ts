@@ -20,6 +20,7 @@ import ProductoImpuesto from "./models/catalogo/productoImpuesto";
 import ProveedorProducto from "./models/catalogo/proveedorProducto";
 import PlantillaPrecio from "./models/catalogo/plantillaPrecio";
 import ReglaPlantilla from "./models/catalogo/reglaPlantilla";
+import ClientePlantilla from "./models/catalogo/clientePlantilla";
 
 import BitacoraError from "./models/registros/bitacoraError";
 import Documento from "./models/registros/documento";
@@ -57,6 +58,7 @@ export const database = new Database({
     PrecioEspecialFamiliaCliente,
     PlantillaPrecio,
     ReglaPlantilla,
+    ClientePlantilla,
 
     MovimientoInventario,
     Documento,

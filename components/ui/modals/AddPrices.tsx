@@ -2,6 +2,7 @@ import { Calculator, Info, Loader2, Search, X, Plus, Trash2, Users, Tag, Box } f
 import { useEffect, useState } from "react";
 import { usePagination } from "../../../src/hooks/usePagination";
 import { database } from "../../../src/services/DB/indexBD";
+import ErrorModal from "./ErrorModal";
 
 export interface TemplateRule {
     id: string;
@@ -56,6 +57,12 @@ export default function AddPrices({
     const [activeTarget, setActiveTarget] = useState<{ tipo: 'producto' | 'familia', id: string, name: string } | null>(null);
     const [activeDesc, setActiveDesc] = useState("0");
     const [activeFijo, setActiveFijo] = useState("0");
+
+    const [errorModal, setErrorModal] = useState<{ isOpen: boolean; title: string; message: string }>({
+        isOpen: false,
+        title: "",
+        message: "",
+    });
 
     useEffect(() => {
         if (isOpen) {
@@ -123,7 +130,11 @@ export default function AddPrices({
         const fijoNum = parseFloat(activeFijo) || 0;
 
         if (descNum === 0 && fijoNum === 0) {
-            alert("Debes poner al menos un descuento o un precio fijo.");
+            setErrorModal({
+                isOpen: true,
+                title: "Valores requeridos",
+                message: "Debes poner al menos un descuento o un precio fijo para agregar la regla."
+            });
             return;
         }
 
@@ -172,9 +183,38 @@ export default function AddPrices({
 
     const handleSave = async () => {
         if (!nombreLista.trim()) {
-            alert("El nombre de la lista es obligatorio.");
+            setErrorModal({
+                isOpen: true,
+                title: "Campo requerido",
+                message: "El nombre de la lista es obligatorio."
+            });
             return;
         }
+
+        // Validar si el nombre ya existe
+        try {
+            const plantillasDb = database.collections.get("plantillas_precios");
+            const existing = await plantillasDb.query().fetch();
+            
+            // Si estamos editando, permitimos el mismo nombre que ya tiene
+            // Si es nueva, o el nombre cambió a uno que ya existe, bloqueamos
+            const isDuplicate = existing.some((p: any) => 
+                p.nombre.toLowerCase() === nombreLista.trim().toLowerCase() && 
+                (!editData || p.nombre.toLowerCase() !== editData.nombreLista.toLowerCase())
+            );
+
+            if (isDuplicate) {
+                setErrorModal({
+                    isOpen: true,
+                    title: "Nombre duplicado",
+                    message: `Ya existe una lista con el nombre "${nombreLista.trim()}". Por favor, elige un nombre diferente.`
+                });
+                return;
+            }
+        } catch (error) {
+            console.error("Error validando nombre:", error);
+        }
+
         if (onSave) {
             await onSave({
                 nombreLista,
@@ -441,6 +481,12 @@ export default function AddPrices({
                     </div>
                 </div>
             </div>
+            <ErrorModal 
+                isOpen={errorModal.isOpen} 
+                onClose={() => setErrorModal(prev => ({ ...prev, isOpen: false }))}
+                title={errorModal.title}
+                message={errorModal.message}
+            />
         </div>
     );
 }
