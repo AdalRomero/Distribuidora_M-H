@@ -1,5 +1,6 @@
 import { Clock, Eye, FileCheck, FileCode, FileMinus, FileText, Loader2, Plus, Search, TrendingUp } from 'lucide-react';
 import { Fragment, useState, useMemo, useEffect, useCallback } from 'react';
+import { useLocalSearchParams, router } from 'expo-router';
 import { usePagination } from '../../src/hooks/usePagination';
 import AddInvoice from '../../components/ui/modals/AddInvoice';
 import SyncErrorBanner, { SyncError } from "../../components/ui/SyncErrorBanner";
@@ -108,6 +109,26 @@ export default function Invoices() {
         setRecoveringErrorId(err.id);
         setShowAddInvoice(true);
     };
+
+    const params = useLocalSearchParams();
+
+    useEffect(() => {
+        if (params.openModal === 'action_add_invoice') {
+            setShowAddInvoice(true);
+            router.setParams({ openModal: '' });
+        }
+    }, [params.openModal]);
+
+    // Listener para hotkey de acción
+    useEffect(() => {
+        const handleActionHotkey = (e: any) => {
+            if (e.detail?.actionId === 'action_add_invoice') {
+                setShowAddInvoice(true);
+            }
+        };
+        window.addEventListener('action_hotkey', handleActionHotkey);
+        return () => window.removeEventListener('action_hotkey', handleActionHotkey);
+    }, []);
 
     const filteredInvoices = invoices.filter(inv =>
         inv.folio.toLowerCase().includes(searchTerm.toLowerCase()) ||

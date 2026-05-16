@@ -133,6 +133,18 @@ export const mySchema = appSchema({
       ],
     }),
     tableSchema({
+      name: "proveedor_contactos",
+      columns: [
+        { name: "proveedor_id", type: "string", isIndexed: true },
+        { name: "nombre", type: "string" },
+        { name: "telefono", type: "string", isOptional: true },
+        { name: "correo", type: "string", isOptional: true },
+        { name: "cargo", type: "string", isOptional: true },
+        { name: "created_at", type: "number" },
+        { name: "updated_at", type: "number" },
+      ],
+    }),
+    tableSchema({
       name: "precios_especiales_familias_clientes",
       columns: [
         { name: "cliente_id", type: "string", isIndexed: true },

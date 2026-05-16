@@ -7,6 +7,7 @@ import {
   LogOut,
   Settings,
   ShelvingUnitIcon,
+  Truck,
   User,
   Users,
   Wrench,
@@ -165,6 +166,17 @@ export const SideBarMenu: React.FC = () => {
             title="Catálogos"
           >
             <BookOpen size={18} />
+          </a>
+        </Link>
+        <Link href="/suppliers" asChild>
+          <a
+            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${isActive("/suppliers")
+              ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
+              : "bg-[#15335c] border-transparent hover:bg-black/20 text-slate-300 hover:text-white"
+              }`}
+            title="Proveedores"
+          >
+            <Truck size={18} />
           </a>
         </Link>
       </div>

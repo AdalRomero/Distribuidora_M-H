@@ -23,7 +23,7 @@ import SyncErrorBanner, {
   SyncError,
 } from "../../components/ui/SyncErrorBanner";
 import { useSyncErrors } from "../../src/hooks/useSyncErrors";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, router } from "expo-router";
 import { database } from "../../src/services/DB/indexBD";
 import FamiliaModel from "../../src/services/DB/models/bases/familia";
 import LoteModel from "../../src/services/DB/models/catalogo/lote";
@@ -154,12 +154,33 @@ function InventoryContent({ productos, familias, allLotes }: InventoryProps) {
   }, [params.search]);
 
   useEffect(() => {
+    if (params.openModal === 'action_add_product') {
+      setEditProduct(null);
+      setIsAddModalOpen(true);
+      // Intentar limpiar el parámetro (expo-router)
+      router.setParams({ openModal: '' }); 
+    }
+  }, [params.openModal]);
+
+  useEffect(() => {
     const autoRecoverId = params.recoverErrorId as string;
     if (autoRecoverId && syncErrors.length > 0) {
       const err = syncErrors.find((e) => e.id === autoRecoverId);
       if (err) triggerRecoveryWrapper(err);
     }
   }, [syncErrors]);
+
+  // Listener para hotkey de acción
+  useEffect(() => {
+    const handleActionHotkey = (e: any) => {
+        if (e.detail?.actionId === 'action_add_product') {
+            setEditProduct(null);
+            setIsAddModalOpen(true);
+        }
+    };
+    window.addEventListener('action_hotkey', handleActionHotkey);
+    return () => window.removeEventListener('action_hotkey', handleActionHotkey);
+  }, []);
 
   const triggerRecoveryWrapper = (err: SyncError) => {
     setRecoverData({

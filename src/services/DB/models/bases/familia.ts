@@ -11,7 +11,9 @@ export default class Familia extends Model {
   @text('codigo_familia') codigoFamilia!: string
   @text('nombre') nombre!: string
   @field('estado') estado!: boolean
-
+  @field('umbral_verde_dias') umbralVerdeDias?: number
+  @field('umbral_amarillo_dias') umbralAmarilloDias?: number
+  @field('umbral_rojo_dias') umbralRojoDias?: number
 
   @readonly @date('created_at') createdAt!: number
   @readonly @date('updated_at') updatedAt!: number

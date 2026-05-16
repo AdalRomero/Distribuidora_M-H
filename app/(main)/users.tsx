@@ -15,6 +15,7 @@ import {
   User as UserIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useLocalSearchParams, router } from "expo-router";
 import { usePagination } from "../../src/hooks/usePagination";
 
 // Importamos tus modales
@@ -143,6 +144,28 @@ export default function Users() {
 
   useEffect(() => {
     loadUsers();
+  }, []);
+
+  const params = useLocalSearchParams();
+
+  useEffect(() => {
+      if (params.openModal === 'action_add_user') {
+          resetForm();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          router.setParams({ openModal: '' });
+      }
+  }, [params.openModal]);
+
+  // Listener para hotkey de acción
+  useEffect(() => {
+      const handleActionHotkey = (e: any) => {
+          if (e.detail?.actionId === 'action_add_user') {
+              resetForm();
+              window.scrollTo({ top: 0, behavior: "smooth" });
+          }
+      };
+      window.addEventListener('action_hotkey', handleActionHotkey);
+      return () => window.removeEventListener('action_hotkey', handleActionHotkey);
   }, []);
 
   const loadUsers = async () => {
