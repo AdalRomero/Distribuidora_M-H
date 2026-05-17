@@ -21,6 +21,9 @@ export default function Invoices() {
     const [recoveringErrorId, setRecoveringErrorId] = useState<string | null>(null);
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [readonlyMode, setReadonlyMode] = useState(false);
+    const [autoDownloadPDF, setAutoDownloadPDF] = useState(false);
+    const [autoDownloadXML, setAutoDownloadXML] = useState(false);
 
     const tablesToWatch = useMemo(() => ["documentos", "documentos_detalles"], []);
     const { syncErrors, handleDismissError } = useSyncErrors(tablesToWatch);
@@ -108,6 +111,65 @@ export default function Invoices() {
         setRecoverData(err.datosAtrapados);
         setRecoveringErrorId(err.id);
         setShowAddInvoice(true);
+    };
+
+    const openInvoiceModal = async (invId: string, action: 'view' | 'pdf' | 'xml') => {
+        try {
+            const docRecord: any = await database.collections.get('documentos').find(invId);
+            const detalles = await database.collections.get('documentos_detalles').query(Q.where('documento_id', invId)).fetch();
+            
+            let clienteRecord: any = null;
+            if (docRecord._raw.cliente_id && docRecord._raw.cliente_id !== 'publico_general') {
+                try {
+                    clienteRecord = await database.collections.get('clientes').find(docRecord._raw.cliente_id);
+                } catch { }
+            }
+
+            const recData = {
+                serie: docRecord.folio ? docRecord.folio.split('-')[0] : 'A',
+                folio: docRecord.folio && docRecord.folio.includes('-') ? docRecord.folio.split('-')[1] : docRecord.folio || '1',
+                fecha: docRecord._raw.created_at ? new Date(docRecord._raw.created_at).toISOString() : new Date().toISOString(),
+                clienteId: docRecord._raw.cliente_id,
+                nombre: clienteRecord ? clienteRecord.nombre : 'Público General',
+                rfc: clienteRecord ? clienteRecord.rfc : 'XAXX010101000',
+                domicilio: clienteRecord ? `${clienteRecord.calle || ''} ${clienteRecord.colonia || ''} ${clienteRecord.cp || ''} ${clienteRecord.ciudad || ''}`.trim() : '',
+                codigoCliente: clienteRecord ? clienteRecord.id.slice(0, 6).toUpperCase() : '',
+                conceptos: detalles.map((d: any) => {
+                    const jsonImpuestosStr = d._raw.json_impuestos_aplicados || d.jsonImpuestosAplicados;
+                    const jsonImpuestos = jsonImpuestosStr ? JSON.parse(jsonImpuestosStr) : { iva: 16 };
+                    const qty = d.cantidad || 0;
+                    const vu = d.precioUnitarioAplicado || d._raw.precio_unitario_aplicado || 0;
+                    const desc = d.descuentoAplicado || d._raw.descuento_aplicado || 0;
+                    const descPct = (qty > 0 && vu > 0 && desc > 0) ? ((desc / (qty * vu)) * 100).toFixed(2) : '0';
+                    return {
+                        id: Math.random().toString(36).slice(2),
+                        cantidad: String(qty),
+                        concepto: d.descripcionAplicada || d._raw.descripcion_aplicada || '',
+                        valorUnitario: String(vu),
+                        productoId: d._raw.producto_id,
+                        descuento: descPct,
+                        porcImpuesto: String(jsonImpuestos.iva || 16),
+                        unidadSat: 'H87',
+                        claveSat: '',
+                    }
+                }),
+                usoCFDI: 'G03',
+                tipoComprobante: docRecord.tipo === 'factura' ? 'I' : 'I',
+                metodoPago: 'PUE',
+                formaPago: '01',
+                moneda: 'MXN',
+                lugarExpedicion: '83554'
+            };
+
+            setRecoverData(recData);
+            setReadonlyMode(true);
+            setAutoDownloadPDF(action === 'pdf');
+            setAutoDownloadXML(action === 'xml');
+            setShowAddInvoice(true);
+        } catch (error) {
+            console.error("Error opening invoice details:", error);
+            alert("No se pudo cargar la factura");
+        }
     };
 
     const params = useLocalSearchParams();
@@ -285,9 +347,9 @@ export default function Invoices() {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button className="p-1.5 text-slate-400 hover:text-mh-blue hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-mh-blue/20" title="Ver Detalle"><Eye className="w-4 h-4" /></button>
-                                                        <button className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-200" title="Descargar PDF"><FileText className="w-4 h-4" /></button>
-                                                        <button className="p-1.5 text-slate-400 hover:text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:bg-indigo-500/10 rounded-lg transition-colors border border-transparent hover:border-indigo-200" title="Descargar XML"><FileCode className="w-4 h-4" /></button>
+                                                        <button onClick={() => openInvoiceModal(inv.id, 'view')} className="p-1.5 text-slate-400 hover:text-mh-blue hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-mh-blue/20" title="Ver Detalle"><Eye className="w-4 h-4" /></button>
+                                                        <button onClick={() => openInvoiceModal(inv.id, 'pdf')} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-200" title="Descargar PDF"><FileText className="w-4 h-4" /></button>
+                                                        <button onClick={() => openInvoiceModal(inv.id, 'xml')} className="p-1.5 text-slate-400 hover:text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:bg-indigo-500/10 rounded-lg transition-colors border border-transparent hover:border-indigo-200" title="Descargar XML"><FileCode className="w-4 h-4" /></button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -315,7 +377,21 @@ export default function Invoices() {
                      )}
                 </div>
             </div>
-            <AddInvoice isOpen={showAddInvoice} onClose={() => { setShowAddInvoice(false); setRecoverData(null); setRecoveringErrorId(null); }} recoverData={recoverData} onSaveSuccess={() => {
+            <AddInvoice 
+                isOpen={showAddInvoice} 
+                onClose={() => { 
+                    setShowAddInvoice(false); 
+                    setRecoverData(null); 
+                    setRecoveringErrorId(null); 
+                    setReadonlyMode(false);
+                    setAutoDownloadPDF(false);
+                    setAutoDownloadXML(false);
+                }} 
+                recoverData={recoverData} 
+                readonlyMode={readonlyMode}
+                autoDownloadPDF={autoDownloadPDF}
+                autoDownloadXML={autoDownloadXML}
+                onSaveSuccess={() => {
                 if (recoveringErrorId) {
                     handleDismissError(recoveringErrorId);
                     setRecoveringErrorId(null);

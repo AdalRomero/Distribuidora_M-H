@@ -198,7 +198,7 @@ function CatalogsContent({ familias, almacenes, impuestos, margenes, categorias 
         />
 
         {/* Tabs as Metric Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
           {tabs.map((t) => {
             const isSelected = tab === t.key;
             // Definimos clases dinámicas basadas en el color

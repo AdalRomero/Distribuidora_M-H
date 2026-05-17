@@ -4,13 +4,14 @@ import { database } from '../../../src/services/DB/indexBD';
 import { useAuth } from '../../../src/context/AuthContext';
 import * as Crypto from 'expo-crypto';
 import { LOGO_MH_B64 } from '../../../constants/logo_base64';
+import { Q } from '@nozbe/watermelondb';
 
-interface AddInvoiceProps { isOpen: boolean; onClose: () => void; recoverData?: any; onSaveSuccess?: () => void; }
+interface AddInvoiceProps { isOpen: boolean; onClose: () => void; recoverData?: any; onSaveSuccess?: () => void; readonlyMode?: boolean; autoDownloadPDF?: boolean; autoDownloadXML?: boolean; }
 interface Concepto { id: string; cantidad: string; unidadSat: string; claveSat: string; concepto: string; valorUnitario: string; descuento: string; porcImpuesto: string; productoId: string; }
 interface InvoiceForm { serie: string; folio: string; fecha: string; hora: string; tipoComprobante: string; lugarExpedicion: string; metodoPago: string; formaPago: string; moneda: string; codigoCliente: string; nombre: string; rfc: string; domicilio: string; agente: string; usoCFDI: string; observaciones: string; tipoRelacion: string; cfdiRelacionado: string; conceptos: Concepto[]; clienteId: string; }
 
 interface ClienteItem { id: string; nombre: string; rfc: string; categoria: string; listaPrecioBase: string; descuentoGlobal: number; contacto: string; calle: string; colonia: string; cp: string; ciudad: string; estado: boolean; }
-interface ProductoItem { id: string; codigoInterno: string; descripcion: string; claveSat: string; precioLista: number; precioMayoreo: number; precioMenudeo: number; estado: boolean; }
+interface ProductoItem { id: string; codigoInterno: string; descripcion: string; claveSat: string; precioLista: number; precioMayoreo: number; precioMenudeo: number; estado: boolean; stock: number; }
 interface PrecioEspecial { id: string; clienteId: string; productoId: string; descuentoPorcentaje: number; precioFijo: number; }
 
 const newConcepto = (): Concepto => ({ id: Math.random().toString(36).slice(2), cantidad: '', unidadSat: 'H87', claveSat: '', concepto: '', valorUnitario: '', descuento: '', porcImpuesto: '16', productoId: '' });
@@ -82,7 +83,7 @@ function SearchableDropdown<T extends { id: string }>({ items, value, onChange, 
     );
 }
 
-export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess }: AddInvoiceProps) {
+export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess, readonlyMode, autoDownloadPDF, autoDownloadXML }: AddInvoiceProps) {
     const { userId } = useAuth();
     const [form, setForm] = useState<InvoiceForm>(initialForm);
     const [viewMode, setViewMode] = useState<'simultaneous' | 'tabular'>('simultaneous');
@@ -104,8 +105,36 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
     useEffect(() => {
         if (isOpen) {
             loadData();
+            if (readonlyMode) {
+                setViewMode('tabular');
+                setStep('preview');
+            }
+        } else {
+            setViewMode('simultaneous');
+            setStep('capture');
         }
-    }, [isOpen]);
+    }, [isOpen, readonlyMode]);
+
+    // ==========================================
+    // AUTO DOWNLOAD (PDF / XML)
+    // ==========================================
+    useEffect(() => {
+        if (isOpen && readonlyMode && !isLoadingData) {
+            if (autoDownloadPDF) {
+                const timer = setTimeout(() => {
+                    handleDownloadPDF().then(() => onClose());
+                }, 800);
+                return () => clearTimeout(timer);
+            }
+            if (autoDownloadXML) {
+                const timer = setTimeout(() => {
+                    handleDownloadXML();
+                    onClose();
+                }, 300);
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [isOpen, readonlyMode, autoDownloadPDF, autoDownloadXML, isLoadingData]);
 
     const loadData = async () => {
         setIsLoadingData(true);
@@ -114,11 +143,19 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
             const productosDb = database.collections.get('productos');
             const preciosDb = database.collections.get('precios_especiales_clientes');
 
-            const [allC, allP, allPE] = await Promise.all([
+            const lotesDb = database.collections.get('lotes');
+            const [allC, allP, allPE, allL] = await Promise.all([
                 clientesDb.query().fetch(),
                 productosDb.query().fetch(),
                 preciosDb.query().fetch(),
+                lotesDb.query(Q.where('estado', true)).fetch(),
             ]);
+
+            const stockMap: Record<string, number> = {};
+            allL.forEach((lote: any) => {
+                const pid = lote._raw.producto_id;
+                stockMap[pid] = (stockMap[pid] || 0) + (lote.cantidad || 0);
+            });
 
             setClientes(allC.map((c: any) => ({
                 id: c.id, nombre: c.nombre || '', rfc: c.rfc || '', categoria: c.categoria || 'General',
@@ -130,6 +167,7 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
                 id: p.id, codigoInterno: p.codigoInterno || '', descripcion: p.descripcion || '',
                 claveSat: p.claveSat || '', precioLista: p.precioLista || 0,
                 precioMayoreo: p.precioMayoreo || 0, precioMenudeo: p.precioMenudeo || 0, estado: p.estado,
+                stock: stockMap[p.id] || 0,
             })));
 
             setPreciosEspeciales(allPE.map((pe: any) => ({
@@ -270,6 +308,22 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
             return;
         }
 
+        // Validación de inventario agrupando cantidades por producto
+        const cantidadesPorProducto: Record<string, number> = {};
+        for (const c of conceptosValidos) {
+            if (c.productoId && c.productoId !== 'manual') {
+                cantidadesPorProducto[c.productoId] = (cantidadesPorProducto[c.productoId] || 0) + parseFloat(c.cantidad);
+            }
+        }
+
+        for (const [prodId, cant] of Object.entries(cantidadesPorProducto)) {
+            const prod = productos.find(p => p.id === prodId);
+            if (prod && cant > prod.stock) {
+                setSaveError(`Inventario insuficiente para el producto "${prod.descripcion}". Stock disponible: ${prod.stock}, Cantidad solicitada en total: ${cant}`);
+                return;
+            }
+        }
+
         setIsSaving(true);
         try {
             const folioCompleto = `${form.serie}-${form.folio}`;
@@ -284,15 +338,24 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
                     doc._raw.cliente_id = form.clienteId || 'publico_general';
                     doc._raw.usuario_id = userId || 'unknown';
                     doc.tipo = 'factura';
+                    doc._raw.tipo = 'factura';
                     doc.folio = folioCompleto;
+                    doc._raw.folio = folioCompleto;
                     doc.estado = 'generada';
+                    doc._raw.estado = 'generada';
                     doc.subtotal = totalSubtotal;
-                    doc.totalImpuestos = totalImpuestos;
+                    doc._raw.subtotal = totalSubtotal;
+                    doc.total_impuestos = totalImpuestos;
+                    doc._raw.total_impuestos = totalImpuestos;
                     doc.total = totalFinal;
+                    doc._raw.total = totalFinal;
                 });
 
-                // 2. Crear detalles por cada concepto válido
+                // 2. Crear detalles por cada concepto válido y procesar inventario
                 const detallesCollection = database.collections.get('documentos_detalles');
+                const lotesCollection = database.collections.get('lotes');
+                const movsCollection = database.collections.get('movimientos_inventario');
+
                 for (const concepto of conceptosValidos) {
                     const detalleId = Crypto.randomUUID();
                     const calc = calcConcepto(concepto);
@@ -301,14 +364,71 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
                         det._raw.documento_id = docId;
                         det._raw.producto_id = concepto.productoId || 'manual';
                         det.cantidad = parseFloat(concepto.cantidad);
-                        det.descripcionAplicada = concepto.concepto;
-                        det.precioUnitarioAplicado = parseFloat(concepto.valorUnitario);
-                        det.descuentoAplicado = calc.descMonto;
-                        det.jsonImpuestosAplicados = JSON.stringify({
+                        det._raw.cantidad = parseFloat(concepto.cantidad);
+                        det.descripcion_aplicada = concepto.concepto;
+                        det._raw.descripcion_aplicada = concepto.concepto;
+                        det.precio_unitario_aplicado = parseFloat(concepto.valorUnitario);
+                        det._raw.precio_unitario_aplicado = parseFloat(concepto.valorUnitario);
+                        det.descuento_aplicado = calc.descMonto;
+                        det._raw.descuento_aplicado = calc.descMonto;
+                        const impJson = JSON.stringify({
                             iva: parseFloat(concepto.porcImpuesto) || 0,
                             montoIva: calc.impuestos,
                         });
+                        det.json_impuestos_aplicados = impJson;
+                        det._raw.json_impuestos_aplicados = impJson;
                     });
+
+                    // 3. Deducción de inventario (FIFO) si no es concepto manual
+                    if (concepto.productoId && concepto.productoId !== 'manual') {
+                        let cantDeducir = parseFloat(concepto.cantidad);
+                        
+                        // Obtener lotes activos del producto
+                        const lotesProducto = await lotesCollection.query(
+                            Q.where('producto_id', concepto.productoId),
+                            Q.where('estado', true)
+                        ).fetch();
+
+                        // Ordenar por fecha de caducidad (FIFO)
+                        const lotesOrdenados = lotesProducto.sort((a: any, b: any) => {
+                            const dateA = a.fecha_caducidad || Number.MAX_SAFE_INTEGER;
+                            const dateB = b.fecha_caducidad || Number.MAX_SAFE_INTEGER;
+                            return dateA - dateB;
+                        });
+
+                        for (const lote of lotesOrdenados as any[]) {
+                            if (cantDeducir <= 0) break;
+                            if (lote.cantidad <= 0) continue;
+
+                            const descuentoActual = Math.min(lote.cantidad, cantDeducir);
+                            const nuevaCantidadLote = lote.cantidad - descuentoActual;
+
+                            // Actualizar lote
+                            await lote.update((l: any) => {
+                                l.cantidad = nuevaCantidadLote;
+                                l._raw.cantidad = nuevaCantidadLote;
+                            });
+
+                            // Registrar movimiento
+                            await movsCollection.create((mov: any) => {
+                                mov._raw.id = Crypto.randomUUID();
+                                mov._raw.almacen_id = 'default';
+                                mov._raw.producto_id = concepto.productoId;
+                                mov._raw.lote_id = lote.id;
+                                mov._raw.usuario_id = userId || 'unknown';
+                                mov.tipo = 'SALIDA_VENTA';
+                                mov._raw.tipo = 'SALIDA_VENTA';
+                                mov.cantidad = descuentoActual;
+                                mov._raw.cantidad = descuentoActual;
+                            });
+
+                            cantDeducir -= descuentoActual;
+                        }
+
+                        if (cantDeducir > 0) {
+                            throw new Error(`Inconsistencia en lotes para ${concepto.concepto}`);
+                        }
+                    }
                 }
             });
 
@@ -343,7 +463,7 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
                 margin: [4, 4, 4, 4] as [number, number, number, number],
                 filename: `${folioName}.pdf`,
                 image: { type: 'jpeg' as const, quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, logging: false },
+                html2canvas: { scale: 3, useCORS: true, logging: false, windowWidth: 800 },
                 jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' as const },
             };
 
@@ -360,6 +480,45 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
             }
         }
     };
+    // ==========================================
+    // DESCARGAR XML
+    // ==========================================
+    const handleDownloadXML = () => {
+        const xmlString = `<?xml version="1.0" encoding="utf-8"?>
+<cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/4" Version="4.0" Serie="${form.serie}" Folio="${form.folio}" Fecha="${form.fecha}T${form.hora}:00" FormaPago="${form.formaPago}" SubTotal="${totalSubtotal.toFixed(2)}" Moneda="${form.moneda}" Total="${totalFinal.toFixed(2)}" TipoDeComprobante="${form.tipoComprobante}" MetodoPago="${form.metodoPago}" LugarExpedicion="${form.lugarExpedicion}">
+  <cfdi:Emisor Rfc="MICV9209288D2" Nombre="VIANEY OMARA MIRANDA CASTRO" RegimenFiscal="612" />
+  <cfdi:Receptor Rfc="${form.rfc || 'XAXX010101000'}" Nombre="${form.nombre}" DomicilioFiscalReceptor="${form.domicilio}" UsoCFDI="${form.usoCFDI}" />
+  <cfdi:Conceptos>
+    ${form.conceptos.map(c => {
+        const { subtotal, descMonto, impuestos } = calcConcepto(c);
+        return `<cfdi:Concepto ClaveProdServ="${c.claveSat}" Cantidad="${c.cantidad}" ClaveUnidad="${c.unidadSat}" Descripcion="${c.concepto}" ValorUnitario="${parseFloat(c.valorUnitario).toFixed(2)}" Importe="${subtotal.toFixed(2)}" Descuento="${descMonto.toFixed(2)}">
+      <cfdi:Impuestos>
+        <cfdi:Traslados>
+          <cfdi:Traslado Base="${(subtotal - descMonto).toFixed(2)}" Impuesto="002" TipoFactor="Tasa" TasaOCuota="${(parseFloat(c.porcImpuesto)/100).toFixed(6)}" Importe="${impuestos.toFixed(2)}" />
+        </cfdi:Traslados>
+      </cfdi:Impuestos>
+    </cfdi:Concepto>`;
+    }).join('\n    ')}
+  </cfdi:Conceptos>
+  <cfdi:Impuestos TotalImpuestosTrasladados="${totalImpuestos.toFixed(2)}">
+    <cfdi:Traslados>
+      <cfdi:Traslado Base="${(totalSubtotal - totalDesc).toFixed(2)}" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="${totalImpuestos.toFixed(2)}" />
+    </cfdi:Traslados>
+  </cfdi:Impuestos>
+</cfdi:Comprobante>`;
+
+        const blob = new Blob([xmlString], { type: 'application/xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const folioName = `Factura_${form.serie}-${form.folio}_${form.nombre.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30)}`;
+        a.download = `${folioName}.xml`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
     const removeConcepto = (id: string) => setForm(prev => ({ ...prev, conceptos: prev.conceptos.filter(c => c.id !== id) }));
 
     const totalSubtotal = form.conceptos.reduce((s, c) => s + calcConcepto(c).subtotal, 0);
@@ -567,7 +726,7 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
     );
 
     const renderPDFPreview = () => (
-        <div ref={previewRef} className="bg-white shadow-lg mx-auto" style={{ width: 680, minHeight: 880, fontFamily: 'Arial, sans-serif', fontSize: 8, lineHeight: 1.4, color: '#000', padding: '12px 16px 20px' }}>
+        <div ref={previewRef} className="bg-white shadow-lg mx-auto" style={{ width: 800, minHeight: 1050, boxSizing: 'border-box', fontFamily: 'Arial, sans-serif', fontSize: 9, lineHeight: 1.4, color: '#000', padding: '20px 24px' }}>
 
             {/* =============== HEADER: Logo + Emisor + Factura =============== */}
             <div style={{ display: 'flex', marginBottom: 8 }}>
@@ -586,7 +745,7 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
                     <p style={{ marginBottom: 0 }}>Tel: 638 102 1180</p>
                 </div>
                 {/* Factura Info */}
-                <div style={{ width: 175, flexShrink: 0, textAlign: 'left', paddingTop: 2, fontSize: 7.5 }}>
+                <div style={{ width: 175, flexShrink: 0, textAlign: 'left', paddingTop: 2, fontSize: 8 }}>
                     <p style={{ fontWeight: 'bold', fontSize: 11, marginBottom: 6 }}>Factura</p>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}><tbody>
                         <tr><td style={{ padding: '1px 0', whiteSpace: 'nowrap' }}>Serie: {form.serie || 'MH'}</td></tr>
@@ -601,7 +760,7 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
             </div>
 
             {/* =============== DATOS DEL CLIENTE =============== */}
-            <div style={{ border: '1px solid #000', padding: '4px 8px', marginBottom: 8, fontSize: 7.5 }}>
+            <div style={{ border: '1px solid #000', padding: '4px 8px', marginBottom: 8, fontSize: 8 }}>
                 <p style={{ marginBottom: 4 }}><b>Datos del cliente:</b></p>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
                     <span>Codigo Cliente: {form.codigoCliente || '01023'}</span>
@@ -643,16 +802,16 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
                             <tr key={c.id}>
                                 <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center' }}>{c.cantidad || ''}</td>
                                 <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center' }}>{c.unidadSat || ''} - Pieza</td>
-                                <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', fontSize: 6.5 }}>{c.claveSat || ''}</td>
+                                <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', fontSize: 7 }}>{c.claveSat || ''}</td>
                                 <td style={{ border: '1px solid #000', padding: '2px 3px', fontSize: 7 }}>
                                     {c.claveSat || ''} {c.concepto || '—'}
-                                    <br /><span style={{ fontSize: 6.5, color: '#555' }}>Pedimento: Aduana: Fecha:</span>
+                                    <br /><span style={{ fontSize: 7, color: '#555' }}>Pedimento: Aduana: Fecha:</span>
                                 </td>
                                 <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'right' }}>{c.valorUnitario ? `$${fmt(parseFloat(c.valorUnitario))}` : ''}</td>
                                 <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center' }}>{c.descuento ? `${c.descuento}%` : '0%'}</td>
                                 <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'right' }}>${fmt(subtotal)}</td>
                                 <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center' }}>{c.porcImpuesto} %</td>
-                                <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'left', fontSize: 6.5 }}>IVA - Importe: {fmt(impuestos)}</td>
+                                <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'left', fontSize: 7 }}>IVA - Importe: {fmt(impuestos)}</td>
                                 <td style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'right' }}>${fmt(total)}</td>
                             </tr>
                         );
@@ -668,7 +827,7 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
             </table>
 
             {/* =============== TOTALES: Importe con letra + QR | Montos =============== */}
-            <div style={{ display: 'flex', marginBottom: 10, fontSize: 7.5 }}>
+            <div style={{ display: 'flex', marginBottom: 10, fontSize: 8 }}>
                 {/* Lado izquierdo: Importe con letra, tipo relación, QR */}
                 <div style={{ flex: 1, paddingRight: 16 }}>
                     <p style={{ marginBottom: 6, textDecoration: 'underline' }}>
@@ -687,7 +846,7 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
                 </div>
                 {/* Lado derecho: Tabla de montos */}
                 <div style={{ width: 200, flexShrink: 0, paddingTop: 2 }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 7.5 }}><tbody>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 8 }}><tbody>
                         <tr><td style={{ padding: '2px 6px', textAlign: 'right' }}>Subtotal:</td><td style={{ padding: '2px 6px', textAlign: 'right', width: 80 }}>${fmt(totalSubtotal)}</td></tr>
                         <tr><td style={{ padding: '2px 6px', textAlign: 'right' }}>IEPS:</td><td style={{ padding: '2px 6px', textAlign: 'right' }}>$0.00</td></tr>
                         <tr><td style={{ padding: '2px 6px', textAlign: 'right' }}>IEPS C.:</td><td style={{ padding: '2px 6px', textAlign: 'right' }}>$0.00</td></tr>
@@ -707,7 +866,7 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
                     <tr><td style={{ border: '1px solid #000', borderTop: 'none', padding: '2px 8px' }}>No. de serie del Certificado del SAT: 00001000000505142236</td></tr>
                     <tr><td style={{ border: '1px solid #000', borderTop: 'none', padding: '2px 8px' }}>Fecha y hora de certificación: {form.fecha}T{form.hora}:05</td></tr>
                 </tbody></table>
-                <p style={{ textAlign: 'right', fontSize: 6.5, marginTop: 3 }}>*Efectos fiscales al pago</p>
+                <p style={{ textAlign: 'right', fontSize: 7, marginTop: 3 }}>*Efectos fiscales al pago</p>
             </div>
 
             {/* =============== SELLOS =============== */}
@@ -715,21 +874,21 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
                 {/* Sello digital del CFDI */}
                 <div style={{ border: '1px solid #000', marginBottom: 4 }}>
                     <div style={{ background: '#d0d0d0', padding: '2px 8px', textAlign: 'center', fontSize: 7, fontWeight: 'bold' }}>Sello digital del CFDI</div>
-                    <div style={{ padding: '3px 8px', fontSize: 5.5, wordBreak: 'break-all', fontFamily: 'monospace', lineHeight: 1.3 }}>
+                    <div style={{ padding: '3px 8px', fontSize: 6, wordBreak: 'break-all', fontFamily: 'monospace', lineHeight: 1.3 }}>
                         g1hVudoRwyMP3ogrEiA5orgGaWAN5WCgttza5rdFDhK5yWHssWUqqqAX+KMUwGW64dS0or9twwpBSx1eZ+MKJV7J2PmfADKv6e0fnML3prAN5EDA54uMEFDJgDAhdroFDWz0gTjG4+Qog6ZznNF1FtUfROXo20HPl9GlKjMtaOvP0v51NLUFER0mWOPHsg
                     </div>
                 </div>
                 {/* Sello del SAT */}
                 <div style={{ border: '1px solid #000', marginBottom: 4 }}>
                     <div style={{ background: '#d0d0d0', padding: '2px 8px', textAlign: 'center', fontSize: 7, fontWeight: 'bold' }}>Sello del SAT</div>
-                    <div style={{ padding: '3px 8px', fontSize: 5.5, wordBreak: 'break-all', fontFamily: 'monospace', lineHeight: 1.3 }}>
+                    <div style={{ padding: '3px 8px', fontSize: 6, wordBreak: 'break-all', fontFamily: 'monospace', lineHeight: 1.3 }}>
                         fkzxgXrcvfXlP6apKG1sFu5tXAxLGc0xi0rp0w/R2K5BOYrD5Sc65vbRnTn1zV0vozmkMhPs58ejEcfaJ1my1xJu6ty7bWfYDBkrtpR8IuOB34Kkn7gPC5z/XfNKd6uzGj3mjyeNm0En
                     </div>
                 </div>
                 {/* Cadena original */}
                 <div style={{ border: '1px solid #000' }}>
                     <div style={{ background: '#d0d0d0', padding: '2px 8px', textAlign: 'center', fontSize: 7, fontWeight: 'bold' }}>Cadena original del complemento de la certificación digital del SAT</div>
-                    <div style={{ padding: '3px 8px', fontSize: 5.5, wordBreak: 'break-all', fontFamily: 'monospace', lineHeight: 1.3 }}>
+                    <div style={{ padding: '3px 8px', fontSize: 6, wordBreak: 'break-all', fontFamily: 'monospace', lineHeight: 1.3 }}>
                         ||1.1|FA476ECB-C78D-42F9-A9EB-D8A9322FB87C|{form.fecha}T{form.hora}:05|INT021024I62|mnattocprdxyMAdoScrdLj6TqgrpsfM8tiSW+MuczeoegfzINIQcMovJP+Sv64Q0qqAxHKMUwGW64dS0or9twwpBSx1eZ+MKJV7J2PmfADKv6e0fnML3prAN5EDA54uMEFDJgDAhdroF||
                     </div>
                 </div>
@@ -743,7 +902,7 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
                     <span style={{ textTransform: 'uppercase' }}>{toLetras(totalFinal)}</span>{' '}
                     ({form.moneda} ${fmt(totalFinal)}) EN LA CIUDAD DE __ EL DIA DE SU VENCIMIENTO, PAGAREMOS ADEMAS INTERESES MORATORIOS HASTA SU LIQUIDACION TOTAL A RAZON DEL 3% MENSUAL SIN QUE ESTO SE CONSIDERE EL PLAZO FIJADO PARA EL CUMPLIMIENTO DE ESTA OBLIGACION.
                 </p>
-                <p style={{ fontSize: 7.5, marginTop: 8 }}>ACEPTO Y PAGARE: _______________________</p>
+                <p style={{ fontSize: 8, marginTop: 8 }}>ACEPTO Y PAGARE: _______________________</p>
             </div>
 
         </div>
@@ -767,10 +926,12 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
                             </div>
                         </div>
                         <div className="flex items-center gap-4">
-                            <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
-                                <button onClick={() => setViewMode('simultaneous')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'simultaneous' ? 'bg-white dark:bg-slate-600 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}>Vista Dividida</button>
-                                <button onClick={() => { setViewMode('tabular'); setStep('capture'); }} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'tabular' ? 'bg-white dark:bg-slate-600 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}>Modo Tabular</button>
-                            </div>
+                            {!readonlyMode && (
+                                <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
+                                    <button onClick={() => setViewMode('simultaneous')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'simultaneous' ? 'bg-white dark:bg-slate-600 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}>Vista Dividida</button>
+                                    <button onClick={() => { setViewMode('tabular'); setStep('capture'); }} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'tabular' ? 'bg-white dark:bg-slate-600 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}>Modo Tabular</button>
+                                </div>
+                            )}
                             <button onClick={handleClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
                         </div>
                     </div>
@@ -805,7 +966,7 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
                     {/* FOOTER */}
                     <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0 flex justify-between items-center gap-3">
                         <div className="flex items-center gap-3">
-                            <button type="button" onClick={handleClose} className="px-6 py-2 rounded-xl text-slate-500 dark:text-slate-400 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 transition-colors">Cancelar</button>
+                            <button type="button" onClick={handleClose} className="px-6 py-2 rounded-xl text-slate-500 dark:text-slate-400 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 transition-colors">{readonlyMode ? 'Cerrar' : 'Cancelar'}</button>
                             {saveError && (
                                 <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400 text-xs font-medium bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800">
                                     <AlertCircle className="w-3.5 h-3.5" />{saveError}
@@ -819,22 +980,30 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
                         </div>
 
                         <div className="flex gap-3">
-                            {viewMode === 'tabular' && step === 'preview' && (
-                                <button type="button" onClick={() => setStep('capture')} className="px-6 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all">Atrás a Captura</button>
-                            )}
-
-                            {viewMode === 'tabular' && step === 'capture' ? (
-                                <button type="button" onClick={() => setStep('preview')} className="px-6 py-2 rounded-xl bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white text-sm font-bold transition-all shadow-md">Siguiente (Vista Previa)</button>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={handleGenerateInvoice}
-                                    disabled={isSaving}
-                                    className={`flex items-center gap-2 px-6 py-2 rounded-xl text-white text-sm font-bold transition-all active:scale-95 shadow-md shadow-blue-500/20 ${isSaving ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
-                                >
-                                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
-                                    {isSaving ? 'Guardando...' : 'Generar Factura'}
+                            {readonlyMode ? (
+                                <button type="button" onClick={handleDownloadPDF} className="flex items-center gap-2 px-6 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition-all shadow-md">
+                                    <FileText className="w-4 h-4" />Descargar PDF
                                 </button>
+                            ) : (
+                                <>
+                                    {viewMode === 'tabular' && step === 'preview' && (
+                                        <button type="button" onClick={() => setStep('capture')} className="px-6 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all">Atrás a Captura</button>
+                                    )}
+
+                                    {viewMode === 'tabular' && step === 'capture' ? (
+                                        <button type="button" onClick={() => setStep('preview')} className="px-6 py-2 rounded-xl bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white text-sm font-bold transition-all shadow-md">Siguiente (Vista Previa)</button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={handleGenerateInvoice}
+                                            disabled={isSaving}
+                                            className={`flex items-center gap-2 px-6 py-2 rounded-xl text-white text-sm font-bold transition-all active:scale-95 shadow-md shadow-blue-500/20 ${isSaving ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                                        >
+                                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+                                            {isSaving ? 'Guardando...' : 'Generar Factura'}
+                                        </button>
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>
