@@ -1,12 +1,12 @@
-import { Calculator, Info, Loader2, Search, X, Plus, Trash2, Users, Tag, Box } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Calculator, Info, Loader2, Search, X, Plus, Trash2, Users, Tag, Box, Globe } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
 import { usePagination } from "../../../src/hooks/usePagination";
 import { database } from "../../../src/services/DB/indexBD";
 import ErrorModal from "./ErrorModal";
 
 export interface TemplateRule {
     id: string;
-    tipo: 'producto' | 'familia';
+    tipo: 'producto' | 'familia' | 'global';
     targetId: string;
     targetName: string;
     descuentoPorcentaje: string;
@@ -54,7 +54,7 @@ export default function AddPrices({
     const [productSearch, setProductSearch] = useState("");
     const [familySearch, setFamilySearch] = useState("");
 
-    const [activeTarget, setActiveTarget] = useState<{ tipo: 'producto' | 'familia', id: string, name: string } | null>(null);
+    const [activeTarget, setActiveTarget] = useState<{ tipo: 'producto' | 'familia' | 'global', id: string, name: string } | null>(null);
     const [activeDesc, setActiveDesc] = useState("0");
     const [activeFijo, setActiveFijo] = useState("0");
 
@@ -229,7 +229,31 @@ export default function AddPrices({
     const filteredProductos = productos.filter(p => p.label.toLowerCase().includes(productSearch.toLowerCase()));
     const filteredFamilias = familias.filter(f => f.label.toLowerCase().includes(familySearch.toLowerCase()));
 
-    const { visible: visibleClientes, hasMore: hasMoreClientes, loadMore: loadMoreClientes } = usePagination(filteredClientes, 10);
+    const { visible: visibleClientes, hasMore: hasMoreClientes, loadMore: loadMoreClientes } = usePagination(filteredClientes, 6);
+
+    // Infinite Scroll Observer
+    const observerTarget = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && hasMoreClientes) {
+                    loadMoreClientes();
+                }
+            },
+            { threshold: 0.1 }
+        );
+
+        if (observerTarget.current) {
+            observer.observe(observerTarget.current);
+        }
+
+        return () => {
+            if (observerTarget.current) {
+                observer.unobserve(observerTarget.current);
+            }
+        };
+    }, [hasMoreClientes, loadMoreClientes]);
 
     if (!isOpen) return null;
 
@@ -270,6 +294,25 @@ export default function AddPrices({
                                             placeholder="Ej. Mayoreo, Distribuidores Especiales..."
                                             className="w-full border-b-2 border-slate-200 dark:border-slate-700 bg-transparent px-2 py-3 text-lg font-bold text-slate-800 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
                                         />
+                                    </div>
+
+                                    {/* Descuento Global */}
+                                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 rounded-lg">
+                                                <Globe className="w-5 h-5" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-slate-800 dark:text-white">Descuento Global</h4>
+                                                <p className="text-xs text-slate-500">Se aplicará a toda la lista de precios y se acumula con otros descuentos</p>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={() => setActiveTarget({ tipo: 'global', id: 'global', name: 'Descuento Global' })}
+                                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeTarget?.tipo === 'global' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600'}`}
+                                        >
+                                            Configurar
+                                        </button>
                                     </div>
 
                                     {/* Sección de Selección Dividida */}
@@ -342,7 +385,7 @@ export default function AddPrices({
                                                     <div className="bg-white dark:bg-slate-800 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center min-h-[42px]">
                                                         {activeTarget ? (
                                                             <span className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
-                                                                {activeTarget.tipo === 'familia' ? 'Familia: ' : 'Producto: '}{activeTarget.name}
+                                                                {activeTarget.tipo === 'global' ? '' : activeTarget.tipo === 'familia' ? 'Familia: ' : 'Producto: '}{activeTarget.name}
                                                             </span>
                                                         ) : (
                                                             <span className="text-sm text-slate-400 italic">Selecciona un elemento arriba...</span>
@@ -383,8 +426,8 @@ export default function AddPrices({
                                                 {reglas.map(r => (
                                                     <div key={r.id} className="flex items-center justify-between px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                                         <div className="flex items-center gap-3">
-                                                            <div className={`p-1.5 rounded-lg ${r.tipo === 'familia' ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'}`}>
-                                                                {r.tipo === 'familia' ? <Box className="w-4 h-4" /> : <Tag className="w-4 h-4" />}
+                                                            <div className={`p-1.5 rounded-lg ${r.tipo === 'global' ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400' : r.tipo === 'familia' ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'}`}>
+                                                                {r.tipo === 'global' ? <Globe className="w-4 h-4" /> : r.tipo === 'familia' ? <Box className="w-4 h-4" /> : <Tag className="w-4 h-4" />}
                                                             </div>
                                                             <div>
                                                                 <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{r.targetName}</p>
@@ -456,9 +499,10 @@ export default function AddPrices({
                                                 ))}
                                                 {filteredClientes.length === 0 && <p className="p-4 text-center text-slate-400 text-sm">No hay clientes con ese nombre.</p>}
                                                 {hasMoreClientes && (
-                                                    <button onClick={loadMoreClientes} className="w-full py-2 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors">
-                                                        Cargar más ({filteredClientes.length - visibleClientes.length} restantes)
-                                                    </button>
+                                                    <div ref={observerTarget} className="w-full py-4 flex justify-center items-center gap-2 text-slate-400">
+                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                        <span className="text-xs font-bold">Cargando más clientes...</span>
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>

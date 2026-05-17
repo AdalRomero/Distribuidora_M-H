@@ -11,7 +11,7 @@ import {
   Plus,
   Search
 } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { usePagination } from "../../src/hooks/usePagination";
 import AddEntry from "../../components/ui/modals/AddEntry";
 import AddInventory from "../../components/ui/modals/AddInventory";
@@ -126,7 +126,32 @@ function InventoryContent({ productos, familias, allLotes }: InventoryProps) {
       return a.estado ? -1 : 1;
     });
 
-  const { visible: visibleProductos, hasMore: hasMoreProductos, loadMore: loadMoreProductos, reset: resetInvPage } = usePagination(filteredProductos, 10);
+  const { visible: visibleProductos, hasMore: hasMoreProductos, loadMore: loadMoreProductos, reset: resetInvPage } = usePagination(filteredProductos, 6);
+  
+  // Infinite Scroll Observer
+  const observerTarget = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMoreProductos) {
+          loadMoreProductos();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current);
+      }
+    };
+  }, [hasMoreProductos, loadMoreProductos]);
+
   useEffect(() => { resetInvPage(); }, [searchTerm, filterFamilia, selectedAlertFilters]);
 
   const tablesToWatch = useMemo(
@@ -641,15 +666,13 @@ function InventoryContent({ productos, familias, allLotes }: InventoryProps) {
           </div>
         )}
 
-        {/* Load More */}
+        {/* Infinite Scroll Trigger */}
         {!selectedProduct && hasMoreProductos && (
-          <div className="flex justify-center mt-6">
-            <button
-              onClick={loadMoreProductos}
-              className="px-8 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors shadow-sm"
-            >
-              Cargar más ({filteredProductos.length - visibleProductos.length} restantes)
-            </button>
+          <div ref={observerTarget} className="flex justify-center mt-6 py-4">
+            <div className="flex items-center gap-2 text-slate-400">
+              <Package className="w-5 h-5 animate-pulse" />
+              <span className="text-sm font-medium">Cargando más productos...</span>
+            </div>
           </div>
         )}
 

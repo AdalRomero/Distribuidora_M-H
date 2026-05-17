@@ -17,7 +17,8 @@ import {
   ToggleRight,
   Trash2,
   Warehouse,
-  X
+  X,
+  Users
 } from "lucide-react";
 import React, { useState } from "react";
 import ErrorModal from "../../components/ui/modals/ErrorModal";
@@ -25,6 +26,7 @@ import SuccessModal from "../../components/ui/modals/SuccessModal";
 import WarningModal from "../../components/ui/modals/WarningModal";
 import { database } from "../../src/services/DB/indexBD";
 import AlmacenModel from "../../src/services/DB/models/bases/almacen";
+import CategoriaClienteModel from "../../src/services/DB/models/bases/categoriaCliente";
 import FamiliaModel from "../../src/services/DB/models/bases/familia";
 import ImpuestoModel from "../../src/services/DB/models/bases/impuesto";
 import MargenModel from "../../src/services/DB/models/bases/margen";
@@ -34,13 +36,14 @@ import { useSyncErrors } from "../../src/hooks/useSyncErrors";
 import { useMemo, useEffect } from "react";
 
 // ─── Types ──────────────────────────────────────────────────
-type ActiveTab = "familias" | "almacenes" | "impuestos" | "margenes";
+type ActiveTab = "familias" | "almacenes" | "impuestos" | "margenes" | "categorias";
 
 interface CatalogsProps {
   familias: FamiliaModel[];
   almacenes: AlmacenModel[];
   impuestos: ImpuestoModel[];
   margenes: MargenModel[];
+  categorias: CategoriaClienteModel[];
 }
 
 // ─── Modal State type ────────────────────────────────────────
@@ -58,7 +61,7 @@ const initialModalState: ModalState = {
 
 
 // ─── Main Component ─────────────────────────────────────────
-function CatalogsContent({ familias, almacenes, impuestos, margenes }: CatalogsProps) {
+function CatalogsContent({ familias, almacenes, impuestos, margenes, categorias }: CatalogsProps) {
   const [tab, setTab] = useState<ActiveTab>("familias");
   const [modal, setModal] = useState<ModalState>(initialModalState);
   const [syncing, setSyncing] = useState(false);
@@ -79,7 +82,7 @@ function CatalogsContent({ familias, almacenes, impuestos, margenes }: CatalogsP
 
   const handleRecoverWrapper = (err: SyncError) => {
      const tabla = err.tabla_origen as ActiveTab;
-     if (['familias', 'almacenes', 'impuestos', 'margenes'].includes(tabla)) {
+     if (['familias', 'almacenes', 'impuestos', 'margenes', 'categorias'].includes(tabla)) {
         setTab(tabla);
         setRecoverData({ tabla, data: err.datosAtrapados, errorId: err.id });
         showSuccess("Datos Recuperados", "Revisa el formulario para editar y re-enviar.");
@@ -152,6 +155,13 @@ function CatalogsContent({ familias, almacenes, impuestos, margenes }: CatalogsP
         count: margenes.length,
         colorClass: "indigo",
       },
+      {
+        key: "categorias",
+        label: "Cat. Clientes",
+        icon: <Users className="w-6 h-6" />,
+        count: categorias.length,
+        colorClass: "purple",
+      },
     ];
 
   return (
@@ -167,7 +177,7 @@ function CatalogsContent({ familias, almacenes, impuestos, margenes }: CatalogsP
           <div>
             <h1 className="text-2xl font-bold text-mh-blue-dark dark:text-white tracking-tight">Catálogos</h1>
             <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-              Administra las bases de datos de Familias, Almacenes, Impuestos y Márgenes
+              Administra las bases de datos de Familias, Almacenes, Impuestos, Márgenes y Categorías de Clientes
             </p>
           </div>
           {syncing && (
@@ -197,6 +207,7 @@ function CatalogsContent({ familias, almacenes, impuestos, margenes }: CatalogsP
               amber: { border: "border-amber-500", gradient: "from-amber-500/10 dark:from-amber-400/15", iconBgSelected: "bg-amber-50 dark:bg-amber-900/30", iconTextSelected: "text-amber-500", shadowStr: "shadow-amber-500/5" },
               emerald: { border: "border-emerald-500", gradient: "from-emerald-500/10 dark:from-emerald-400/15", iconBgSelected: "bg-emerald-50 dark:bg-emerald-900/30", iconTextSelected: "text-emerald-600 dark:text-emerald-500", shadowStr: "shadow-emerald-500/5" },
               indigo: { border: "border-indigo-500", gradient: "from-indigo-500/10 dark:from-indigo-400/15", iconBgSelected: "bg-indigo-50 dark:bg-indigo-900/30", iconTextSelected: "text-indigo-600 dark:text-indigo-400", shadowStr: "shadow-indigo-500/5" },
+              purple: { border: "border-purple-500", gradient: "from-purple-500/10 dark:from-purple-400/15", iconBgSelected: "bg-purple-50 dark:bg-purple-900/30", iconTextSelected: "text-purple-600 dark:text-purple-400", shadowStr: "shadow-purple-500/5" },
             };
             const cInfo = colorMap[t.colorClass];
 
@@ -242,6 +253,7 @@ function CatalogsContent({ familias, almacenes, impuestos, margenes }: CatalogsP
         {tab === "almacenes" && <AlmacenesTab almacenes={almacenes} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} recoverData={recoverData} onRecoverSaveSuccess={handleRecoverSaveSuccess} />}
         {tab === "impuestos" && <ImpuestosTab impuestos={impuestos} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} recoverData={recoverData} onRecoverSaveSuccess={handleRecoverSaveSuccess} />}
         {tab === "margenes" && <MargenesTab margenes={margenes} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} recoverData={recoverData} onRecoverSaveSuccess={handleRecoverSaveSuccess} />}
+        {tab === "categorias" && <CategoriasTab categorias={categorias} showSuccess={showSuccess} showError={showError} showWarning={showWarning} syncAfterOp={syncAfterOp} recoverData={recoverData} onRecoverSaveSuccess={handleRecoverSaveSuccess} />}
       </div>
     </div>
   );
@@ -1409,6 +1421,263 @@ function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterO
   );
 }
 
+// ═══════════════════════════════════════════════════════════
+// CATEGORIAS DE CLIENTES TAB
+// ═══════════════════════════════════════════════════════════
+function CategoriasTab({ categorias, showSuccess, showError, showWarning, syncAfterOp, recoverData, onRecoverSaveSuccess }: { categorias: CategoriaClienteModel[] } & TabCallbacks) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [nombre, setNombre] = useState("");
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editNombre, setEditNombre] = useState("");
+
+  useEffect(() => {
+     if (recoverData?.tabla === "categorias") {
+        setShowAdd(true);
+        setNombre(recoverData.data?.nombre || "");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+     }
+  }, [recoverData]);
+
+  const handleAdd = async () => {
+    if (!nombre) {
+      showError("Campo requerido", "El nombre de la categoría es obligatorio.");
+      return;
+    }
+    const duplicado = categorias.find(
+      (c) => c.nombre.trim().toLowerCase() === nombre.trim().toLowerCase()
+    );
+    if (duplicado) {
+      showError("Nombre duplicado", `Ya existe una categoría con el nombre "${nombre}".`);
+      return;
+    }
+    try {
+      await database.write(async () => {
+        await database.get<CategoriaClienteModel>("categorias_clientes").create((c) => {
+          c._raw.id = Crypto.randomUUID();
+          c.nombre = nombre;
+          c.estado = true;
+        });
+      });
+      showSuccess("Categoría creada", `La categoría "${nombre}" se ha guardado correctamente.`);
+      setNombre("");
+      setShowAdd(false);
+      if (onRecoverSaveSuccess) onRecoverSaveSuccess();
+      await syncAfterOp();
+    } catch (e: any) {
+      showError("Error al crear", e.message || "No se pudo crear la categoría.");
+    }
+  };
+
+  const handleSaveEdit = async (c: CategoriaClienteModel) => {
+    try {
+      await database.write(async () => {
+        await c.update((record) => {
+          record.nombre = editNombre;
+        });
+      });
+      setEditId(null);
+      showSuccess("Categoría actualizada", `Los cambios en "${editNombre}" se guardaron correctamente.`);
+      await syncAfterOp();
+    } catch (e: any) {
+      showError("Error al actualizar", e.message || "No se pudo actualizar la categoría.");
+    }
+  };
+
+  const toggleEstado = async (c: CategoriaClienteModel) => {
+    const nuevoEstado = !c.estado;
+    const doToggle = async () => {
+      try {
+        await database.write(async () => {
+          await c.update((record) => {
+            record.estado = nuevoEstado;
+          });
+        });
+        showSuccess(
+          nuevoEstado ? "Categoría activada" : "Categoría desactivada",
+          `"${c.nombre}" ahora está ${nuevoEstado ? "activa" : "inactiva"}.`
+        );
+        await syncAfterOp();
+      } catch (e: any) {
+        showError("Error", e.message || "No se pudo cambiar el estado.");
+      }
+    };
+
+    if (!nuevoEstado) {
+      const count = await database.collections.get("clientes").query(Q.where("categoria", c.nombre)).fetchCount();
+      if (count > 0) {
+        showWarning(
+          "Aviso de Afectación",
+          `Al desactivar esta categoría, hay ${count} cliente(s) que tienen esta categoría asignada. ¿Deseas continuar?`,
+          doToggle
+        );
+        return;
+      }
+    }
+    doToggle();
+  };
+
+  return (
+    <div>
+      <div className="flex justify-end mb-4">
+        <button
+          onClick={() => setShowAdd(!showAdd)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm shadow-sm"
+        >
+          <Plus className="w-4 h-4" />
+          Nueva Categoría
+        </button>
+      </div>
+
+      {showAdd && (
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-blue-100 mb-6 space-y-4">
+          <h3 className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+            <Plus className="w-4 h-4 text-blue-500" />
+            Crear Nueva Categoría
+          </h3>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+              Nombre *
+            </label>
+            <input
+              type="text"
+              className="w-full max-w-md px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="Ej. General"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setShowAdd(false)}
+              className="px-4 py-2 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 rounded-lg transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleAdd}
+              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors font-medium shadow-sm"
+            >
+              Guardar
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-100 dark:border-slate-700">
+            <tr>
+              <th className="px-6 py-4">Nombre</th>
+              <th className="px-6 py-4">Estado</th>
+              <th className="px-6 py-4 text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {categorias.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={3}
+                  className="px-6 py-10 text-center text-slate-400"
+                >
+                  No hay categorías registradas.
+                </td>
+              </tr>
+            ) : (
+              categorias.map((c) => (
+                <tr
+                  key={c.id}
+                  className={`hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900/50 transition-colors group ${!c.estado ? 'opacity-50 bg-slate-50 dark:bg-slate-900/30' : ''}`}
+                >
+                  {editId === c.id ? (
+                    <>
+                      <td className="px-6 py-3">
+                        <input
+                          type="text"
+                          className="px-2 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm w-60 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                          value={editNombre}
+                          onChange={(e) => setEditNombre(e.target.value)}
+                        />
+                      </td>
+                      <td className="px-6 py-3"></td>
+                      <td className="px-6 py-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => handleSaveEdit(c)}
+                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setEditId(null)}
+                            className="p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 rounded-lg"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center">
+                            <Users className="w-4 h-4 text-purple-600 dark:text-purple-500" />
+                          </div>
+                          <span className="font-medium text-slate-800 dark:text-white">
+                            {c.nombre}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => toggleEstado(c)}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 ${c.estado
+                            ? "bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+                            : "bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50"
+                            }`}
+                        >
+                          {c.estado ? (
+                            <>
+                              <ToggleRight className="w-6 h-6 text-emerald-500" />
+                              <span className="text-xs font-bold text-emerald-600">
+                                Activo
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <ToggleLeft className="w-6 h-6 text-slate-400" />
+                              <span className="text-xs font-bold text-slate-400">
+                                Inactivo
+                              </span>
+                            </>
+                          )}
+                        </button>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => {
+                              setEditId(c.id);
+                              setEditNombre(c.nombre);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ─── withObservables Wrapper ────────────────────────────────
 export default withObservables([], () => ({
   familias: database.collections
@@ -1425,6 +1694,10 @@ export default withObservables([], () => ({
     .observe(),
   margenes: database.collections
     .get<MargenModel>("margenes")
+    .query()
+    .observe(),
+  categorias: database.collections
+    .get<CategoriaClienteModel>("categorias_clientes")
     .query()
     .observe(),
 }))(CatalogsContent);

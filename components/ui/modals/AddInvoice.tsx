@@ -203,6 +203,8 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
         let precio = producto.precioLista; // default
         let descuento = '';
 
+        let descuentoTotal = 0;
+
         if (selectedCliente) {
             // Determinar precio según lista del cliente
             switch (selectedCliente.listaPrecioBase) {
@@ -211,20 +213,23 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
                 default: precio = producto.precioLista; break;
             }
 
-            // Aplicar descuento global del cliente si existe
+            // Acumular descuento global del cliente si existe
             if (selectedCliente.descuentoGlobal > 0) {
-                descuento = String(selectedCliente.descuentoGlobal);
+                descuentoTotal += selectedCliente.descuentoGlobal;
             }
         }
 
-        // Precio especial sobreescribe todo
+        // Agregar precio especial / descuento especial acumulado
         if (precioEsp) {
             if (precioEsp.precioFijo > 0) {
                 precio = precioEsp.precioFijo;
-                descuento = '';
             } else if (precioEsp.descuentoPorcentaje > 0) {
-                descuento = String(precioEsp.descuentoPorcentaje);
+                descuentoTotal += precioEsp.descuentoPorcentaje;
             }
+        }
+        
+        if (descuentoTotal > 0) {
+            descuento = String(descuentoTotal);
         }
 
         setForm(prev => ({

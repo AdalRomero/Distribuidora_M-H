@@ -160,7 +160,9 @@ export default function Prices() {
             tipo: r.tipo as "producto" | "familia",
             targetId: r.targetId,
             targetName:
-              r.tipo === "producto"
+              r.tipo === "global"
+                ? "Descuento Global"
+                : r.tipo === "producto"
                 ? productoMap.get(r.targetId)
                 : familiaMap.get(r.targetId),
             descuentoPorcentaje: String(r.descuentoPorcentaje || 0),
@@ -278,6 +280,7 @@ export default function Prices() {
         for (const c of clientsToClear) {
           await (c as any).update((r: any) => {
             r.lista_precio_base = null;
+            r.descuentoGlobal = 0;
           });
           const rP = await pProdDb.query(Q.where("cliente_id", c.id)).fetch();
           for (const r of rP) await (r as any).markAsDeleted();
@@ -290,6 +293,7 @@ export default function Prices() {
           const c = (await clientesDb.find(cid)) as any;
           await c.update((r: any) => {
             r.lista_precio_base = formData.nombreLista;
+            r.descuentoGlobal = 0;
           });
 
           const rP = await pProdDb.query(Q.where("cliente_id", cid)).fetch();
@@ -298,7 +302,11 @@ export default function Prices() {
           for (const r of rF) await (r as any).markAsDeleted();
 
           for (const r of formData.reglas) {
-            if (r.tipo === "producto") {
+            if (r.tipo === "global") {
+              await c.update((rec: any) => {
+                rec.descuentoGlobal = Number(r.descuentoPorcentaje) || 0;
+              });
+            } else if (r.tipo === "producto") {
               await pProdDb.create((rec: any) => {
                 rec._raw.id = Crypto.randomUUID();
                 rec.cliente.id = cid;
@@ -438,7 +446,31 @@ export default function Prices() {
     hasMore: hasMoreLists,
     loadMore: loadMoreLists,
     reset: resetPricePage,
-  } = usePagination(filteredLists, 5);
+  } = usePagination(filteredLists, 6);
+
+  // Infinite Scroll Observer
+  const observerTarget = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMoreLists) {
+          loadMoreLists();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current);
+      }
+    };
+  }, [hasMoreLists, loadMoreLists]);
   useEffect(() => {
     resetPricePage();
   }, [searchTerm]);
@@ -632,16 +664,13 @@ export default function Prices() {
           </div>
         )}
 
-        {/* Load More */}
+        {/* Infinite Scroll Trigger */}
         {hasMoreLists && (
-          <div className="flex justify-center mt-6">
-            <button
-              onClick={loadMoreLists}
-              className="px-8 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors shadow-sm"
-            >
-              Cargar más ({filteredLists.length - visibleLists.length}{" "}
-              restantes)
-            </button>
+          <div ref={observerTarget} className="flex justify-center mt-6 py-4">
+            <div className="flex items-center gap-2 text-slate-400">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span className="text-sm font-medium">Cargando más listas...</span>
+            </div>
           </div>
         )}
 

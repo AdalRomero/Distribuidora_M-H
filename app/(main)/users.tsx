@@ -14,7 +14,7 @@ import {
   Unlock,
   User as UserIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useLocalSearchParams, router } from "expo-router";
 import { usePagination } from "../../src/hooks/usePagination";
 
@@ -620,7 +620,32 @@ export default function Users() {
     );
   }, [usersList, searchTerm]);
 
-  const { visible: visibleUsers, hasMore: hasMoreUsers, loadMore: loadMoreUsers, reset: resetUsersPage } = usePagination(filteredUsers, 8);
+  const { visible: visibleUsers, hasMore: hasMoreUsers, loadMore: loadMoreUsers, reset: resetUsersPage } = usePagination(filteredUsers, 6);
+
+  // Infinite Scroll Observer
+  const observerTarget = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMoreUsers) {
+          loadMoreUsers();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current);
+      }
+    };
+  }, [hasMoreUsers, loadMoreUsers]);
+
   useEffect(() => { resetUsersPage(); }, [searchTerm]);
 
   const StatusBadge = ({ active }: { active: boolean }) => (
@@ -853,15 +878,13 @@ export default function Users() {
               </div>
             </div>
 
-            {/* Load More */}
+            {/* Infinite Scroll Trigger */}
             {hasMoreUsers && (
-              <div className="flex justify-center mt-4">
-                <button
-                  onClick={loadMoreUsers}
-                  className="px-8 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors shadow-sm"
-                >
-                  Cargar más ({filteredUsers.length - visibleUsers.length} restantes)
-                </button>
+              <div ref={observerTarget} className="flex justify-center mt-4 py-4">
+                <div className="flex items-center gap-2 text-slate-400">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span className="text-sm font-medium">Cargando más usuarios...</span>
+                </div>
               </div>
             )}
           </div>

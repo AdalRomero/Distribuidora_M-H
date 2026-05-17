@@ -461,6 +461,14 @@ export default function AddClient({
             });
             
             currentForm.listaPrecios = autoName;
+            
+            // Set global discount for custom list
+            const globalRule = form.discountRules.find(r => r.type === "global");
+            if (globalRule) {
+                currentForm.descuentoGlobal = String(parseFloat(globalRule.percentage) || 0);
+            } else {
+                currentForm.descuentoGlobal = "0";
+            }
         } catch (error) {
             console.error('Error al crear plantilla personalizada:', error);
             setErrorModal({
@@ -469,6 +477,14 @@ export default function AddClient({
                 message: "No se pudo crear la lista de precios personalizada. Intente de nuevo."
             });
             return;
+        }
+    } else {
+        // Set global discount from standard template rules
+        const globalRule = templateRules.find(r => r.type === "global");
+        if (globalRule) {
+            currentForm.descuentoGlobal = String(parseFloat(globalRule.percentage) || 0);
+        } else {
+            currentForm.descuentoGlobal = "0";
         }
     }
 
@@ -770,26 +786,12 @@ export default function AddClient({
                             name="listaPrecios"
                             value={form.listaPrecios}
                             onChange={(e) => {
-                              if (e.target.value === "NEW") {
-                                setIsAddingPriceList(true);
-                                setForm((prev) => ({
-                                  ...prev,
-                                  discountRules: [],
-                                }));
-                              } else {
-                                handlePriceListChange(e.target.value);
-                              }
+                              handlePriceListChange(e.target.value);
                             }}
                             className={inputClass}
                           >
                             <option value="" disabled hidden>
                               Selecciona lista de precios
-                            </option>
-                            <option
-                              value="NEW"
-                              className="text-blue-600 font-bold"
-                            >
-                              + Nuevo
                             </option>
                             {customPriceLists.map((list) => (
                               <option key={list} value={list}>

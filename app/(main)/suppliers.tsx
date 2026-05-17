@@ -1,6 +1,6 @@
 import * as Crypto from 'expo-crypto';
 import { Building2, Plus, Search, Edit2, Loader2, Trash2, ToggleRight, ToggleLeft, Phone, Mail, Package, ChevronDown, ChevronUp, Contact } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
 import { usePagination } from '../../src/hooks/usePagination';
 import { Q } from '@nozbe/watermelondb';
@@ -340,7 +340,32 @@ export default function Suppliers() {
         );
     }, [suppliersList, searchTerm]);
 
-    const { visible, hasMore, loadMore, reset } = usePagination(filtered, 5);
+    const { visible, hasMore, loadMore, reset } = usePagination(filtered, 6);
+    
+    // Infinite Scroll Observer
+    const observerTarget = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && hasMore) {
+                    loadMore();
+                }
+            },
+            { threshold: 0.1 }
+        );
+
+        if (observerTarget.current) {
+            observer.observe(observerTarget.current);
+        }
+
+        return () => {
+            if (observerTarget.current) {
+                observer.unobserve(observerTarget.current);
+            }
+        };
+    }, [hasMore, loadMore]);
+
     useEffect(() => { reset(); }, [searchTerm]);
 
     // ==========================================
@@ -554,12 +579,13 @@ export default function Suppliers() {
                     </div>
                 </div>
 
-                {/* Load More */}
+                {/* Infinite Scroll Trigger */}
                 {hasMore && (
-                    <div className="flex justify-center mt-6">
-                        <button onClick={loadMore} className="px-8 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors shadow-sm">
-                            Cargar más ({filtered.length - visible.length} restantes)
-                        </button>
+                    <div ref={observerTarget} className="flex justify-center mt-6 py-4">
+                        <div className="flex items-center gap-2 text-slate-400">
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <span className="text-sm font-medium">Cargando más proveedores...</span>
+                        </div>
                     </div>
                 )}
 
