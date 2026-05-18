@@ -17,6 +17,9 @@ import {
 import { useEffect, useState } from "react";
 import { supabase } from "../../../src/services/api/supabaseClient";
 import { database } from "../../../src/services/DB/indexBD";
+import WarningModal from "../../../components/ui/modals/WarningModal";
+import ErrorModal from "../../../components/ui/modals/ErrorModal";
+import SuccessModal from "../../../components/ui/modals/SuccessModal";
 
 // Interfaz para los usuarios combinados
 interface UserData {
@@ -52,6 +55,39 @@ export default function DevAuth() {
   const [usersList, setUsersList] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [viewMode, setViewMode] = useState<"LOCAL" | "NUBE">("LOCAL");
+
+  // States for custom modals
+  const [warningConfig, setWarningConfig] = useState<{
+    isOpen: boolean;
+    onConfirm: () => void;
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    onConfirm: () => {},
+    title: "",
+    message: "",
+  });
+
+  const [errorConfig, setErrorConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+  });
+
+  const [successConfig, setSuccessConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+  });
 
   useEffect(() => {
     loadUsers();
@@ -111,22 +147,53 @@ export default function DevAuth() {
     }
   };
 
-  const handleSendResetLink = async (userEmail: string | null) => {
+  const handleSendResetLink = (userEmail: string | null) => {
     if (!userEmail || userEmail === "Sin correo") {
-      alert("Este usuario no tiene un correo válido registrado.");
+      setErrorConfig({
+        isOpen: true,
+        title: "Correo Inválido",
+        message: "Este usuario no tiene un correo válido registrado."
+      });
       return;
     }
-    if (!confirm(`¿Enviar link de recuperación a ${userEmail}?`)) return;
-
-    const { error } = await supabase.auth.resetPasswordForEmail(userEmail);
-    if (error) alert("Error: " + error.message);
-    else alert("✅ Link de reseteo enviado a " + userEmail);
+    setWarningConfig({
+      isOpen: true,
+      title: "Enviar Link de Recuperación",
+      message: `¿Enviar link de recuperación a ${userEmail}?`,
+      onConfirm: () => doSendResetLink(userEmail)
+    });
   };
 
-  const handleToggleRole = async (userId: string, currentRole: string) => {
-    const newRole = currentRole === "DEV" ? "Empleado" : "DEV";
-    if (!confirm(`¿Cambiar el rol de este usuario a ${newRole}?`)) return;
+  const doSendResetLink = async (userEmail: string) => {
+    setWarningConfig(prev => ({ ...prev, isOpen: false }));
+    const { error } = await supabase.auth.resetPasswordForEmail(userEmail);
+    if (error) {
+      setErrorConfig({
+        isOpen: true,
+        title: "Error de Recuperación",
+        message: error.message
+      });
+    } else {
+      setSuccessConfig({
+        isOpen: true,
+        title: "Link Enviado",
+        message: `✅ Link de reseteo enviado a ${userEmail}`
+      });
+    }
+  };
 
+  const handleToggleRole = (userId: string, currentRole: string) => {
+    const newRole = currentRole === "DEV" ? "Empleado" : "DEV";
+    setWarningConfig({
+      isOpen: true,
+      title: "Cambiar Rol",
+      message: `¿Cambiar el rol de este usuario a ${newRole}?`,
+      onConfirm: () => doToggleRole(userId, newRole)
+    });
+  };
+
+  const doToggleRole = async (userId: string, newRole: string) => {
+    setWarningConfig(prev => ({ ...prev, isOpen: false }));
     try {
       // 1. Actualizar en Supabase
       const { error: supabaseError } = await supabase
@@ -150,21 +217,37 @@ export default function DevAuth() {
         console.warn("Información no encontrada localmente, pero rol actualizado en la nube.");
       }
 
-      alert(`✅ Rol actualizado a ${newRole} en la nube y localmente.`);
+      setSuccessConfig({
+        isOpen: true,
+        title: "Rol Actualizado",
+        message: `Rol actualizado a ${newRole} en la nube y localmente.`
+      });
       loadUsers();
     } catch (error: any) {
-      alert(`Error al actualizar rol: ${error.message}`);
+      setErrorConfig({
+        isOpen: true,
+        title: "Error al Actualizar Rol",
+        message: error.message
+      });
     }
   };
 
-  const handleToggleStatus = async (
+  const handleToggleStatus = (
     userId: string,
     currentStatus: boolean,
     username: string,
   ) => {
     const action = currentStatus ? "DESACTIVAR" : "REACTIVAR";
-    if (!confirm(`¿Deseas ${action} el acceso de ${username}?`)) return;
+    setWarningConfig({
+      isOpen: true,
+      title: `${action === "DESACTIVAR" ? "Desactivar" : "Reactivar"} Acceso`,
+      message: `¿Deseas ${action} el acceso de ${username}?`,
+      onConfirm: () => doToggleStatus(userId, currentStatus, action)
+    });
+  };
 
+  const doToggleStatus = async (userId: string, currentStatus: boolean, action: string) => {
+    setWarningConfig(prev => ({ ...prev, isOpen: false }));
     try {
       // 1. Actualizar en Supabase
       const { error: supabaseError } = await supabase
@@ -188,10 +271,18 @@ export default function DevAuth() {
         console.warn("Usuario no encontrado localmente, pero actualizado en la nube.");
       }
 
-      alert(`✅ Usuario ${action}D en la nube y localmente.`);
+      setSuccessConfig({
+        isOpen: true,
+        title: "Estado Actualizado",
+        message: `Usuario ${action}D en la nube y localmente.`
+      });
       loadUsers();
     } catch (error: any) {
-      alert(`Error al actualizar estado: ${error.message}`);
+      setErrorConfig({
+        isOpen: true,
+        title: "Error al Actualizar Estado",
+        message: error.message
+      });
     }
   };
 
@@ -657,6 +748,25 @@ export default function DevAuth() {
           </div>
         </div>
       </div>
+      <WarningModal
+        isOpen={warningConfig.isOpen}
+        onClose={() => setWarningConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={warningConfig.onConfirm}
+        title={warningConfig.title}
+        message={warningConfig.message}
+      />
+      <ErrorModal
+        isOpen={errorConfig.isOpen}
+        onClose={() => setErrorConfig(prev => ({ ...prev, isOpen: false }))}
+        title={errorConfig.title}
+        message={errorConfig.message}
+      />
+      <SuccessModal
+        isOpen={successConfig.isOpen}
+        onClose={() => setSuccessConfig(prev => ({ ...prev, isOpen: false }))}
+        title={successConfig.title}
+        message={successConfig.message}
+      />
     </div>
   );
 }

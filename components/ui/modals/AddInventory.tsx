@@ -88,6 +88,7 @@ function AddInventoryInner({
   const [imageExt, setImageExt] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedIcon, setSelectedIcon] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (isOpen && recoverData?.data) {
@@ -250,7 +251,7 @@ function AddInventoryInner({
     if (source === "camera") {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        alert("Se requieren permisos de cámara");
+        setError("Se requieren permisos de cámara");
         return;
       }
       result = await ImagePicker.launchCameraAsync(options);
@@ -258,7 +259,7 @@ function AddInventoryInner({
       const permission =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        alert("Se requieren permisos de galería");
+        setError("Se requieren permisos de galería");
         return;
       }
       result = await ImagePicker.launchImageLibraryAsync(options);
@@ -290,13 +291,15 @@ function AddInventoryInner({
     setImageUri(null);
     setImageBase64(null);
     setSelectedIcon(null);
+    setError(null);
   }
 
   const handleSave = async () => {
     try {
+      setError(null);
       if (!nombre || !codigoInterno) {
-        alert(
-          "Por favor llena los campos obligatorios (Nombre y Código Interno).",
+        setError(
+          "Por favor llena los campos obligatorios (Nombre y Código Interno)."
         );
         return;
       }
@@ -307,7 +310,7 @@ function AddInventoryInner({
       const pMenudeo = parseFloat(precioMenudeoManual) || 0;
 
       if (pLista <= 0) {
-        alert("Define al menos el Precio de Lista.");
+        setError("Define al menos el Precio de Lista.");
         return;
       }
 
@@ -442,7 +445,7 @@ function AddInventoryInner({
       onClose();
     } catch (error: any) {
       console.error("Error saving product:", error);
-      alert("Error al guardar: " + error.message);
+      setError("Error al guardar: " + error.message);
       setIsUploading(false);
     }
   };
@@ -472,6 +475,12 @@ function AddInventoryInner({
             <X className="w-6 h-6" />
           </button>
         </div>
+
+        {error && (
+          <div className="mx-8 mt-4 p-3 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-xs rounded-xl border border-rose-100 dark:border-rose-800 font-medium animate-in fade-in slide-in-from-top-1">
+            ⚠️ {error}
+          </div>
+        )}
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">

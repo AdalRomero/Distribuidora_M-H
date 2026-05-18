@@ -456,7 +456,11 @@ export default function AddClient({
 
   const handleSave = async () => {
     if (!form.nombre.trim()) {
-      alert("El nombre o razón social es obligatorio.");
+      setErrorModal({
+        isOpen: true,
+        title: "Campo Requerido",
+        message: "El nombre o razón social es obligatorio."
+      });
       return;
     }
 

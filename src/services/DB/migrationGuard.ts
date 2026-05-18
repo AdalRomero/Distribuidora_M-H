@@ -58,11 +58,6 @@ Acción requerida:
 `;
       console.error(errorMsg);
       
-      // Intentamos lanzar un alert de bloqueo visual si estamos en hilo principal UI
-      try {
-        alert(errorMsg);
-      } catch (e) {}
-
       throw new Error(errorMsg);
     }
   }

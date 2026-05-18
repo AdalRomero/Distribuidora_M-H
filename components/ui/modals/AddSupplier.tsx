@@ -150,13 +150,16 @@ export default function AddSupplier({ isOpen, onClose, onSave, isLoading = false
 
     // Catálogo de productos para el buscador
     const [productosDisponibles, setProductosDisponibles] = useState<{ id: string; nombre: string; codigo: string }[]>([]);
+    const [error, setError] = useState<string | null>(null);
 
     // Sync form when editData changes or modal opens
     useEffect(() => {
         if (isOpen && editData) {
             setForm(editData);
+            setError(null);
         } else if (isOpen && !editData) {
             setForm(initialState);
+            setError(null);
         }
         if (isOpen) {
             loadProductos();
@@ -239,9 +242,10 @@ export default function AddSupplier({ isOpen, onClose, onSave, isLoading = false
     };
 
     const removeContactRow = (id: string) => {
+        setError(null);
         setForm(prev => {
             if (prev.contactos.length <= 2) {
-                alert('Debe mantener al menos 2 contactos.');
+                setError('Debe mantener al menos 2 contactos.');
                 return prev;
             }
             return {
@@ -259,31 +263,34 @@ export default function AddSupplier({ isOpen, onClose, onSave, isLoading = false
     };
 
     const handleSave = async () => {
+        setError(null);
         if (!form.nombreComercial.trim()) {
-            alert('El nombre comercial es obligatorio.');
+            setError('El nombre comercial es obligatorio.');
             return;
         }
 
         if (form.contactos.length < 2) {
-            alert('Debe ingresar al menos 2 contactos.');
+            setError('Debe ingresar al menos 2 contactos.');
             return;
         }
 
         const invalidContacts = form.contactos.some(c => !c.nombre.trim());
         if (invalidContacts) {
-            alert('Todos los contactos deben tener al menos un nombre.');
+            setError('Todos los contactos deben tener al menos un nombre.');
             return;
         }
         if (onSave) {
             await onSave(form);
         }
         setForm(initialState);
+        setError(null);
         onClose();
     };
 
     const handleClose = () => {
         if (isLoading) return;
         setForm(initialState);
+        setError(null);
         onClose();
     };
 
@@ -301,6 +308,12 @@ export default function AddSupplier({ isOpen, onClose, onSave, isLoading = false
                             <h3 className="text-xl font-bold text-slate-800 dark:text-white">{isEditMode ? 'Editar Proveedor' : 'Agregar Nuevo Proveedor'}</h3>
                             <button onClick={handleClose} disabled={isLoading} className="p-2 text-slate-400 hover:text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 rounded-lg transition-colors disabled:opacity-50"><X className="w-5 h-5" /></button>
                         </div>
+
+                        {error && (
+                            <div className="mx-6 mt-4 p-3 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-xs rounded-xl border border-rose-100 dark:border-rose-800 font-medium animate-in fade-in slide-in-from-top-1">
+                                ⚠️ {error}
+                            </div>
+                        )}
 
                         {/* Body */}
                         <div className="p-6 bg-slate-50 dark:bg-slate-900/50 overflow-y-auto flex-1">

@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { database } from "../../../src/services/DB/indexBD";
+import WarningModal from "../../../components/ui/modals/WarningModal";
+import ErrorModal from "../../../components/ui/modals/ErrorModal";
 
 // Interfaz adaptada a tu modelo BitacoraError
 interface SyncError {
@@ -27,7 +29,31 @@ export default function DevSyncPanel() {
   const router = useRouter();
   const [errors, setErrors] = useState<SyncError[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedError, setSelectedError] = useState<SyncError | null>(null);
+
+  // States for custom modals
+  const [warningConfig, setWarningConfig] = useState<{
+    isOpen: boolean;
+    onConfirm: () => void;
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    onConfirm: () => {},
+    title: "",
+    message: "",
+  });
+
+  const [errorConfig, setErrorConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+  });
 
   useEffect(() => {
     loadErrors();
@@ -61,14 +87,17 @@ export default function DevSyncPanel() {
     }
   };
 
-  const handleResolveError = async (errorId: string) => {
-    if (
-      !confirm(
-        "¿Marcar como resuelto? Esto eliminará el log de error localmente.",
-      )
-    )
-      return;
+  const handleResolveError = (errorId: string) => {
+    setWarningConfig({
+      isOpen: true,
+      title: "¿Marcar como Resuelto?",
+      message: "¿Deseas marcar este error como resuelto? Esto eliminará el log de error localmente.",
+      onConfirm: () => doResolveError(errorId)
+    });
+  };
 
+  const doResolveError = async (errorId: string) => {
+    setWarningConfig(prev => ({ ...prev, isOpen: false }));
     try {
       const bitacoraDb = database.collections.get("bitacora_errores");
       const record = await bitacoraDb.find(errorId);
@@ -83,7 +112,11 @@ export default function DevSyncPanel() {
 
       loadErrors();
     } catch (error) {
-      alert("No se pudo eliminar el error.");
+      setErrorConfig({
+        isOpen: true,
+        title: "Error al Eliminar",
+        message: "No se pudo eliminar el error de la bitácora."
+      });
     }
   };
 
@@ -268,6 +301,19 @@ export default function DevSyncPanel() {
           )}
         </div>
       </div>
+      <WarningModal
+        isOpen={warningConfig.isOpen}
+        onClose={() => setWarningConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={warningConfig.onConfirm}
+        title={warningConfig.title}
+        message={warningConfig.message}
+      />
+      <ErrorModal
+        isOpen={errorConfig.isOpen}
+        onClose={() => setErrorConfig(prev => ({ ...prev, isOpen: false }))}
+        title={errorConfig.title}
+        message={errorConfig.message}
+      />
     </div>
   );
 }

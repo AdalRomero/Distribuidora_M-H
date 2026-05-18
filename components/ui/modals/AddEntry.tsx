@@ -64,6 +64,7 @@ function AddEntryInner({
     ImpuestoModel[]
   >([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Auto-fill from recoverData
   useEffect(() => {
@@ -167,12 +168,14 @@ function AddEntryInner({
     setUltimoCosto(null);
     setProductoMargen(null);
     setProductoImpuestosTasas([]);
+    setError(null);
   }
 
   const handleSave = async () => {
     try {
+      setError(null);
       if (!productoId || !almacenId || !lote || !cantidad || !costo) {
-        alert("Por favor llena los campos obligatorios.");
+        setError("Por favor llena los campos obligatorios.");
         return;
       }
       setIsSaving(true);
@@ -230,7 +233,7 @@ function AddEntryInner({
       onClose();
     } catch (error: any) {
       console.error("Error Registrando Entrada:", error);
-      alert("Error al guardar: " + error.message);
+      setError("Error al guardar: " + error.message);
       setIsSaving(false);
     }
   };
@@ -294,6 +297,12 @@ function AddEntryInner({
             <X className="w-6 h-6" />
           </button>
         </div>
+
+        {error && (
+          <div className="mx-8 mt-4 p-3 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-xs rounded-xl border border-rose-100 dark:border-rose-800 font-medium animate-in fade-in slide-in-from-top-1">
+            ⚠️ {error}
+          </div>
+        )}
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">

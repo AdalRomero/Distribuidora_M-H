@@ -2,12 +2,37 @@ import { useRouter } from "expo-router";
 import { ArrowLeft, Database, Edit3, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { database } from "../../../src/services/DB/indexBD";
+import WarningModal from "../../../components/ui/modals/WarningModal";
+import ErrorModal from "../../../components/ui/modals/ErrorModal";
 
 export default function DevDatabase() {
   const router = useRouter();
   const [activeTable, setActiveTable] = useState<string>("perfiles");
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // States for custom modals
+  const [warningConfig, setWarningConfig] = useState<{
+    isOpen: boolean;
+    onConfirm: () => void;
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    onConfirm: () => {},
+    title: "",
+    message: "",
+  });
+
+  const [errorConfig, setErrorConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+  });
 
   // Lista de todas las tablas en tu base de datos
   const tables = ["perfiles", "informacion_perfil", "permisos"];
@@ -39,22 +64,32 @@ export default function DevDatabase() {
   };
 
   // Función para borrar un registro específico
-  const handleDelete = async (id: string) => {
-    if (!confirm("¿Estás seguro de borrar este registro permanentemente?"))
-      return;
+  const handleDelete = (id: string) => {
+    setWarningConfig({
+      isOpen: true,
+      title: "¿Borrar Registro?",
+      message: "¿Estás seguro de borrar este registro permanentemente?",
+      onConfirm: () => doDelete(id)
+    });
+  };
 
+  const doDelete = async (id: string) => {
+    setWarningConfig(prev => ({ ...prev, isOpen: false }));
     try {
       const collection = database.collections.get(activeTable);
       const record = await collection.find(id);
 
       await database.write(async () => {
-        await record.destroyPermanently(); // O markAsDeleted() si usas sync
+        await record.destroyPermanently();
       });
 
-      // Recargamos la lista
       fetchRecords();
-    } catch (error) {
-      alert("Error al borrar: " + error);
+    } catch (error: any) {
+      setErrorConfig({
+        isOpen: true,
+        title: "Error al Borrar",
+        message: "Error al borrar: " + error.message
+      });
     }
   };
 
@@ -174,6 +209,19 @@ export default function DevDatabase() {
           </table>
         </div>
       </div>
+      <WarningModal
+        isOpen={warningConfig.isOpen}
+        onClose={() => setWarningConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={warningConfig.onConfirm}
+        title={warningConfig.title}
+        message={warningConfig.message}
+      />
+      <ErrorModal
+        isOpen={errorConfig.isOpen}
+        onClose={() => setErrorConfig(prev => ({ ...prev, isOpen: false }))}
+        title={errorConfig.title}
+        message={errorConfig.message}
+      />
     </div>
   );
 }

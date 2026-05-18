@@ -4,6 +4,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { usePagination } from '../../src/hooks/usePagination';
 import AddInvoice from '../../components/ui/modals/AddInvoice';
 import SyncErrorBanner, { SyncError } from "../../components/ui/SyncErrorBanner";
+import ErrorModal from '../../components/ui/modals/ErrorModal';
 import { useSyncErrors } from "../../src/hooks/useSyncErrors";
 import { database } from '../../src/services/DB/indexBD';
 import { Q } from '@nozbe/watermelondb';
@@ -24,6 +25,7 @@ export default function Invoices() {
     const [readonlyMode, setReadonlyMode] = useState(false);
     const [autoDownloadPDF, setAutoDownloadPDF] = useState(false);
     const [autoDownloadXML, setAutoDownloadXML] = useState(false);
+    const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
 
     const tablesToWatch = useMemo(() => ["documentos", "documentos_detalles"], []);
     const { syncErrors, handleDismissError } = useSyncErrors(tablesToWatch);
@@ -168,7 +170,7 @@ export default function Invoices() {
             setShowAddInvoice(true);
         } catch (error) {
             console.error("Error opening invoice details:", error);
-            alert("No se pudo cargar la factura");
+            setIsErrorModalOpen(true);
         }
     };
 
@@ -399,6 +401,12 @@ export default function Invoices() {
                 }
                 loadInvoices();
             }} />
+            <ErrorModal
+                isOpen={isErrorModalOpen}
+                onClose={() => setIsErrorModalOpen(false)}
+                title="Error al Cargar Factura"
+                message="No se pudo cargar la factura especificada. Intenta nuevamente."
+            />
         </Fragment>
     );
 }

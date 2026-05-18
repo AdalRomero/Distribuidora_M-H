@@ -19,6 +19,8 @@ export default function EditLote({ isOpen, onClose, lote }: EditLoteProps) {
     const [fechaCaducidad, setFechaCaducidad] = useState("");
     const [isSaving, setIsSaving] = useState(false);
 
+    const [error, setError] = useState<string | null>(null);
+
     useEffect(() => {
         if (isOpen && lote) {
             setIdentificadorLote(lote.identificadorLote);
@@ -37,6 +39,7 @@ export default function EditLote({ isOpen, onClose, lote }: EditLoteProps) {
             setCostoAdquisicion("");
             setCantidad("");
             setFechaCaducidad("");
+            setError(null);
         }
     }, [isOpen, lote]);
 
@@ -46,9 +49,10 @@ export default function EditLote({ isOpen, onClose, lote }: EditLoteProps) {
 
     const handleSave = async () => {
         if (!identificadorLote || !costoAdquisicion) {
-            alert("Identificador y Costo son obligatorios");
+            setError("Identificador y Costo son obligatorios");
             return;
         }
+        setError(null);
         setIsSaving(true);
         try {
             await database.write(async () => {
@@ -111,7 +115,7 @@ export default function EditLote({ isOpen, onClose, lote }: EditLoteProps) {
             onClose();
         } catch (error: any) {
             console.error("Error editando lote:", error);
-            alert("Error al guardar: " + error.message);
+            setError("Error al guardar: " + error.message);
             setIsSaving(false);
         }
     };
@@ -134,6 +138,12 @@ export default function EditLote({ isOpen, onClose, lote }: EditLoteProps) {
                         <X className="w-5 h-5" />
                     </button>
                 </div>
+
+                {error && (
+                    <div className="mx-6 mt-4 p-3 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-xs rounded-xl border border-rose-100 dark:border-rose-800 font-medium animate-in fade-in slide-in-from-top-1">
+                        ⚠️ {error}
+                    </div>
+                )}
 
                 <div className="p-6 space-y-5">
                     <div>
