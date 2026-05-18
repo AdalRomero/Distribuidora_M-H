@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from "@nozbe/watermelondb";
 
 export const mySchema = appSchema({
-  version: 28,
+  version: 30,
   tables: [
     // ==================
     // 1. USUARIOS Y PERMISOS
@@ -37,6 +37,7 @@ export const mySchema = appSchema({
         { name: "precios", type: "boolean" },
         { name: "usuarios", type: "boolean" },
         { name: "configuraciones", type: "boolean" },
+        { name: "borrar", type: "boolean" },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
@@ -317,6 +318,7 @@ export const mySchema = appSchema({
       name: "plantillas_precios",
       columns: [
         { name: "nombre", type: "string" },
+        { name: "estado", type: "boolean" },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],

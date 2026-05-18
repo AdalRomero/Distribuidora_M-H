@@ -23,6 +23,7 @@ import SyncErrorBanner, {
   SyncError,
 } from "../../components/ui/SyncErrorBanner";
 import { useSyncErrors } from "../../src/hooks/useSyncErrors";
+import { useIntegrity } from "../../src/context/IntegrityContext";
 import { useLocalSearchParams, router } from "expo-router";
 import { database } from "../../src/services/DB/indexBD";
 import FamiliaModel from "../../src/services/DB/models/bases/familia";
@@ -38,6 +39,7 @@ interface InventoryProps {
 
 function InventoryContent({ productos, familias, allLotes }: InventoryProps) {
   const params = useLocalSearchParams();
+  const { scan: scanIntegrity } = useIntegrity();
   const [searchTerm, setSearchTerm] = useState((params.search as string) || "");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAddEntryOpen, setIsAddEntryOpen] = useState(false);
@@ -53,11 +55,35 @@ function InventoryContent({ productos, familias, allLotes }: InventoryProps) {
   const [isFamiliaDropdownOpen, setIsFamiliaDropdownOpen] = useState(false);
   const [familiaSearchTerm, setFamiliaSearchTerm] = useState("");
 
-  const handleDelete = (producto: ProductoModel) => {
+  const handleToggleStatus = (producto: ProductoModel) => {
     setDeleteProduct(producto);
   };
 
-  const confirmDelete = async () => {
+  const handleSoftDelete = (producto: ProductoModel) => {
+    setWarningModalConfig({
+        isOpen: true,
+        title: 'Borrar Producto',
+        message: `¿Estás seguro que deseas borrar el producto "${producto.descripcion}"? No se eliminará de la base de datos, solo dejará de mostrarse en la app.`,
+        onConfirm: async () => {
+            setWarningModalConfig(prev => ({ ...prev, isOpen: false }));
+            try {
+                await database.write(async () => {
+                    await producto.markAsDeleted();
+                });
+                syncApp().catch(console.error);
+                scanIntegrity('soft_delete').catch(console.error);
+            } catch (error) {
+                console.error("Error al borrar el producto:", error);
+            }
+        }
+    });
+  };
+
+  const [warningModalConfig, setWarningModalConfig] = useState<{
+        isOpen: boolean; title: string; message: string; onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
+
+  const confirmToggle = async () => {
     if (!deleteProduct) return;
     const newEstado = !deleteProduct.estado; // toggle
     await database.write(async () => {
@@ -77,6 +103,7 @@ function InventoryContent({ productos, familias, allLotes }: InventoryProps) {
     });
     setDeleteProduct(null);
     syncApp().catch(console.error);
+    scanIntegrity('deactivate').catch(console.error);
   };
 
   const productAlertLevels = useMemo(() => {
@@ -627,6 +654,7 @@ function InventoryContent({ productos, familias, allLotes }: InventoryProps) {
                     <th className="px-6 py-4">Fiscal y Finanzas</th>
 
                     <th className="px-6 py-4">Existencia y Cad</th>
+                    <th className="px-6 py-4 text-center">Estado</th>
                     <th className="px-6 py-4 text-center">Acciones</th>
                   </tr>
                 </thead>
@@ -655,7 +683,8 @@ function InventoryContent({ productos, familias, allLotes }: InventoryProps) {
                         key={item.id}
                         producto={item}
                         onClick={() => setSelectedProduct(item)}
-                        onDelete={(p: ProductoModel) => handleDelete(p)}
+                        onToggleStatus={(p: ProductoModel) => handleToggleStatus(p)}
+                        onSoftDelete={(p: ProductoModel) => handleSoftDelete(p)}
                         onEdit={(p: ProductoModel) => handleEditProduct(p)}
                       />
                     ))
@@ -703,9 +732,16 @@ function InventoryContent({ productos, familias, allLotes }: InventoryProps) {
           }}
         />
         <WarningModal
+          isOpen={warningModalConfig.isOpen}
+          onClose={() => setWarningModalConfig(prev => ({ ...prev, isOpen: false }))}
+          onConfirm={warningModalConfig.onConfirm}
+          title={warningModalConfig.title}
+          message={warningModalConfig.message}
+        />
+        <WarningModal
           isOpen={!!deleteProduct}
           onClose={() => setDeleteProduct(null)}
-          onConfirm={confirmDelete}
+          onConfirm={confirmToggle}
           title={
             deleteProduct?.estado === false
               ? "Reactivar Producto"

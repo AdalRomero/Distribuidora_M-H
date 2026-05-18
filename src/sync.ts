@@ -3,6 +3,43 @@ import { synchronize } from "@nozbe/watermelondb/sync";
 import { database } from "./services/DB/indexBD";
 import { supabase } from "./services/api/supabaseClient";
 
+function registerMassDeletionIncident(reason: string) {
+  if (typeof localStorage === "undefined") return;
+  try {
+    const raw = localStorage.getItem("dist_mh_integrity_incidents");
+    const incidents = raw ? JSON.parse(raw) : [];
+    
+    // Evitamos duplicar incidencias pendientes del mismo tipo
+    const exists = incidents.some((i: any) => i.ruleId === "sync_masivo_bloqueado" && i.status !== "resolved");
+    if (exists) return;
+
+    const newIncident = {
+      id: "sync_blocked_" + Date.now(),
+      ruleId: "sync_masivo_bloqueado",
+      severity: "critical",
+      title: "Sincronización Bloqueada: Borrado Masivo",
+      description: reason,
+      affectedCount: 1,
+      resolvedCount: 0,
+      detectedAt: Date.now(),
+      updatedAt: Date.now(),
+      status: "pending",
+      meta: {
+        reason,
+        details: "Se ha bloqueado el envío de eliminaciones locales a la base de datos central de Supabase."
+      }
+    };
+
+    incidents.push(newIncident);
+    localStorage.setItem("dist_mh_integrity_incidents", JSON.stringify(incidents));
+    
+    // Lanzamos evento global para que las vistas del panel reaccionen en tiempo real
+    window.dispatchEvent(new Event("storage"));
+  } catch (e) {
+    console.error("Error al registrar incidencia de borrado masivo:", e);
+  }
+}
+
 export async function syncApp() {
   try {
     // LIMPIEZA DE EMERGENCIA: Eliminar registros locales con IDs corruptos que bloquean el sync
@@ -38,9 +75,48 @@ export async function syncApp() {
 
         return { changes: data.changes, timestamp: data.timestamp };
       },
-
-
       pushChanges: async ({ changes }) => {
+        // --- BLINDAJE DE SINCRONIZACIÓN CONTRA BORRADOS MASIVOS ---
+        const CRITICAL_TABLES = [
+          "productos",
+          "lotes",
+          "clientes",
+          "proveedores",
+          "documentos",
+          "movimientos_inventario",
+          "producto_impuestos",
+          "codigos_alternos",
+          "proveedor_productos"
+        ];
+
+        let suspicious = false;
+        let suspiciousReason = "";
+
+        for (const tableName of CRITICAL_TABLES) {
+          const tableChanges = (changes as any)[tableName];
+          if (tableChanges?.deleted && tableChanges.deleted.length > 0) {
+            const deletedCount = tableChanges.deleted.length;
+            
+            // Si el intento de eliminación supera un límite seguro (ej. 10 registros)
+            if (deletedCount > 10) {
+              suspicious = true;
+              suspiciousReason = `Se detectó un intento de eliminación masiva de ${deletedCount} registros en la tabla crítica '${tableName}'.`;
+              break;
+            }
+          }
+        }
+
+        if (suspicious && typeof localStorage !== "undefined" && localStorage.getItem("bypass_bulk_delete_protection") !== "true") {
+          registerMassDeletionIncident(suspiciousReason);
+          localStorage.setItem("sync_blocked_reason", suspiciousReason);
+          throw new Error(`SYNC_BLOCKED_MASS_DELETION: ${suspiciousReason}`);
+        }
+
+        // Si pasó la protección o se forzó el bypass, reiniciamos la bandera de bypass
+        if (typeof localStorage !== "undefined") {
+          localStorage.removeItem("bypass_bulk_delete_protection");
+        }
+
         // Enviamos los cambios a Supabase
         const { data, error } = await supabase.rpc("push_changes", {
           changes: changes,

@@ -5,6 +5,8 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { usePagination } from '../../src/hooks/usePagination';
 import { Q } from '@nozbe/watermelondb';
 import AddSupplier, { SupplierData, SupplierProductRow, SupplierContactRow } from '../../components/ui/modals/AddSupplier';
+import { useAuth } from '../../src/context/AuthContext';
+import { useIntegrity } from '../../src/context/IntegrityContext';
 
 import ErrorModal from '../../components/ui/modals/ErrorModal';
 import SuccessModal from '../../components/ui/modals/SuccessModal';
@@ -36,6 +38,8 @@ interface SupplierItem {
 }
 
 export default function Suppliers() {
+    const { userRole, canDelete } = useAuth();
+    const { scan: scanIntegrity } = useIntegrity();
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [suppliersList, setSuppliersList] = useState<SupplierItem[]>([]);
@@ -330,6 +334,7 @@ export default function Suppliers() {
                 await database.write(async () => { await record.update((p: any) => { p.estado = false; }); });
                 setMessage({ type: 'success', text: `Proveedor "${name}" desactivado. Los registros históricos permanecen intactos.` });
                 loadSuppliers(); syncApp().catch(console.error);
+                scanIntegrity('deactivate').catch(console.error);
             } catch (error: any) { setMessage({ type: 'error', text: 'Error: ' + error.message }); }
         };
 
@@ -410,8 +415,8 @@ export default function Suppliers() {
     // ==========================================
     const handleDelete = (id: string, name: string) => {
         setWarningModalConfig({
-            isOpen: true, title: 'Eliminar Proveedor',
-            message: `¿Estás seguro que deseas eliminar al proveedor "${name}"? Esta acción no se puede deshacer.`,
+            isOpen: true, title: 'Borrar Proveedor',
+            message: `¿Estás seguro que deseas borrar al proveedor "${name}"? No se eliminará de la base de datos, solo dejará de mostrarse en la app.`,
             onConfirm: async () => {
                 setWarningModalConfig(prev => ({ ...prev, isOpen: false }));
                 try {
@@ -419,6 +424,7 @@ export default function Suppliers() {
                     await database.write(async () => { await record.markAsDeleted(); });
                     setMessage({ type: 'success', text: `Proveedor "${name}" eliminado correctamente. Sincronizando...` });
                     loadSuppliers(); syncApp().catch(console.error);
+                    scanIntegrity('soft_delete').catch(console.error);
                 } catch (error: any) { setMessage({ type: 'error', text: 'Error al eliminar el proveedor: ' + error.message }); }
             },
         });
@@ -541,11 +547,11 @@ export default function Suppliers() {
                             </thead>
                             <tbody className="divide-y divide-slate-50">
                                 {isLoadingTable ? (
-                                    <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                                    <tr><td colSpan={4} className="px-6 py-12 text-center text-slate-400">
                                         <div className="flex items-center justify-center gap-2"><Loader2 className="w-5 h-5 animate-spin" /> Cargando proveedores...</div>
                                     </td></tr>
                                 ) : visible.length === 0 ? (
-                                    <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                                    <tr><td colSpan={4} className="px-6 py-12 text-center text-slate-400">
                                         {searchTerm ? 'No se encontraron proveedores que coincidan.' : 'No hay proveedores registrados. ¡Agrega el primero!'}
                                     </td></tr>
                                 ) : (
@@ -612,31 +618,32 @@ export default function Suppliers() {
                                                         )}
                                                     </button>
                                                 </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex justify-center">
-                                                        <button
-                                                            onClick={() => handleToggleStatus(supplier.id, supplier.nombreComercial, supplier.estado)}
-                                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 ${supplier.estado
-                                                                ? 'bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50'
-                                                                : 'bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50'
-                                                                }`}
-                                                        >
-                                                            {supplier.estado ? (
-                                                                <><ToggleRight className="w-6 h-6 text-emerald-500" /><span className="text-xs font-bold text-emerald-600">Activo</span></>
-                                                            ) : (
-                                                                <><ToggleLeft className="w-6 h-6 text-slate-400" /><span className="text-xs font-bold text-slate-400">Inactivo</span></>
-                                                            )}
-                                                        </button>
-                                                    </div>
+                                                <td className="px-6 py-4 text-center">
+                                                    <button
+                                                        onClick={() => handleToggleStatus(supplier.id, supplier.nombreComercial, supplier.estado)}
+                                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${supplier.estado ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                                    >
+                                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${supplier.estado ? 'translate-x-5' : 'translate-x-1'}`} />
+                                                    </button>
                                                 </td>
                                                 <td className="px-4 py-4">
-                                                    <div className="flex items-center justify-center gap-1">
-                                                        <button onClick={() => startEdit(supplier)} className="p-2 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors" title="Editar proveedor">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <button
+                                                            onClick={() => startEdit(supplier)}
+                                                            className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg transition-colors"
+                                                            title="Editar proveedor"
+                                                        >
                                                             <Edit2 className="w-4 h-4" />
                                                         </button>
-                                                        <button onClick={() => handleDelete(supplier.id, supplier.nombreComercial)} className="p-2 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors" title="Eliminar proveedor">
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
+                                                        {canDelete && (
+                                                            <button
+                                                                onClick={() => handleDelete(supplier.id, supplier.nombreComercial)}
+                                                                className="p-1.5 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg transition-colors"
+                                                                title="Borrar proveedor"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>

@@ -18,11 +18,13 @@ import {
   Cherry,
   ChefHat,
   Coffee,
-  Apple
+  Apple,
+  Trash2
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { of } from "rxjs";
 import { switchMap } from "rxjs/operators";
+import { useAuth } from "../../src/context/AuthContext";
 import FamiliaModel from "../../src/services/DB/models/bases/familia";
 import LoteModel from "../../src/services/DB/models/catalogo/lote";
 import ProductoModel from "../../src/services/DB/models/catalogo/producto";
@@ -122,7 +124,8 @@ interface ProductRowProps {
   lotes: LoteModel[];
   impuestosLinks: ProductoImpuestoModel[];
   stockGlobal: number;
-  onDelete: (p: ProductoModel) => void;
+  onToggleStatus: (p: ProductoModel) => void;
+  onSoftDelete: (p: ProductoModel) => void;
   onEdit: (p: ProductoModel) => void;
   onClick?: () => void;
 }
@@ -133,10 +136,12 @@ function ProductRowInner({
   lotes,
   impuestosLinks,
   stockGlobal,
-  onDelete,
+  onToggleStatus,
+  onSoftDelete,
   onEdit,
   onClick,
 }: ProductRowProps) {
+  const { userRole, canDelete } = useAuth();
   const [impuestoNames, setImpuestoNames] = useState<string[]>([]);
   const [acknowledgedIds, setAcknowledgedIds] = useState<string[]>([]);
 
@@ -375,35 +380,39 @@ function ProductRowInner({
         </div>
       </td>
 
+      {/* Estado */}
+      <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={() => onToggleStatus(producto)}
+          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${producto.estado ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`}
+        >
+          <span
+            className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${producto.estado ? "translate-x-5" : "translate-x-1"}`}
+          />
+        </button>
+      </td>
+
       {/* Acciones */}
       <td className="px-6 py-4 text-center">
-        <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit(producto);
-            }}
-            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-            title="Editar info base del producto"
-          >
-            <Edit2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(producto);
-            }}
-            className={`p-1.5 ${producto.estado ? "text-slate-400 hover:text-rose-600 hover:bg-rose-50" : "text-amber-500 hover:text-amber-600 hover:bg-amber-50"} rounded-lg transition-colors`}
-            title={
-              producto.estado ? "Desactivar Producto" : "Reactivar Producto"
-            }
-          >
-            {producto.estado ? (
-              <ToggleRight className="w-5 h-5 text-emerald-500" />
-            ) : (
-              <ToggleLeft className="w-5 h-5 text-slate-400" />
+        <div className="flex items-center justify-center gap-2">
+          <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5">
+            <button
+              onClick={() => onEdit(producto)}
+              className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg shadow-sm transition-colors"
+              title="Editar"
+            >
+              <Edit2 className="w-4 h-4" />
+            </button>
+            {canDelete && (
+              <button
+                onClick={() => onSoftDelete(producto)}
+                className="p-1.5 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50 rounded-lg shadow-sm transition-colors"
+                title="Borrar"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
             )}
-          </button>
+          </div>
         </div>
       </td>
     </tr>
@@ -417,7 +426,8 @@ const enhance = withObservables(
     producto,
   }: {
     producto: ProductoModel;
-    onDelete: (p: ProductoModel) => void;
+    onToggleStatus: (p: ProductoModel) => void;
+    onSoftDelete: (p: ProductoModel) => void;
     onEdit: (p: ProductoModel) => void;
   }) => ({
     producto: producto.observe(),

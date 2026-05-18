@@ -9,6 +9,8 @@ import {
     Search,
     Trash2,
     Users,
+    ToggleLeft,
+    ToggleRight,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AddPrices, {
@@ -23,17 +25,21 @@ import SyncErrorBanner, {
 } from "../../components/ui/SyncErrorBanner";
 import { usePagination } from "../../src/hooks/usePagination";
 import { useSyncErrors } from "../../src/hooks/useSyncErrors";
+import { useIntegrity } from "../../src/context/IntegrityContext";
 import { database } from "../../src/services/DB/indexBD";
 import { syncApp } from "../../src/sync";
 
 interface PriceListSummary {
+  id: string;
   nombreLista: string;
+  estado: boolean;
   clientesIds: string[];
   reglasCount: number;
   reglas: TemplateRule[];
 }
 
 export default function Prices() {
+  const { scan: scanIntegrity } = useIntegrity();
   const [searchTerm, setSearchTerm] = useState("");
   const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
 
@@ -170,7 +176,9 @@ export default function Prices() {
           }));
 
           return {
+            id: p.id,
             nombreLista: p.nombre,
+            estado: p.estado !== false,
             clientesIds: listToClients.get(p.nombre) || [],
             reglasCount: mappedReglas.length,
             reglas: mappedReglas,
@@ -349,6 +357,59 @@ export default function Prices() {
   };
 
   // ==========================================
+  // TOGGLE ACTIVADA/DESACTIVADA LISTA
+  // ==========================================
+  const handleToggleStatus = async (id: string, name: string, currentStatus: boolean) => {
+    if (name === "Mayoreo" || name === "Menudeo") {
+      setMessage({
+        type: "error",
+        text: "Las listas base (Mayoreo, Menudeo) no se pueden desactivar.",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const plantillasDb = database.collections.get("plantillas_precios");
+      const record = await plantillasDb.find(id);
+      
+      await database.write(async () => {
+        await record.update((r: any) => {
+          r.estado = !currentStatus;
+        });
+      });
+
+      setMessage({
+        type: "success",
+        text: `Lista de precios "${name}" ha sido ${!currentStatus ? 'activada' : 'desactivada'} correctamente.`,
+      });
+
+      // Synchronize changes
+      try {
+        await syncApp();
+      } catch (syncErr) {
+        console.error("Error al sincronizar tras cambiar estado de la lista:", syncErr);
+      }
+
+      // Reload local data
+      await loadPriceLists();
+
+      // Proactively scan for broken relationships
+      if (scanIntegrity) {
+        await scanIntegrity("deactivate");
+      }
+    } catch (error: any) {
+      console.error("Error al cambiar estado de la lista:", error);
+      setMessage({
+        type: "error",
+        text: `Error al cambiar estado de la lista: ${error.message || error}`,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ==========================================
   // EDITAR LISTA EXISTENTE
   // ==========================================
   const startEdit = (item: PriceListSummary) => {
@@ -389,6 +450,13 @@ export default function Prices() {
           );
 
           await database.write(async () => {
+            // Find and delete the template itself
+            const pDb = database.collections.get("plantillas_precios");
+            const existingTemplates = await pDb.query(Q.where("nombre", item.nombreLista)).fetch();
+            for (const t of existingTemplates) {
+              await t.markAsDeleted();
+            }
+
             for (const cid of item.clientesIds) {
               const c = (await clientesDb.find(cid)) as any;
               await c.update((record: any) => {
@@ -415,6 +483,7 @@ export default function Prices() {
           });
           // Observer triggers reload automatically
           syncApp().catch(console.error);
+          scanIntegrity('soft_delete').catch(console.error);
         } catch (error: any) {
           setMessage({
             type: "error",
@@ -608,20 +677,41 @@ export default function Prices() {
             {visibleLists.map((list) => (
               <div
                 key={list.nombreLista}
-                className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col transition-all hover:shadow-md"
+                className={`bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border flex flex-col transition-all hover:shadow-md ${
+                  list.estado === false
+                    ? "border-slate-200 dark:border-slate-700/50 opacity-70 border-dashed"
+                    : "border-slate-100 dark:border-slate-700"
+                }`}
               >
                 <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-lg font-bold text-slate-800 dark:text-white truncate pr-4">
-                    {list.nombreLista}
-                  </h3>
-                  <div className="flex gap-1 shrink-0">
-                    <button
-                      onClick={() => startEdit(list)}
-                      className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-                      title="Editar Lista"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
+                  <div className="flex flex-col truncate pr-4">
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white truncate">
+                      {list.nombreLista}
+                    </h3>
+                    {list.estado === false && (
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
+                        Desactivada
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {list.nombreLista !== "Mayoreo" && list.nombreLista !== "Menudeo" && (
+                      <button
+                        onClick={() => handleToggleStatus(list.id, list.nombreLista, list.estado)}
+                        className={`p-1 rounded-lg transition-colors ${
+                          list.estado
+                            ? "text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                            : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50"
+                        }`}
+                        title={list.estado ? "Desactivar Lista" : "Activar Lista"}
+                      >
+                        {list.estado ? (
+                          <ToggleRight className="w-6 h-6" />
+                        ) : (
+                          <ToggleLeft className="w-6 h-6" />
+                        )}
+                      </button>
+                    )}
                     <button
                       onClick={() => handleDeleteList(list)}
                       className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors"

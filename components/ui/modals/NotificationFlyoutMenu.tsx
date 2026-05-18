@@ -11,11 +11,15 @@ import {
   ShieldAlert,
   Skull,
   Trash2,
+  Wrench,
   X,
 } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { database } from "../../../src/services/DB/indexBD";
 import { errorTranslator } from "../../../src/utils/errorTranslator";
+import { useIntegrity } from "../../../src/context/IntegrityContext";
+import type { IntegrityIncident } from "../../../src/integrity/types";
+import IntegrityFixModal from "./IntegrityFixModal";
 
 /* ─── Types ─── */
 export type NotificationPriority = "alta" | "media" | "baja" | "critica"; // critica para negro
@@ -85,6 +89,8 @@ const priorityConfig: Record<
 
 export default function NotificationFlyoutMenu() {
   const router = useRouter();
+  const { incidents, pendingCount, dismiss } = useIntegrity();
+  const [activeIncident, setActiveIncident] = useState<IntegrityIncident | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<
@@ -357,9 +363,12 @@ export default function NotificationFlyoutMenu() {
   });
 
   const unreadCount = items.filter((n) => n.status === "unread").length;
+  const totalBadge = unreadCount + pendingCount;
 
   /* ── Render ── */
   return (
+    <>
+    <IntegrityFixModal incident={activeIncident} onClose={() => setActiveIncident(null)} />
     <div className="relative" ref={panelRef}>
       {/* Bell trigger */}
       <button
@@ -374,16 +383,16 @@ export default function NotificationFlyoutMenu() {
         title="Notificaciones"
       >
         <Bell size={18} />
-        {unreadCount > 0 && (
+        {totalBadge > 0 && (
           <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-[#15335c] shadow-sm animate-pulse">
-            {unreadCount > 9 ? "9+" : unreadCount}
+            {totalBadge > 9 ? "9+" : totalBadge}
           </span>
         )}
       </button>
 
       {/* Panel */}
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-[380px] bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden z-50 origin-top-right animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute right-0 mt-3 w-[400px] bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden z-50 origin-top-right animate-in fade-in zoom-in-95 duration-150">
           {/* ── Header ── */}
           <div className="bg-[radial-gradient(ellipse_at_center,_#15335c_0%,_#15335c_100%)] px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -395,7 +404,7 @@ export default function NotificationFlyoutMenu() {
                   Notificaciones
                 </h3>
                 <p className="text-slate-400 text-[10px] font-medium uppercase tracking-widest mt-0.5">
-                  {unreadCount} acciones necesarias
+                  {totalBadge} acciones necesarias
                 </p>
               </div>
             </div>
@@ -467,8 +476,72 @@ export default function NotificationFlyoutMenu() {
             </span>
           </div>
 
-          {/* ── List ── */}
-          <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100 custom-scrollbar">
+          {/* ── Integrity Incidents Section ── */}
+          {incidents.length > 0 && (
+            <div className="border-b border-slate-100 dark:border-slate-700">
+              <div className="px-4 pt-3 pb-1.5 flex items-center gap-2">
+                <Wrench size={12} className="text-amber-500" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                  Integridad de Datos — {incidents.length} pendiente{incidents.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className="divide-y divide-slate-100 dark:divide-slate-700/60">
+                {incidents.map((inc) => {
+                  const sevColors = {
+                    critical: { bg: 'bg-rose-50 dark:bg-rose-900/10', dot: 'bg-rose-500', text: 'text-rose-700 dark:text-rose-400', badge: 'bg-rose-100 text-rose-700 border-rose-200' },
+                    high: { bg: 'bg-orange-50 dark:bg-orange-900/10', dot: 'bg-orange-500', text: 'text-orange-700 dark:text-orange-400', badge: 'bg-orange-100 text-orange-700 border-orange-200' },
+                    medium: { bg: 'bg-amber-50 dark:bg-amber-900/10', dot: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-400', badge: 'bg-amber-100 text-amber-700 border-amber-200' },
+                    low: { bg: 'bg-sky-50 dark:bg-sky-900/10', dot: 'bg-sky-500', text: 'text-sky-700 dark:text-sky-400', badge: 'bg-sky-100 text-sky-700 border-sky-200' },
+                  }[inc.severity];
+                  return (
+                    <div
+                      key={inc.id}
+                      className={`group px-4 py-3 flex items-start gap-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors ${sevColors.bg}`}
+                      onClick={() => { setActiveIncident(inc); setIsOpen(false); }}
+                    >
+                      <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${sevColors.dot}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <p className={`text-xs font-bold truncate ${sevColors.text}`}>{inc.title}</p>
+                          {inc.status === 'partial' && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full border bg-blue-100 text-blue-700 border-blue-200 shrink-0">Parcial</span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug line-clamp-2">{inc.description}</p>
+                        {inc.status === 'partial' && (
+                          <div className="mt-1.5 h-1 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-blue-500 rounded-full"
+                              style={{ width: `${(inc.resolvedCount / inc.affectedCount) * 100}%` }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setActiveIncident(inc); setIsOpen(false); }}
+                          className="p-1 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 hover:bg-blue-200 transition-colors"
+                          title="Corregir ahora"
+                        >
+                          <Wrench size={11} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); dismiss(inc.id); }}
+                          className="p-1 rounded-md text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors"
+                          title="Descartar"
+                        >
+                          <X size={11} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── Sync Errors / Lotes List ── */}
+          <div className="max-h-[300px] overflow-y-auto divide-y divide-slate-100 custom-scrollbar">
             {visibleItems.length === 0 ? (
               <div className="py-12 flex flex-col items-center justify-center gap-2 text-center px-8">
                 <PackageCheck
@@ -578,7 +651,7 @@ export default function NotificationFlyoutMenu() {
           </div>
 
           {/* ── Footer ── */}
-          {visibleItems.length > 0 && (
+          {(visibleItems.length > 0 || incidents.length > 0) && (
             <div className="px-4 py-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-700 text-center">
               <button
                 onClick={markAllRead}
@@ -591,5 +664,6 @@ export default function NotificationFlyoutMenu() {
         </div>
       )}
     </div>
+    </>
   );
 }

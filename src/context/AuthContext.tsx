@@ -9,6 +9,7 @@ interface AuthContextType {
   userName: string;
   userRole: string;
   isDev: boolean;
+  canDelete: boolean;
   loginLocal: (id: string) => Promise<void>;
   logoutLocal: () => Promise<void>;
 }
@@ -19,6 +20,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [userId, setUserId] = useState<string | null>(null);
   const [userName, setUserName] = useState("Usuario");
   const [userRole, setUserRole] = useState("Empleado");
+  const [canDelete, setCanDelete] = useState(false);
 
   // Al abrir la app, revisa si alguien dejó su sesión abierta
   useEffect(() => {
@@ -41,7 +43,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Instanciamos las colecciones que necesitamos
       const perfilesDb = database.collections.get("perfiles");
       const infoPerfilesDb = database.collections.get("informacion_perfil");
-      // const permisosDb = database.collections.get("permisos"); // <-- Listo para el futuro
+      const permisosDb = database.collections.get("permisos");
 
       // 1. Buscamos el perfil principal (Para sacar el nickname/usuario)
       const perfil = (await perfilesDb.find(id)) as any;
@@ -57,11 +59,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.log("No se encontró la informacion_perfil para este usuario.");
       }
 
+      let hasDeletePermission = false;
+      try {
+        const permisosUsuario = (await permisosDb.find(id)) as any;
+        if (permisosUsuario && permisosUsuario.borrar) {
+          hasDeletePermission = true;
+        }
+      } catch (e) {
+        console.log("No se encontraron permisos o no tiene borrar");
+      }
+
       // Si el perfil existe, actualizamos todo el estado global de la App
       if (perfil) {
         setUserId(id);
         setUserName(perfil.usuario || "Usuario");
         setUserRole(rolUsuario);
+        setCanDelete(rolUsuario === "Administrador" || rolUsuario === "DEV" || hasDeletePermission);
       }
     } catch (e) {
       console.log("No se pudo cargar el perfil de WatermelonDB");
@@ -81,6 +94,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUserId(null);
     setUserName("Usuario");
     setUserRole("Empleado");
+    setCanDelete(false);
   };
 
   return (
@@ -90,6 +104,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         userName,
         userRole,
         isDev: userRole === "DEV", // Esto ahora se calculará correctamente
+        canDelete,
         loginLocal,
         logoutLocal,
       }}

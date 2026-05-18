@@ -213,8 +213,17 @@ export default function AddClient({
   useEffect(() => {
     if (isOpen && editData) {
       setForm(editData);
+      if (editData.discountRules && editData.discountRules.length > 0) {
+        setIsCustomList(true);
+        setBaseTemplateName(editData.listaPrecios || "lista");
+      } else {
+        setIsCustomList(false);
+        setBaseTemplateName("");
+      }
     } else if (isOpen && !editData) {
       setForm(initialState);
+      setIsCustomList(false);
+      setBaseTemplateName("");
     }
     if (isOpen) {
       loadCategorias();
@@ -230,15 +239,44 @@ export default function AddClient({
 
       const plantillasDb = database.collections.get("plantillas_precios");
       const allPlantillas = await plantillasDb.query().fetch();
-      setCustomPriceLists(allPlantillas.map((p: any) => p.nombre));
+      const loadedLists = allPlantillas.map((p: any) => p.nombre);
+
+      if (editData && editData.listaPrecios && editData.listaPrecios !== "lista" && editData.listaPrecios !== "" && !loadedLists.includes(editData.listaPrecios)) {
+        loadedLists.push(editData.listaPrecios);
+      }
+      setCustomPriceLists(loadedLists);
 
       const famDb = database.collections.get("familias");
       const allFams = await famDb.query().fetch();
-      setFamilias(allFams.map((f: any) => ({ id: f.id, nombre: f.nombre, codigo: f.codigoFamilia })));
+      const loadedFamilias = allFams.map((f: any) => ({ id: f.id, nombre: f.nombre, codigo: f.codigoFamilia }));
+      setFamilias(loadedFamilias);
 
       const prodDb = database.collections.get("productos");
       const allProds = await prodDb.query().fetch();
-      setProductos(allProds.map((p: any) => ({ id: p.id, nombre: p.descripcion, codigo: p.codigoInterno })));
+      const loadedProductos = allProds.map((p: any) => ({ id: p.id, nombre: p.descripcion, codigo: p.codigoInterno }));
+      setProductos(loadedProductos);
+
+      if (editData && editData.listaPrecios) {
+        const reglasDb = database.collections.get("reglas_plantilla");
+        const pArr = await plantillasDb.query(Q.where("nombre", editData.listaPrecios)).fetch();
+        if (pArr.length > 0) {
+          const rulesArr = await reglasDb.query(Q.where("plantilla_id", pArr[0].id)).fetch();
+          setTemplateRules(
+            rulesArr.map((r: any) => ({
+              id: r.id,
+              type: r.tipo as any,
+              targetId: r.targetId,
+              targetName:
+                r.tipo === "familia"
+                  ? loadedFamilias.find((f: any) => f.id === r.targetId)?.nombre || r.targetId
+                  : r.tipo === "producto"
+                    ? loadedProductos.find((p: any) => p.id === r.targetId)?.nombre || r.targetId
+                    : "",
+              percentage: String(r.descuentoPorcentaje),
+            }))
+          );
+        }
+      }
     } catch (error) {
       console.error("Error al cargar categorías o plantillas:", error);
     } finally {
@@ -793,6 +831,7 @@ export default function AddClient({
                             <option value="" disabled hidden>
                               Selecciona lista de precios
                             </option>
+                            <option value="lista">Precio Lista (Base)</option>
                             {customPriceLists.map((list) => (
                               <option key={list} value={list}>
                                 {list}

@@ -24,6 +24,10 @@ import SuccessModal from "../../components/ui/modals/SuccessModal";
 import WarningModal from "../../components/ui/modals/WarningModal";
 import SyncErrorBanner, { SyncError } from "../../components/ui/SyncErrorBanner";
 import { useSyncErrors } from "../../src/hooks/useSyncErrors";
+import { useIntegrity } from "../../src/context/IntegrityContext";
+
+import BulkFixModal from "../../components/ui/modals/BulkFixModal";
+import { useAuth } from "../../src/context/AuthContext";
 
 import { supabase } from "../../src/services/api/supabaseClient";
 import { database } from "../../src/services/DB/indexBD";
@@ -37,6 +41,7 @@ export const DEFAULT_PERMISSIONS: Record<string, string[]> = {
     "Precios",
     "Usuarios",
     "Configuraciones",
+    "Borrar",
   ],
   Ventas: ["Inventario", "Clientes", "Facturas"],
   Cobranza: ["Clientes", "Facturas"],
@@ -67,6 +72,8 @@ interface UserItem {
 
 
 export default function Users() {
+  const { userRole, canDelete } = useAuth();
+  const { scan: scanIntegrity } = useIntegrity();
   const [searchTerm, setSearchTerm] = useState("");
   const [usersList, setUsersList] = useState<UserItem[]>([]);
   const [isLoadingTable, setIsLoadingTable] = useState(false);
@@ -140,6 +147,7 @@ export default function Users() {
     Precios: "precios",
     Usuarios: "usuarios",
     Configuraciones: "configuraciones",
+    Borrar: "borrar",
   };
 
   useEffect(() => {
@@ -344,12 +352,37 @@ export default function Users() {
       if (editingUserId === userId) resetForm();
       loadUsers();
       syncApp().catch(console.error);
+      scanIntegrity('deactivate').catch(console.error);
     } catch (error) {
       setMessage({
         type: "error",
         text: "Error al actualizar el estado localmente.",
       });
     }
+  };
+
+  const handleSoftDelete = (userId: string, userName: string) => {
+    setWarningModalConfig({
+        isOpen: true,
+        title: 'Borrar Usuario',
+        message: `¿Estás seguro que deseas borrar al usuario "${userName}"? No se eliminará de la base de datos, solo dejará de mostrarse en la app.`,
+        onConfirm: async () => {
+            setWarningModalConfig((prev) => ({ ...prev, isOpen: false }));
+            try {
+                const perfilesDb = database.collections.get("perfiles");
+                const perfilRecord = (await perfilesDb.find(userId)) as any;
+                await database.write(async () => {
+                    await perfilRecord.markAsDeleted();
+                });
+                setMessage({ type: "success", text: `Usuario borrado correctamente. Sincronizando...` });
+                loadUsers();
+                syncApp().catch(console.error);
+                scanIntegrity('soft_delete').catch(console.error);
+            } catch (error) {
+                setMessage({ type: "error", text: "Error al borrar el usuario." });
+            }
+        }
+    });
   };
 
   const cleanString = (str: string) => {
@@ -755,7 +788,7 @@ export default function Users() {
                       <th className="px-4 py-3 xl:px-3">Usuario</th>
                       <th className="px-4 py-3 xl:px-3">Rol</th>
                       <th className="px-4 py-3 xl:px-3">Permisos</th>
-                      <th className="px-4 py-3 xl:px-3">Estado</th>
+                      <th className="px-4 py-3 xl:px-3 text-center">Estado</th>
                       <th className="px-4 py-3 xl:px-3 text-center">Acciones</th>
                     </tr>
                   </thead>
@@ -828,14 +861,21 @@ export default function Users() {
                               </div>
                             )}
                           </td>
-                          <td className="px-4 py-3 xl:px-3">
-                            <StatusBadge active={user.status} />
+                          <td className="px-4 py-3 xl:px-3 text-center">
+                            <button
+                              onClick={() => handleToggleStatus(user.id, user.nombres, user.status)}
+                              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${user.status ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`}
+                            >
+                              <span
+                                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${user.status ? "translate-x-5" : "translate-x-1"}`}
+                              />
+                            </button>
                           </td>
                           <td className="px-4 py-3 xl:px-3 text-center text-slate-400">
-                            <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center justify-center gap-1.5">
                               <button
                                 onClick={() => handleEditClick(user)}
-                                className="p-2 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg shadow-sm"
+                                className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg shadow-sm transition-colors"
                                 title="Editar"
                               >
                                 <Edit2 className="w-4 h-4" />
@@ -846,28 +886,20 @@ export default function Users() {
                                   userEmail: user.email,
                                   userName: user.nombres,
                                 })}
-                                className="p-2 hover:text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:bg-indigo-500/10 rounded-lg shadow-sm"
+                                className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg shadow-sm transition-colors"
                                 title="Enviar Link de Recuperación"
                               >
                                 <Mail className="w-4 h-4" />
                               </button>
-                              <button
-                                onClick={() =>
-                                  handleToggleStatus(
-                                    user.id,
-                                    user.nombres,
-                                    user.status,
-                                  )
-                                }
-                                className={`p-2 rounded-lg shadow-sm ${user.status ? "hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30" : "hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"}`}
-                                title={user.status ? "Desactivar" : "Reactivar"}
-                              >
-                                {user.status ? (
+                              {canDelete && (
+                                <button
+                                  onClick={() => handleSoftDelete(user.id, user.nombres)}
+                                  className="p-1.5 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50 rounded-lg shadow-sm transition-colors"
+                                  title="Borrar Usuario"
+                                >
                                   <Trash2 className="w-4 h-4" />
-                                ) : (
-                                  <RotateCcw className="w-4 h-4" />
-                                )}
-                              </button>
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>

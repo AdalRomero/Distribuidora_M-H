@@ -35,6 +35,7 @@ import { syncApp } from "../../src/sync";
 import SyncErrorBanner, { SyncError } from "../../components/ui/SyncErrorBanner";
 import { useSyncErrors } from "../../src/hooks/useSyncErrors";
 import { useMemo, useEffect } from "react";
+import { useIntegrity } from "../../src/context/IntegrityContext";
 
 // ─── Types ──────────────────────────────────────────────────
 type ActiveTab = "familias" | "almacenes" | "impuestos" | "margenes" | "categorias";
@@ -63,6 +64,7 @@ const initialModalState: ModalState = {
 
 // ─── Main Component ─────────────────────────────────────────
 function CatalogsContent({ familias, almacenes, impuestos, margenes, categorias }: CatalogsProps) {
+  const { scan: scanIntegrity } = useIntegrity();
   const [tab, setTab] = useState<ActiveTab>("familias");
   const [modal, setModal] = useState<ModalState>(initialModalState);
   const [syncing, setSyncing] = useState(false);
@@ -113,6 +115,7 @@ function CatalogsContent({ familias, almacenes, impuestos, margenes, categorias 
     setSyncing(true);
     try {
       await syncApp();
+      scanIntegrity('deactivate').catch(console.error);
     } catch (e: any) {
       console.warn("Sincronización pendiente:", e.message);
       // No mostramos error — se reintentará después. Los datos ya están en local.

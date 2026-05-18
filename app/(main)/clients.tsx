@@ -4,12 +4,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
 import { usePagination } from '../../src/hooks/usePagination';
 import { Q } from '@nozbe/watermelondb';
-import AddClient, { ClientData } from '../../components/ui/modals/AddClient';
+import AddClient, { ClientData, DiscountRule } from '../../components/ui/modals/AddClient';
 
 import ErrorModal from '../../components/ui/modals/ErrorModal';
 import SuccessModal from '../../components/ui/modals/SuccessModal';
 import WarningModal from '../../components/ui/modals/WarningModal';
 import BulkFixModal, { AffectedItem, ReplacementOption } from '../../components/ui/modals/BulkFixModal';
+import { useAuth } from '../../src/context/AuthContext';
+import { useIntegrity } from '../../src/context/IntegrityContext';
 
 import { database } from '../../src/services/DB/indexBD';
 import { syncApp } from '../../src/sync';
@@ -32,6 +34,8 @@ interface ClientItem {
 }
 
 export default function Clients() {
+    const { userRole, canDelete } = useAuth();
+    const { scan: scanIntegrity } = useIntegrity();
     const [searchTerm, setSearchTerm] = useState('');
     const [isClientModalOpen, setIsClientModalOpen] = useState(false);
     const [clientsList, setClientsList] = useState<ClientItem[]>([]);
@@ -250,23 +254,80 @@ export default function Clients() {
     // ==========================================
     // EDITAR CLIENTE (SOBREESCRIBIR)
     // ==========================================
-    const startEdit = (client: ClientItem) => {
+    const startEdit = async (client: ClientItem) => {
         setEditingClientId(client.id);
-        setEditData({
-            nombre: client.nombre,
-            rfc: client.rfc,
-            categoria: client.categoria,
-            listaPrecios: client.listaPrecioBase,
-            descuentoGlobal: String(client.descuentoGlobal),
-            discountRules: [],
-            contactos: client.contactos.length > 0 ? client.contactos : [''],
-            estado: client.estado ? 'Activo' : 'Inactivo',
-            calle: client.calle,
-            colonia: client.colonia,
-            cp: client.cp,
-            ciudad: client.ciudad,
-        });
-        setIsClientModalOpen(true);
+
+        try {
+            // Load custom rules for the client
+            const rulesProd = await database.collections.get('precios_especiales_clientes').query(Q.where('cliente_id', client.id)).fetch();
+            const rulesFam = await database.collections.get('precios_especiales_familias_clientes').query(Q.where('cliente_id', client.id)).fetch();
+            
+            const discountRules: DiscountRule[] = [];
+            
+            // Note: We don't have targetName here but AddClient resolves it if needed, or we just leave it blank as it's not strictly required for saving
+            for(const rp of rulesProd as any[]) {
+                discountRules.push({
+                    id: rp.id,
+                    type: 'producto',
+                    targetId: rp.producto.id,
+                    targetName: '', 
+                    percentage: String(rp.descuentoPorcentaje),
+                });
+            }
+            for(const rf of rulesFam as any[]) {
+                discountRules.push({
+                    id: rf.id,
+                    type: 'familia',
+                    targetId: rf.familia.id,
+                    targetName: '', 
+                    percentage: String(rf.descuentoPorcentaje),
+                });
+            }
+
+            if (client.descuentoGlobal > 0) {
+                discountRules.push({
+                    id: 'global-1',
+                    type: 'global',
+                    targetId: '',
+                    targetName: '',
+                    percentage: String(client.descuentoGlobal),
+                });
+            }
+
+            setEditData({
+                nombre: client.nombre,
+                rfc: client.rfc,
+                categoria: client.categoria,
+                listaPrecios: client.listaPrecioBase,
+                descuentoGlobal: String(client.descuentoGlobal),
+                discountRules,
+                contactos: client.contactos.length > 0 ? client.contactos : [''],
+                estado: client.estado ? 'Activo' : 'Inactivo',
+                calle: client.calle,
+                colonia: client.colonia,
+                cp: client.cp,
+                ciudad: client.ciudad,
+            });
+            setIsClientModalOpen(true);
+        } catch (error) {
+            console.error('Error loading client rules:', error);
+            // Fallback in case of error
+            setEditData({
+                nombre: client.nombre,
+                rfc: client.rfc,
+                categoria: client.categoria,
+                listaPrecios: client.listaPrecioBase,
+                descuentoGlobal: String(client.descuentoGlobal),
+                discountRules: [],
+                contactos: client.contactos.length > 0 ? client.contactos : [''],
+                estado: client.estado ? 'Activo' : 'Inactivo',
+                calle: client.calle,
+                colonia: client.colonia,
+                cp: client.cp,
+                ciudad: client.ciudad,
+            });
+            setIsClientModalOpen(true);
+        }
     };
 
     const handleUpdateClient = async (formData: ClientData) => {
@@ -309,6 +370,36 @@ export default function Clients() {
                             j.clienteId = editingClientId;
                             j.plantillaId = plantilla.id;
                         });
+                    }
+                }
+
+                // Update custom discount rules if it's a custom list
+                const pProdDb = database.collections.get('precios_especiales_clientes');
+                const pFamDb = database.collections.get('precios_especiales_familias_clientes');
+                
+                const oldP = await pProdDb.query(Q.where('cliente_id', editingClientId)).fetch();
+                for (const o of oldP) await o.markAsDeleted();
+                const oldF = await pFamDb.query(Q.where('cliente_id', editingClientId)).fetch();
+                for (const o of oldF) await o.markAsDeleted();
+                
+                if (formData.discountRules && formData.discountRules.length > 0) {
+                    for(const rule of formData.discountRules) {
+                         if (rule.type === 'producto') {
+                             await pProdDb.create((r: any) => {
+                                 r._raw.id = Crypto.randomUUID();
+                                 r.cliente.id = editingClientId;
+                                 r.producto.id = rule.targetId;
+                                 r.descuentoPorcentaje = Number(rule.percentage) || 0;
+                             });
+                         } else if (rule.type === 'familia') {
+                             await pFamDb.create((r: any) => {
+                                 r._raw.id = Crypto.randomUUID();
+                                 r.cliente.id = editingClientId;
+                                 r.familia.id = rule.targetId;
+                                 r.descuentoPorcentaje = Number(rule.percentage) || 0;
+                             });
+                         } 
+                         // global is already saved in c.descuentoGlobal
                     }
                 }
 
@@ -364,6 +455,7 @@ export default function Clients() {
                         await database.write(async () => { await record.update((c: any) => { c.estado = true; }); });
                         setMessage({ type: 'success', text: `Cliente "${clientName}" reactivado. Sincronizando...` });
                         loadClients(); syncApp().catch(console.error);
+                        scanIntegrity('deactivate').catch(console.error);
                     } catch (error: any) { setMessage({ type: 'error', text: 'Error: ' + error.message }); }
                 },
             });
@@ -372,7 +464,7 @@ export default function Clients() {
 
         // DESACTIVAR: verificar plantillas asignadas
         const plantillasAsignadas = await database.collections
-            .get('cliente_plantillas')
+            .get('clientes_plantillas')
             .query(Q.where('cliente_id', clientId))
             .fetch();
 
@@ -382,6 +474,7 @@ export default function Clients() {
                 await database.write(async () => { await record.update((c: any) => { c.estado = false; }); });
                 setMessage({ type: 'success', text: `Cliente "${clientName}" desactivado. Facturas y datos fiscales permanecen intactos.` });
                 loadClients(); syncApp().catch(console.error);
+                scanIntegrity('deactivate').catch(console.error);
             } catch (error: any) { setMessage({ type: 'error', text: 'Error: ' + error.message }); }
         };
 
@@ -428,7 +521,7 @@ export default function Clients() {
         try {
             await database.write(async () => {
                 for (const relId of selectedRelIds) {
-                    const rel = await database.collections.get('cliente_plantillas').find(relId) as any;
+                    const rel = await database.collections.get('clientes_plantillas').find(relId) as any;
                     await rel.markAsDeleted();
                 }
             });
@@ -446,7 +539,7 @@ export default function Clients() {
         setWarningModalConfig({
             isOpen: true,
             title: 'Eliminar Cliente',
-            message: `¿Estás seguro que deseas eliminar al cliente "${clientName}"? Esta acción no se puede deshacer.`,
+            message: `¿Estás seguro que deseas eliminar al cliente "${clientName}"? No se eliminará de la base de datos, solo dejará de mostrarse en la app.`,
             onConfirm: async () => {
                 setWarningModalConfig(prev => ({ ...prev, isOpen: false }));
                 try {
@@ -458,6 +551,7 @@ export default function Clients() {
                     setMessage({ type: 'success', text: `Cliente "${clientName}" eliminado correctamente. Sincronizando...` });
                     loadClients();
                     syncApp().catch(console.error);
+                    scanIntegrity('soft_delete').catch(console.error);
                 } catch (error: any) {
                     setMessage({ type: 'error', text: 'Error al eliminar el cliente: ' + error.message });
                 }
@@ -589,11 +683,11 @@ export default function Clients() {
                             </thead>
                             <tbody className="divide-y divide-slate-50">
                                 {isLoadingTable ? (
-                                    <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                                    <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400">
                                         <div className="flex items-center justify-center gap-2"><Loader2 className="w-5 h-5 animate-spin" /> Cargando clientes...</div>
                                     </td></tr>
                                 ) : visibleClients.length === 0 ? (
-                                    <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                                    <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400">
                                         {searchTerm ? 'No se encontraron clientes que coincidan con la búsqueda.' : 'No hay clientes registrados. ¡Agrega el primero!'}
                                     </td></tr>
                                 ) : (
@@ -702,47 +796,34 @@ export default function Clients() {
                                             </td>
 
                                             {/* ESTADO */}
-                                            <td className="px-6 py-4">
-                                                <div className="flex justify-center">
-                                                    <button
-                                                        onClick={() => handleToggleStatus(client.id, client.nombre, client.estado)}
-                                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all duration-200 active:scale-95 ${client.estado
-                                                            ? 'bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50'
-                                                            : 'bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50'
-                                                        }`}
-                                                    >
-                                                        {client.estado ? (
-                                                            <>
-                                                                <ToggleRight className="w-6 h-6 text-emerald-500" />
-                                                                <span className="text-xs font-bold text-emerald-600">Activo</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <ToggleLeft className="w-6 h-6 text-slate-400" />
-                                                                <span className="text-xs font-bold text-slate-400">Inactivo</span>
-                                                            </>
-                                                        )}
-                                                    </button>
-                                                </div>
+                                            <td className="px-6 py-4 text-center">
+                                                <button
+                                                    onClick={() => handleToggleStatus(client.id, client.nombre, client.estado)}
+                                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${client.estado ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                                >
+                                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${client.estado ? 'translate-x-5' : 'translate-x-1'}`} />
+                                                </button>
                                             </td>
 
                                             {/* ACCIONES */}
                                             <td className="px-4 py-4">
-                                                <div className="flex items-center justify-center gap-1">
+                                                <div className="flex items-center justify-center gap-2">
                                                     <button
                                                         onClick={() => startEdit(client)}
-                                                        className="p-2 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                                                        className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg transition-colors"
                                                         title="Editar cliente"
                                                     >
                                                         <Edit2 className="w-4 h-4" />
                                                     </button>
-                                                    <button
-                                                        onClick={() => handleDeleteClient(client.id, client.nombre)}
-                                                        className="p-2 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors"
-                                                        title="Eliminar cliente"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                                    {canDelete && (
+                                                        <button
+                                                            onClick={() => handleDeleteClient(client.id, client.nombre)}
+                                                            className="p-1.5 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg transition-colors"
+                                                            title="Borrar cliente"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
