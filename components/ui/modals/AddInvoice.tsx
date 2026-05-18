@@ -4,6 +4,7 @@ import { database } from '../../../src/services/DB/indexBD';
 import { useAuth } from '../../../src/context/AuthContext';
 import * as Crypto from 'expo-crypto';
 import { LOGO_MH_B64 } from '../../../constants/logo_base64';
+import InvoiceBlockRenderer, { normalizeLayout, InvoiceLayoutFlow } from './InvoiceBlockRenderer';
 
 interface AddInvoiceProps { isOpen: boolean; onClose: () => void; recoverData?: any; onSaveSuccess?: () => void; }
 interface Concepto { id: string; cantidad: string; unidadSat: string; claveSat: string; concepto: string; valorUnitario: string; descuento: string; porcImpuesto: string; productoId: string; }
@@ -94,6 +95,7 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
     const [productos, setProductos] = useState<ProductoItem[]>([]);
     const [preciosEspeciales, setPreciosEspeciales] = useState<PrecioEspecial[]>([]);
     const [isLoadingData, setIsLoadingData] = useState(false);
+    const [invoiceLayout, setInvoiceLayout] = useState<any[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
     const [saveSuccess, setSaveSuccess] = useState(false);
@@ -145,6 +147,20 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
                     const nextFolio = String(allDocs.length + 1).padStart(3, '0');
                     setForm(prev => ({ ...prev, folio: nextFolio }));
                 } catch { /* keep default folio */ }
+            }
+            
+            // Cargar plantilla activa de factura
+            try {
+                const templatesDb = database.collections.get('invoice_templates');
+                const allTemplates = (await templatesDb.query().fetch()) as any[];
+                const defaultT = allTemplates.find((t: any) => t.isDefault);
+                if (defaultT && defaultT.layoutJson) {
+                    setInvoiceLayout(JSON.parse(defaultT.layoutJson));
+                } else if (allTemplates.length > 0 && allTemplates[0].layoutJson) {
+                    setInvoiceLayout(JSON.parse(allTemplates[0].layoutJson));
+                }
+            } catch (err) {
+                console.error('Error cargando plantilla de factura:', err);
             }
         } catch (err) {
             console.error('Error cargando datos para factura:', err);
@@ -566,8 +582,22 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
         </>
     );
 
-    const renderPDFPreview = () => (
-        <div ref={previewRef} className="bg-white shadow-lg mx-auto" style={{ width: 680, minHeight: 880, fontFamily: 'Arial, sans-serif', fontSize: 8, lineHeight: 1.4, color: '#000', padding: '12px 16px 20px' }}>
+    const renderPDFPreview = () => {
+        if (invoiceLayout && invoiceLayout.length > 0) {
+            return (
+                <div ref={previewRef} className="bg-white shadow-lg mx-auto relative text-slate-950" style={{ width: 680, minHeight: 880, fontFamily: 'system-ui, -apple-system, sans-serif', padding: '24px 20px', boxSizing: 'border-box' }}>
+                    <InvoiceLayoutFlow 
+                        layout={invoiceLayout}
+                        form={form}
+                        calcConcepto={calcConcepto}
+                        totals={{ totalSubtotal, totalDesc, totalImpuestos, totalFinal }}
+                        pageSize="letter"
+                    />
+                </div>
+            );
+        }
+        return (
+            <div ref={previewRef} className="bg-white shadow-lg mx-auto" style={{ width: 680, minHeight: 880, fontFamily: 'Arial, sans-serif', fontSize: 8, lineHeight: 1.4, color: '#000', padding: '12px 16px 20px' }}>
 
             {/* =============== HEADER: Logo + Emisor + Factura =============== */}
             <div style={{ display: 'flex', marginBottom: 8 }}>
@@ -747,7 +777,8 @@ export default function AddInvoice({ isOpen, onClose, recoverData, onSaveSuccess
             </div>
 
         </div>
-    );
+        );
+    };
 
     if (!isOpen) return null;
 

@@ -24,6 +24,7 @@ import React, { useState } from "react";
 import ErrorModal from "../../components/ui/modals/ErrorModal";
 import SuccessModal from "../../components/ui/modals/SuccessModal";
 import WarningModal from "../../components/ui/modals/WarningModal";
+import BulkFixModal, { AffectedItem, ReplacementOption } from "../../components/ui/modals/BulkFixModal";
 import { database } from "../../src/services/DB/indexBD";
 import AlmacenModel from "../../src/services/DB/models/bases/almacen";
 import CategoriaClienteModel from "../../src/services/DB/models/bases/categoriaCliente";
@@ -358,37 +359,68 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
     }
   };
 
+  // ── Bulk Fix state (Familias) ───────────────────────────────
+  const [bulkFixFam, setBulkFixFam] = useState<{
+    open: boolean;
+    deactivatedFamilia: FamiliaModel | null;
+    affectedItems: AffectedItem[];
+    replacementOptions: ReplacementOption[];
+  }>({ open: false, deactivatedFamilia: null, affectedItems: [], replacementOptions: [] });
+
   const toggleEstado = async (f: FamiliaModel) => {
     const nuevoEstado = !f.estado;
+
+    if (nuevoEstado) {
+      try {
+        await database.write(async () => { await f.update((r) => { r.estado = true; }); });
+        showSuccess("Familia activada", `"${f.nombre}" ahora está activa.`);
+        await syncAfterOp();
+      } catch (e: any) { showError("Error", e.message); }
+      return;
+    }
+
+    const prods = await database.collections.get("productos").query(Q.where("familia_id", f.id)).fetch();
+
     const doToggle = async () => {
       try {
-        await database.write(async () => {
-          await f.update((record) => {
-            record.estado = nuevoEstado;
-          });
-        });
-        showSuccess(
-          nuevoEstado ? "Familia activada" : "Familia desactivada",
-          `"${f.nombre}" ahora está ${nuevoEstado ? "activa" : "inactiva"}.`
-        );
+        await database.write(async () => { await f.update((r) => { r.estado = false; }); });
+        showSuccess("Familia desactivada", `"${f.nombre}" fue desactivada. Los datos históricos permanecen intactos.`);
         await syncAfterOp();
-      } catch (e: any) {
-        showError("Error", e.message || "No se pudo cambiar el estado.");
-      }
+      } catch (e: any) { showError("Error", e.message); }
     };
 
-    if (!nuevoEstado) {
-      const count = await database.collections.get("productos").query(Q.where("familia_id", f.id)).fetchCount();
-      if (count > 0) {
-        showWarning(
-          "Aviso de Afectación",
-          `Al desactivar esta familia, hay ${count} producto(s) asociado(s) que se verán afectados y requerirán actualización. ¿Deseas continuar?`,
-          doToggle
-        );
-        return;
-      }
+    if (prods.length === 0) { doToggle(); return; }
+
+    const affectedItems: AffectedItem[] = prods.map((p: any) => ({
+      id: p.id,
+      label: p.descripcion || "Producto",
+      subtitle: p.codigoInterno ? `Código: ${p.codigoInterno}` : undefined,
+      currentValue: f.nombre,
+    }));
+
+    const replacementOptions: ReplacementOption[] = familias
+      .filter((fam) => fam.id !== f.id && fam.estado)
+      .map((fam) => ({ id: fam.id, label: `${fam.codigoFamilia} — ${fam.nombre}` }));
+
+    await doToggle();
+    setBulkFixFam({ open: true, deactivatedFamilia: f, affectedItems, replacementOptions });
+  };
+
+  const handleBulkFixFamilia = async (selectedProductIds: string[], newFamiliaId: string | null) => {
+    try {
+      await database.write(async () => {
+        for (const prodId of selectedProductIds) {
+          const prod = await database.collections.get("productos").find(prodId) as any;
+          await prod.update((p: any) => {
+            p._raw.familia_id = newFamiliaId || null;
+          });
+        }
+      });
+      await syncAfterOp();
+    } catch (e: any) {
+      showError("Error en corrección masiva", e.message);
+      throw e;
     }
-    doToggle();
   };
 
   return (
@@ -570,6 +602,21 @@ function FamiliasTab({ familias, showSuccess, showError, showWarning, syncAfterO
           </tbody>
         </table>
       </div>
+
+      {/* ── BulkFix Modal (Familias) ── */}
+      <BulkFixModal
+        isOpen={bulkFixFam.open}
+        onClose={() => setBulkFixFam((p) => ({ ...p, open: false }))}
+        deactivatedName={bulkFixFam.deactivatedFamilia?.nombre ?? ""}
+        entityType="familia"
+        entityLabel="Familia"
+        affectedItems={bulkFixFam.affectedItems}
+        affectedLabel="productos"
+        replacementOptions={bulkFixFam.replacementOptions}
+        replacementLabel="Selecciona la familia de reemplazo"
+        allowNoReplacement={true}
+        onConfirmFix={handleBulkFixFamilia}
+      />
     </div>
   );
 }
@@ -842,6 +889,14 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
   const [editNombre, setEditNombre] = useState("");
   const [editTasa, setEditTasa] = useState("");
 
+  // ── Bulk Fix state ──────────────────────────────────────────
+  const [bulkFix, setBulkFix] = useState<{
+    open: boolean;
+    deactivatedImpuesto: ImpuestoModel | null;
+    affectedItems: AffectedItem[];
+    replacementOptions: ReplacementOption[];
+  }>({ open: false, deactivatedImpuesto: null, affectedItems: [], replacementOptions: [] });
+
   useEffect(() => {
      if (recoverData?.tabla === "impuestos") {
         setShowAdd(true);
@@ -901,35 +956,83 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
 
   const toggleActivo = async (i: ImpuestoModel) => {
     const nuevoEstado = !i.activo;
+
+    // ACTIVAR: directo, sin más
+    if (nuevoEstado) {
+      try {
+        await database.write(async () => { await i.update((r) => { r.activo = true; }); });
+        showSuccess("Impuesto activado", `"${i.nombre}" ahora está activo.`);
+        await syncAfterOp();
+      } catch (e: any) { showError("Error", e.message); }
+      return;
+    }
+
+    // DESACTIVAR: verificar afectados
+    const pivotRows = await database.collections.get("producto_impuestos").query(Q.where("impuesto_id", i.id)).fetch();
+
+    // Ejecutar desactivación siempre
     const doToggle = async () => {
       try {
-        await database.write(async () => {
-          await i.update((record) => {
-            record.activo = nuevoEstado;
-          });
-        });
-        showSuccess(
-          nuevoEstado ? "Impuesto activado" : "Impuesto desactivado",
-          `"${i.nombre}" ahora está ${nuevoEstado ? "activo" : "inactivo"}.`
-        );
+        await database.write(async () => { await i.update((r) => { r.activo = false; }); });
+        showSuccess("Impuesto desactivado", `"${i.nombre}" fue desactivado. Los datos fiscales anteriores permanecen intactos.`);
         await syncAfterOp();
-      } catch (e: any) {
-        showError("Error", e.message || "No se pudo cambiar el estado.");
-      }
+      } catch (e: any) { showError("Error", e.message); }
     };
 
-    if (!nuevoEstado) {
-      const count = await database.collections.get("producto_impuestos").query(Q.where("impuesto_id", i.id)).fetchCount();
-      if (count > 0) {
-        showWarning(
-          "Aviso de Afectación",
-          `Al desactivar este impuesto, hay ${count} producto(s) asociado(s) que dejarán de aplicarlo. ¿Deseas continuar?`,
-          doToggle
-        );
-        return;
-      }
+    if (pivotRows.length === 0) {
+      doToggle();
+      return;
     }
-    doToggle();
+
+    // Construir lista de productos afectados
+    const affectedItems: AffectedItem[] = await Promise.all(
+      pivotRows.map(async (pivot: any) => {
+        try {
+          const prod = await database.collections.get("productos").find(pivot._raw.producto_id);
+          return {
+            id: pivot.id,           // pivot row id (we'll delete it in onConfirmFix)
+            label: (prod as any).descripcion || "Producto",
+            subtitle: (prod as any).codigoInterno ? `Código: ${(prod as any).codigoInterno}` : undefined,
+            currentValue: `${i.nombre} ${i.tasa}%`,
+          } as AffectedItem;
+        } catch {
+          return { id: pivot.id, label: "Producto eliminado", currentValue: `${i.nombre} ${i.tasa}%` } as AffectedItem;
+        }
+      })
+    );
+
+    // Opciones de reemplazo: impuestos activos excluyendo el actual
+    const replacementOptions: ReplacementOption[] = impuestos
+      .filter((imp) => imp.id !== i.id && imp.activo)
+      .map((imp) => ({ id: imp.id, label: `${imp.nombre} ${imp.tasa}%` }));
+
+    // Desactivar primero, luego ofrecer corrección
+    await doToggle();
+    setBulkFix({ open: true, deactivatedImpuesto: i, affectedItems, replacementOptions });
+  };
+
+  const handleBulkFixImpuesto = async (selectedPivotIds: string[], newImpuestoId: string | null) => {
+    try {
+      await database.write(async () => {
+        for (const pivotId of selectedPivotIds) {
+          const pivot = await database.collections.get("producto_impuestos").find(pivotId) as any;
+          if (newImpuestoId) {
+            // Crear nuevo pivot con el impuesto de reemplazo
+            await database.collections.get("producto_impuestos").create((p: any) => {
+              p._raw.id = Crypto.randomUUID();
+              p._raw.producto_id = pivot._raw.producto_id;
+              p._raw.impuesto_id = newImpuestoId;
+            });
+          }
+          // Eliminar el pivot viejo (desvincula el impuesto desactivado)
+          await pivot.markAsDeleted();
+        }
+      });
+      await syncAfterOp();
+    } catch (e: any) {
+      showError("Error en corrección masiva", e.message);
+      throw e;
+    }
   };
 
   return (
@@ -1122,6 +1225,21 @@ function ImpuestosTab({ impuestos, showSuccess, showError, showWarning, syncAfte
           </tbody>
         </table>
       </div>
+
+      {/* ── BulkFix Modal (Impuestos) ── */}
+      <BulkFixModal
+        isOpen={bulkFix.open}
+        onClose={() => setBulkFix((p) => ({ ...p, open: false }))}
+        deactivatedName={bulkFix.deactivatedImpuesto ? `${bulkFix.deactivatedImpuesto.nombre} ${bulkFix.deactivatedImpuesto.tasa}%` : ""}
+        entityType="impuesto"
+        entityLabel="Impuesto"
+        affectedItems={bulkFix.affectedItems}
+        affectedLabel="productos"
+        replacementOptions={bulkFix.replacementOptions}
+        replacementLabel="Selecciona el impuesto de reemplazo"
+        allowNoReplacement={true}
+        onConfirmFix={handleBulkFixImpuesto}
+      />
     </div>
   );
 }
@@ -1194,37 +1312,67 @@ function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterO
     }
   };
 
+  // ── Bulk Fix state (Margenes) ───────────────────────────────
+  const [bulkFixMar, setBulkFixMar] = useState<{
+    open: boolean;
+    deactivatedMargen: MargenModel | null;
+    affectedItems: AffectedItem[];
+    replacementOptions: ReplacementOption[];
+  }>({ open: false, deactivatedMargen: null, affectedItems: [], replacementOptions: [] });
+
   const toggleEstado = async (m: MargenModel) => {
     const nuevoEstado = !m.estado;
+    if (nuevoEstado) {
+      try {
+        await database.write(async () => { await m.update((r) => { r.estado = true; }); });
+        showSuccess("Margen activado", `"${m.nombre}" ahora está activo.`);
+        await syncAfterOp();
+      } catch (e: any) { showError("Error", e.message); }
+      return;
+    }
+
+    const prods = await database.collections.get("productos").query(Q.where("margen_id", m.id)).fetch();
+
     const doToggle = async () => {
       try {
-        await database.write(async () => {
-          await m.update((record) => {
-            record.estado = nuevoEstado;
-          });
-        });
-        showSuccess(
-          nuevoEstado ? "Margen activado" : "Margen desactivado",
-          `"${m.nombre}" ahora está ${nuevoEstado ? "activo" : "inactivo"}.`
-        );
+        await database.write(async () => { await m.update((r) => { r.estado = false; }); });
+        showSuccess("Margen desactivado", `"${m.nombre}" fue desactivado. Los datos históricos permanecen intactos.`);
         await syncAfterOp();
-      } catch (e: any) {
-        showError("Error", e.message || "No se pudo cambiar el estado.");
-      }
+      } catch (e: any) { showError("Error", e.message); }
     };
 
-    if (!nuevoEstado) {
-      const count = await database.collections.get("productos").query(Q.where("margen_id", m.id)).fetchCount();
-      if (count > 0) {
-        showWarning(
-          "Aviso de Afectación",
-          `Al desactivar este margen, hay ${count} producto(s) asociado(s) que podrían verse afectados. ¿Deseas continuar?`,
-          doToggle
-        );
-        return;
-      }
+    if (prods.length === 0) { doToggle(); return; }
+
+    const affectedItems: AffectedItem[] = prods.map((p: any) => ({
+      id: p.id,
+      label: p.descripcion || "Producto",
+      subtitle: p.codigoInterno ? `Código: ${p.codigoInterno}` : undefined,
+      currentValue: `${m.nombre} (${m.porcentaje}%)`,
+    }));
+
+    const replacementOptions: ReplacementOption[] = margenes
+      .filter((mar) => mar.id !== m.id && mar.estado)
+      .map((mar) => ({ id: mar.id, label: `${mar.nombre} (${mar.porcentaje}%)` }));
+
+    await doToggle();
+    setBulkFixMar({ open: true, deactivatedMargen: m, affectedItems, replacementOptions });
+  };
+
+  const handleBulkFixMargen = async (selectedProductIds: string[], newMargenId: string | null) => {
+    try {
+      await database.write(async () => {
+        for (const prodId of selectedProductIds) {
+          const prod = await database.collections.get("productos").find(prodId) as any;
+          await prod.update((p: any) => {
+            p._raw.margen_id = newMargenId || null;
+          });
+        }
+      });
+      await syncAfterOp();
+    } catch (e: any) {
+      showError("Error en corrección masiva", e.message);
+      throw e;
     }
-    doToggle();
   };
 
   return (
@@ -1417,6 +1565,21 @@ function MargenesTab({ margenes, showSuccess, showError, showWarning, syncAfterO
           </tbody>
         </table>
       </div>
+
+      {/* ── BulkFix Modal (Márgenes) ── */}
+      <BulkFixModal
+        isOpen={bulkFixMar.open}
+        onClose={() => setBulkFixMar((p) => ({ ...p, open: false }))}
+        deactivatedName={bulkFixMar.deactivatedMargen ? `${bulkFixMar.deactivatedMargen.nombre} (${bulkFixMar.deactivatedMargen.porcentaje}%)` : ""}
+        entityType="margen"
+        entityLabel="Margen"
+        affectedItems={bulkFixMar.affectedItems}
+        affectedLabel="productos"
+        replacementOptions={bulkFixMar.replacementOptions}
+        replacementLabel="Selecciona el margen de reemplazo"
+        allowNoReplacement={true}
+        onConfirmFix={handleBulkFixMargen}
+      />
     </div>
   );
 }

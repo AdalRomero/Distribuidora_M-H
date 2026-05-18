@@ -9,6 +9,7 @@ import AddClient, { ClientData } from '../../components/ui/modals/AddClient';
 import ErrorModal from '../../components/ui/modals/ErrorModal';
 import SuccessModal from '../../components/ui/modals/SuccessModal';
 import WarningModal from '../../components/ui/modals/WarningModal';
+import BulkFixModal, { AffectedItem, ReplacementOption } from '../../components/ui/modals/BulkFixModal';
 
 import { database } from '../../src/services/DB/indexBD';
 import { syncApp } from '../../src/sync';
@@ -40,6 +41,14 @@ export default function Clients() {
     const [warningModalConfig, setWarningModalConfig] = useState<{
         isOpen: boolean; title: string; message: string; onConfirm: () => void;
     }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
+
+    // ── Bulk Fix (plantillas asignadas) ───────────────────────────
+    const [bulkFix, setBulkFix] = useState<{
+        open: boolean;
+        clientName: string;
+        affectedItems: AffectedItem[];
+        replacementOptions: ReplacementOption[];
+    }>({ open: false, clientName: '', affectedItems: [], replacementOptions: [] });
 
     // ==========================================
     // EDIT STATE
@@ -341,30 +350,93 @@ export default function Clients() {
     // ==========================================
     // TOGGLE ESTADO (ACTIVAR/DESACTIVAR)
     // ==========================================
-    const handleToggleStatus = (clientId: string, clientName: string, currentStatus: boolean) => {
-        const accion = currentStatus ? 'desactivar' : 'reactivar';
+    const handleToggleStatus = async (clientId: string, clientName: string, currentStatus: boolean) => {
+        // ACTIVAR: simple
+        if (!currentStatus) {
+            setWarningModalConfig({
+                isOpen: true,
+                title: 'Reactivar Cliente',
+                message: `¿Deseas reactivar al cliente "${clientName}"?`,
+                onConfirm: async () => {
+                    setWarningModalConfig(prev => ({ ...prev, isOpen: false }));
+                    try {
+                        const record = await database.collections.get('clientes').find(clientId) as any;
+                        await database.write(async () => { await record.update((c: any) => { c.estado = true; }); });
+                        setMessage({ type: 'success', text: `Cliente "${clientName}" reactivado. Sincronizando...` });
+                        loadClients(); syncApp().catch(console.error);
+                    } catch (error: any) { setMessage({ type: 'error', text: 'Error: ' + error.message }); }
+                },
+            });
+            return;
+        }
+
+        // DESACTIVAR: verificar plantillas asignadas
+        const plantillasAsignadas = await database.collections
+            .get('cliente_plantillas')
+            .query(Q.where('cliente_id', clientId))
+            .fetch();
+
+        const doDeactivate = async () => {
+            try {
+                const record = await database.collections.get('clientes').find(clientId) as any;
+                await database.write(async () => { await record.update((c: any) => { c.estado = false; }); });
+                setMessage({ type: 'success', text: `Cliente "${clientName}" desactivado. Facturas y datos fiscales permanecen intactos.` });
+                loadClients(); syncApp().catch(console.error);
+            } catch (error: any) { setMessage({ type: 'error', text: 'Error: ' + error.message }); }
+        };
+
+        if (plantillasAsignadas.length === 0) {
+            setWarningModalConfig({
+                isOpen: true,
+                title: 'Desactivar Cliente',
+                message: `¿Deseas desactivar al cliente "${clientName}"? Sus facturas y datos fiscales permanecen intactos.`,
+                onConfirm: async () => { setWarningModalConfig(prev => ({ ...prev, isOpen: false })); await doDeactivate(); },
+            });
+            return;
+        }
+
+        // Tiene plantillas asignadas — mostrar BulkFix
+        const affectedItems: AffectedItem[] = await Promise.all(
+            plantillasAsignadas.map(async (rel: any) => {
+                try {
+                    const plantilla = await database.collections.get('plantillas_precios').find(rel._raw.plantilla_id);
+                    return {
+                        id: rel.id,
+                        label: (plantilla as any).nombre || 'Lista de precios',
+                        currentValue: 'Asignada a este cliente',
+                    } as AffectedItem;
+                } catch {
+                    return { id: rel.id, label: 'Lista eliminada', currentValue: 'Asignada' } as AffectedItem;
+                }
+            })
+        );
+
         setWarningModalConfig({
             isOpen: true,
-            title: 'Confirmar Acción',
-            message: `¿Estás seguro que deseas ${accion} al cliente "${clientName}"?`,
+            title: 'Desactivar Cliente',
+            message: `Al desactivar "${clientName}", tiene ${plantillasAsignadas.length} lista(s) de precio asignada(s). ¿Deseas continuar?`,
             onConfirm: async () => {
                 setWarningModalConfig(prev => ({ ...prev, isOpen: false }));
-                try {
-                    const clientesDb = database.collections.get('clientes');
-                    const record = await clientesDb.find(clientId) as any;
-                    await database.write(async () => {
-                        await record.update((c: any) => {
-                            c.estado = !currentStatus;
-                        });
-                    });
-                    setMessage({ type: 'success', text: `Cliente ${currentStatus ? 'desactivado' : 'activado'} correctamente. Sincronizando...` });
-                    loadClients();
-                    syncApp().catch(console.error);
-                } catch (error: any) {
-                    setMessage({ type: 'error', text: 'Error al actualizar el estado: ' + error.message });
-                }
+                await doDeactivate();
+                setBulkFix({ open: true, clientName, affectedItems, replacementOptions: [] });
             },
         });
+    };
+
+    const handleBulkFixCliente = async (selectedRelIds: string[], _newValueId: string | null) => {
+        // Solo eliminamos las asignaciones seleccionadas (no hay reemplazo para plantillas)
+        try {
+            await database.write(async () => {
+                for (const relId of selectedRelIds) {
+                    const rel = await database.collections.get('cliente_plantillas').find(relId) as any;
+                    await rel.markAsDeleted();
+                }
+            });
+            loadClients(); syncApp().catch(console.error);
+        } catch (e: any) {
+            setMessage({ type: 'error', text: 'Error al remover asignaciones: ' + e.message });
+            throw e;
+        }
     };
 
     // ==========================================
@@ -697,6 +769,21 @@ export default function Clients() {
                     onSave={editingClientId ? handleUpdateClient : handleSaveClient}
                     isLoading={isLoading}
                     editData={editData}
+                />
+
+                {/* Bulk Fix Modal — asignaciones de listas de precio */}
+                <BulkFixModal
+                    isOpen={bulkFix.open}
+                    onClose={() => setBulkFix(p => ({ ...p, open: false }))}
+                    deactivatedName={bulkFix.clientName}
+                    entityType="cliente"
+                    entityLabel="Cliente"
+                    affectedItems={bulkFix.affectedItems}
+                    affectedLabel="listas de precio asignadas"
+                    replacementOptions={[]}     
+                    replacementLabel="Estas asignaciones se eliminarán"
+                    allowNoReplacement={true}
+                    onConfirmFix={handleBulkFixCliente}
                 />
             </div>
         </div>

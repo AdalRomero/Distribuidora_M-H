@@ -44,7 +44,7 @@ export default function Settings() {
     // TEMPLATE EDITOR STATE
     // ==========================================
     const [isEditMode, setIsEditMode] = useState(false);
-    const [currentLayout, setCurrentLayout] = useState<InvoiceBlock[]>(defaultLayout);
+    const [currentLayout, setCurrentLayout] = useState<any[]>(defaultLayout);
     const [templates, setTemplates] = useState<{ id: string; name: string; isDefault: boolean; layoutJson: string }[]>([]);
     const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
     const [templateName, setTemplateName] = useState('');
@@ -548,6 +548,8 @@ export default function Settings() {
                                     {/* Canvas preview */}
                                     <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700" style={{ height: 520 }}>
                                         <InvoiceBuilderCanvas
+                                             layout={currentLayout}
+                                             onChangeLayout={setCurrentLayout}
                                             isEditMode={isEditMode}
                                             form={dummyForm}
                                             calcConcepto={calcConcepto}

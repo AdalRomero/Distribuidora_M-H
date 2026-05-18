@@ -9,6 +9,7 @@ import AddSupplier, { SupplierData, SupplierProductRow, SupplierContactRow } fro
 import ErrorModal from '../../components/ui/modals/ErrorModal';
 import SuccessModal from '../../components/ui/modals/SuccessModal';
 import WarningModal from '../../components/ui/modals/WarningModal';
+import BulkFixModal, { AffectedItem, ReplacementOption } from '../../components/ui/modals/BulkFixModal';
 
 import { database } from '../../src/services/DB/indexBD';
 import { syncApp } from '../../src/sync';
@@ -52,6 +53,15 @@ export default function Suppliers() {
     const tablesToWatch = useMemo(() => ["proveedores", "proveedor_productos", "proveedor_contactos"], []);
     const { syncErrors, handleDismissError } = useSyncErrors(tablesToWatch);
     const [recoveringErrorId, setRecoveringErrorId] = useState<string | null>(null);
+
+    // ── Bulk Fix ──────────────────────────────────────────────
+    const [bulkFix, setBulkFix] = useState<{
+        open: boolean;
+        supplierName: string;
+        supplierId: string;
+        affectedItems: AffectedItem[];
+        replacementOptions: ReplacementOption[];
+    }>({ open: false, supplierName: '', supplierId: '', affectedItems: [], replacementOptions: [] });
 
     useEffect(() => { loadSuppliers(); }, []);
 
@@ -290,21 +300,109 @@ export default function Suppliers() {
     // ==========================================
     // TOGGLE ESTADO
     // ==========================================
-    const handleToggleStatus = (id: string, name: string, current: boolean) => {
-        const accion = current ? 'desactivar' : 'reactivar';
+    const handleToggleStatus = async (id: string, name: string, current: boolean) => {
+        // ACTIVAR: directo sin confirmación
+        if (!current) {
+            setWarningModalConfig({
+                isOpen: true, title: 'Confirmar Acción',
+                message: `¿Deseas reactivar al proveedor "${name}"?`,
+                onConfirm: async () => {
+                    setWarningModalConfig(prev => ({ ...prev, isOpen: false }));
+                    try {
+                        const record = await database.collections.get('proveedores').find(id) as any;
+                        await database.write(async () => { await record.update((p: any) => { p.estado = true; }); });
+                        setMessage({ type: 'success', text: `Proveedor "${name}" reactivado. Sincronizando...` });
+                        loadSuppliers(); syncApp().catch(console.error);
+                    } catch (error: any) { setMessage({ type: 'error', text: 'Error al actualizar: ' + error.message }); }
+                },
+            });
+            return;
+        }
+
+        // DESACTIVAR: buscar productos vinculados
+        const pivotRows = await database.collections.get('proveedor_productos')
+            .query(Q.where('proveedor_id', id)).fetch();
+
+        // Ejecutar desactivación
+        const doDeactivate = async () => {
+            try {
+                const record = await database.collections.get('proveedores').find(id) as any;
+                await database.write(async () => { await record.update((p: any) => { p.estado = false; }); });
+                setMessage({ type: 'success', text: `Proveedor "${name}" desactivado. Los registros históricos permanecen intactos.` });
+                loadSuppliers(); syncApp().catch(console.error);
+            } catch (error: any) { setMessage({ type: 'error', text: 'Error: ' + error.message }); }
+        };
+
+        if (pivotRows.length === 0) {
+            setWarningModalConfig({
+                isOpen: true, title: 'Confirmar Acción',
+                message: `¿Deseas desactivar al proveedor "${name}"?`,
+                onConfirm: async () => { setWarningModalConfig(prev => ({ ...prev, isOpen: false })); await doDeactivate(); },
+            });
+            return;
+        }
+
+        // Hay productos vinculados — mostrar opción de corrección masiva
+        const affectedItems: AffectedItem[] = await Promise.all(
+            pivotRows.map(async (pivot: any) => {
+                try {
+                    const prod = await database.collections.get('productos').find(pivot._raw.producto_id);
+                    return {
+                        id: pivot.id,
+                        label: (prod as any).descripcion || 'Producto',
+                        subtitle: (prod as any).codigoInterno ? `Código: ${(prod as any).codigoInterno}` : undefined,
+                        currentValue: name,
+                    } as AffectedItem;
+                } catch {
+                    return { id: pivot.id, label: 'Producto eliminado', currentValue: name } as AffectedItem;
+                }
+            })
+        );
+
+        // Proveedores activos como opciones de reemplazo
+        const activeProv = await database.collections.get('proveedores')
+            .query(Q.where('estado', true)).fetch();
+        const replacementOptions: ReplacementOption[] = activeProv
+            .filter((p: any) => p.id !== id)
+            .map((p: any) => ({ id: p.id, label: p.nombreComercial || p.razonSocial || 'Sin nombre' }));
+
         setWarningModalConfig({
-            isOpen: true, title: 'Confirmar Acción',
-            message: `¿Estás seguro que deseas ${accion} al proveedor "${name}"?`,
+            isOpen: true, title: 'Confirmar Desactivación',
+            message: `Al desactivar "${name}", hay ${pivotRows.length} producto(s) vinculado(s). ¿Deseas continuar? Podrás gestionar los vínculos a continuación.`,
             onConfirm: async () => {
                 setWarningModalConfig(prev => ({ ...prev, isOpen: false }));
-                try {
-                    const record = await database.collections.get('proveedores').find(id) as any;
-                    await database.write(async () => { await record.update((p: any) => { p.estado = !current; }); });
-                    setMessage({ type: 'success', text: `Proveedor ${current ? 'desactivado' : 'activado'} correctamente. Sincronizando...` });
-                    loadSuppliers(); syncApp().catch(console.error);
-                } catch (error: any) { setMessage({ type: 'error', text: 'Error al actualizar el estado: ' + error.message }); }
+                await doDeactivate();
+                setBulkFix({ open: true, supplierName: name, supplierId: id, affectedItems, replacementOptions });
             },
         });
+    };
+
+    const handleBulkFixProveedor = async (selectedPivotIds: string[], newProveedorId: string | null) => {
+        try {
+            await database.write(async () => {
+                for (const pivotId of selectedPivotIds) {
+                    const pivot = await database.collections.get('proveedor_productos').find(pivotId) as any;
+                    if (newProveedorId) {
+                        // Crear nuevo vínculo con el proveedor de reemplazo
+                        await database.collections.get('proveedor_productos').create((p: any) => {
+                            p._raw.id = Crypto.randomUUID();
+                            p._raw.producto_id = pivot._raw.producto_id;
+                            p._raw.proveedor_id = newProveedorId;
+                            p.precioCompra = pivot.precioCompra;
+                            p.tiempoEntregaDias = pivot.tiempoEntregaDias;
+                            p.codigoProveedor = pivot.codigoProveedor;
+                        });
+                    }
+                    // Eliminar el vínculo viejo
+                    await pivot.markAsDeleted();
+                }
+            });
+            loadSuppliers();
+            syncApp().catch(console.error);
+        } catch (e: any) {
+            setMessage({ type: 'error', text: 'Error en corrección masiva: ' + e.message });
+            throw e;
+        }
     };
 
     // ==========================================
@@ -595,6 +693,21 @@ export default function Suppliers() {
                     onSave={editingId ? handleUpdate : handleSave}
                     isLoading={isLoading}
                     editData={editData}
+                />
+
+                {/* Bulk Fix Modal */}
+                <BulkFixModal
+                    isOpen={bulkFix.open}
+                    onClose={() => setBulkFix(p => ({ ...p, open: false }))}
+                    deactivatedName={bulkFix.supplierName}
+                    entityType="proveedor"
+                    entityLabel="Proveedor"
+                    affectedItems={bulkFix.affectedItems}
+                    affectedLabel="vínculos de producto"
+                    replacementOptions={bulkFix.replacementOptions}
+                    replacementLabel="Reasignar a otro proveedor activo"
+                    allowNoReplacement={true}
+                    onConfirmFix={handleBulkFixProveedor}
                 />
             </div>
         </div>
