@@ -12,18 +12,45 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Platform } from "react-native";
 
 import { useAuth } from "../../src/context/AuthContext";
+import { usePermissions, type AppModule } from "../../src/permissions";
 import NotificationFlyoutMenu from "./modals/NotificationFlyoutMenu";
 
 const LOGO_MH = "/images/logo-mh.svg";
+
+// ─── Configuración declarativa de navegación ─────────────────────────────────
+// Cada item define su módulo requerido. El sidebar se filtra automáticamente.
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  module: AppModule;
+  /** 'pill' = botón dentro del marco principal, 'bubble' = burbuja individual */
+  variant: 'pill' | 'bubble';
+}
+
+const NAV_ITEMS: NavItem[] = [
+  // Marco principal (pills)
+  { href: '/home',      label: 'Inicio',     icon: LayoutDashboard, module: 'inicio',      variant: 'pill' },
+  { href: '/inventory', label: 'Inventario',  icon: ShelvingUnitIcon, module: 'inventario', variant: 'pill' },
+  { href: '/invoices',  label: 'Facturas',   icon: FileText,        module: 'facturas',    variant: 'pill' },
+  // Burbujas
+  { href: '/clients',   label: 'Clientes',   icon: Users,           module: 'clientes',    variant: 'bubble' },
+  { href: '/prices',    label: 'Precios',    icon: DollarSignIcon,  module: 'precios',     variant: 'bubble' },
+  { href: '/users',     label: 'Usuarios',   icon: User,            module: 'usuarios',    variant: 'bubble' },
+  { href: '/catalogs',  label: 'Catálogos',  icon: BookOpen,        module: 'catalogo',    variant: 'bubble' },
+  { href: '/suppliers', label: 'Proveedores', icon: Truck,           module: 'proveedores', variant: 'bubble' },
+];
 
 export const SideBarMenu: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
   const { userId, userName, userRole, isDev, logoutLocal } = useAuth();
+  const { hasModuleAccess } = usePermissions();
   const [showProfile, setShowProfile] = useState(false);
 
   const avatarName = userName.replace(/[._-]/g, " ");
@@ -40,6 +67,20 @@ export const SideBarMenu: React.FC = () => {
   const isActive = (path: string) => {
     return pathname === path || pathname.startsWith(`${path}/`);
   };
+
+  // Filtrar items según permisos del usuario
+  const visiblePills = useMemo(
+    () => NAV_ITEMS.filter(item => item.variant === 'pill' && hasModuleAccess(item.module)),
+    [hasModuleAccess]
+  );
+
+  const visibleBubbles = useMemo(
+    () => NAV_ITEMS.filter(item => item.variant === 'bubble' && hasModuleAccess(item.module)),
+    [hasModuleAccess]
+  );
+
+  // Configuraciones siempre visible (cada usuario accede a sus propias config)
+  const showSettings = hasModuleAccess('configuraciones');
 
   return (
     <nav className="w-full h-16 bg-[radial-gradient(ellipse_at_center,_#242c3b_0%,_#15335c_100%)] flex items-center px-4 md:px-6 shadow-md shrink-0 relative z-50">
@@ -85,101 +126,43 @@ export const SideBarMenu: React.FC = () => {
         </div>
       )}
 
-      {/* 4. Marco con Inicio, Inventario y Facturas */}
-      <div className="flex items-center bg-white dark:bg-slate-800 p-1 rounded-full shrink-0 mr-4 shadow-sm border border-slate-200 dark:border-slate-700">
-        <Link href="/home" asChild>
-          <a
-            className={`flex items-center gap-1.5 px-5 py-2 rounded-full font-semibold transition-all duration-200 text-sm ${isActive("/home")
-              ? "bg-[#15335c] text-white shadow-sm"
-              : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900"
-              }`}
-          >
-            <LayoutDashboard size={16} />
-            Inicio
-          </a>
-        </Link>
-        <Link href="/inventory" asChild>
-          <a
-            className={`flex items-center gap-1.5 px-5 py-2 rounded-full font-semibold transition-all duration-200 text-sm ${isActive("/inventory")
-              ? "bg-[#15335c] text-white shadow-sm"
-              : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900"
-              }`}
-          >
-            <ShelvingUnitIcon size={16} />
-            Inventario
-          </a>
-        </Link>
-        <Link href="/invoices" asChild>
-          <a
-            className={`flex items-center gap-1.5 px-5 py-2 rounded-full font-semibold transition-all duration-200 text-sm ${isActive("/invoices")
-              ? "bg-[#15335c] text-white shadow-sm"
-              : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900"
-              }`}
-          >
-            <FileText size={16} />
-            Facturas
-          </a>
-        </Link>
-      </div>
+      {/* 4. Marco con pills dinámicas */}
+      {visiblePills.length > 0 && (
+        <div className="flex items-center bg-white dark:bg-slate-800 p-1 rounded-full shrink-0 mr-4 shadow-sm border border-slate-200 dark:border-slate-700">
+          {visiblePills.map((item) => (
+            <Link key={item.href} href={item.href as any} asChild>
+              <a
+                className={`flex items-center gap-1.5 px-5 py-2 rounded-full font-semibold transition-all duration-200 text-sm ${isActive(item.href)
+                  ? "bg-[#15335c] text-white shadow-sm"
+                  : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900"
+                  }`}
+              >
+                <item.icon size={16} />
+                {item.label}
+              </a>
+            </Link>
+          ))}
+        </div>
+      )}
 
-      {/* 5. Burbujas: Clientes, Precios, Usuarios */}
-      <div className="flex items-center gap-2 shrink-0">
-        <Link href="/clients" asChild>
-          <a
-            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${isActive("/clients")
-              ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
-              : "bg-[#15335c] border-transparent hover:bg-black/20 text-slate-300 hover:text-white"
-              }`}
-            title="Clientes"
-          >
-            <Users size={18} />
-          </a>
-        </Link>
-        <Link href="/prices" asChild>
-          <a
-            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${isActive("/prices")
-              ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
-              : "bg-[#15335c] border-transparent hover:bg-black/20 text-slate-300 hover:text-white"
-              }`}
-            title="Precios"
-          >
-            <DollarSignIcon size={18} />
-          </a>
-        </Link>
-        <Link href="/users" asChild>
-          <a
-            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${isActive("/users")
-              ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
-              : "bg-[#15335c] border-transparent hover:bg-black/20 text-slate-300 hover:text-white"
-              }`}
-            title="Usuarios"
-          >
-            <User size={18} />
-          </a>
-        </Link>
-        <Link href="/catalogs" asChild>
-          <a
-            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${isActive("/catalogs")
-              ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
-              : "bg-[#15335c] border-transparent hover:bg-black/20 text-slate-300 hover:text-white"
-              }`}
-            title="Catálogos"
-          >
-            <BookOpen size={18} />
-          </a>
-        </Link>
-        <Link href="/suppliers" asChild>
-          <a
-            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${isActive("/suppliers")
-              ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
-              : "bg-[#15335c] border-transparent hover:bg-black/20 text-slate-300 hover:text-white"
-              }`}
-            title="Proveedores"
-          >
-            <Truck size={18} />
-          </a>
-        </Link>
-      </div>
+      {/* 5. Burbujas dinámicas */}
+      {visibleBubbles.length > 0 && (
+        <div className="flex items-center gap-2 shrink-0">
+          {visibleBubbles.map((item) => (
+            <Link key={item.href} href={item.href as any} asChild>
+              <a
+                className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${isActive(item.href)
+                  ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
+                  : "bg-[#15335c] border-transparent hover:bg-black/20 text-slate-300 hover:text-white"
+                  }`}
+                title={item.label}
+              >
+                <item.icon size={18} />
+              </a>
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* 6. Das el salto */}
       <div className="flex-1 min-w-[20px]"></div>
@@ -188,17 +171,19 @@ export const SideBarMenu: React.FC = () => {
       <div className="flex items-center gap-3 shrink-0">
         <NotificationFlyoutMenu />
 
-        <Link href="/settings" asChild>
-          <a
-            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${isActive("/settings")
-              ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
-              : "bg-[#15335c] border-transparent hover:bg-black/20 text-slate-300 hover:text-white"
-              }`}
-            title="Configuraciones"
-          >
-            <Settings size={18} />
-          </a>
-        </Link>
+        {showSettings && (
+          <Link href="/settings" asChild>
+            <a
+              className={`flex items-center justify-center w-10 h-10 rounded-full transition-all border ${isActive("/settings")
+                ? "bg-[#38bdf8]/20 border-[#38bdf8]/50 text-[#38bdf8] shadow-sm"
+                : "bg-[#15335c] border-transparent hover:bg-black/20 text-slate-300 hover:text-white"
+                }`}
+              title="Configuraciones"
+            >
+              <Settings size={18} />
+            </a>
+          </Link>
+        )}
 
         {/* Separador vertical sutil */}
         <div className="w-px h-8 bg-white dark:bg-slate-800/10 mx-1"></div>

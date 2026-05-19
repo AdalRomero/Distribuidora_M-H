@@ -8,9 +8,11 @@ import {
     Package,
     RefreshCw,
     TrendingUp,
-    Users
+    Users,
+    Calendar,
+    ArrowRightLeft
 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useEffect } from 'react';
 import {
     Bar,
     BarChart,
@@ -24,12 +26,18 @@ import {
 import type { ValueType } from 'recharts/types/component/DefaultTooltipContent';
 import * as XLSX from 'xlsx';
 import {
+    startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear,
+    subDays, subWeeks, subMonths, subYears, format
+} from 'date-fns';
+import { es } from 'date-fns/locale';
+
+import {
     useDashboardStats,
     type CurrencyEntry,
-    type DateRangeFilter,
     type TopClient,
     type TopFamily,
     type TopProduct,
+    type DashboardFilter
 } from '../../src/hooks/useDashboardStats';
 
 // ─── Constants ───────────────────────────────────────────────────────
@@ -40,12 +48,14 @@ const FAMILY_BAR_COLORS = [
     'bg-[#85a3bf]', 'bg-[#ccb9b2]', 'bg-[#6383a1]', 'bg-[#a8948d]', 'bg-[#4a6d8c]',
 ] as const;
 
-const DATE_RANGE_LABELS: Record<DateRangeFilter, string> = {
+type DatePreset = 'today' | 'week' | 'month' | 'year' | 'custom';
+
+const PRESET_LABELS: Record<DatePreset, string> = {
     today: 'Hoy',
     week: 'Esta Semana',
     month: 'Este Mes',
     year: 'Este Año',
-    all: 'Todo el Tiempo',
+    custom: 'Personalizado / Comparar',
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -60,6 +70,45 @@ function formatCompact(amount: number): string {
     if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)}M`;
     if (amount >= 1_000) return `$${(amount / 1_000).toFixed(1)}k`;
     return `$${amount.toFixed(0)}`;
+}
+
+function getPresetFilter(preset: DatePreset): DashboardFilter {
+    const now = new Date();
+    const todayEnd = endOfDay(now);
+
+    switch (preset) {
+        case 'today':
+            return {
+                periodA: { start: startOfDay(now), end: todayEnd },
+                periodB: { start: startOfDay(subDays(now, 1)), end: endOfDay(subDays(now, 1)) },
+                trendGroupBy: 'hour'
+            };
+        case 'week':
+            return {
+                periodA: { start: startOfWeek(now, { locale: es }), end: todayEnd },
+                periodB: { start: startOfWeek(subWeeks(now, 1), { locale: es }), end: endOfDay(subDays(startOfWeek(now, { locale: es }), 1)) },
+                trendGroupBy: 'day'
+            };
+        case 'month':
+            return {
+                periodA: { start: startOfMonth(now), end: todayEnd },
+                periodB: { start: startOfMonth(subMonths(now, 1)), end: endOfDay(subDays(startOfMonth(now), 1)) },
+                trendGroupBy: 'day'
+            };
+        case 'year':
+            return {
+                periodA: { start: startOfYear(now), end: todayEnd },
+                periodB: { start: startOfYear(subYears(now, 1)), end: endOfDay(subDays(startOfYear(now), 1)) },
+                trendGroupBy: 'month'
+            };
+        case 'custom':
+        default:
+            return {
+                periodA: { start: startOfMonth(now), end: todayEnd },
+                periodB: null,
+                trendGroupBy: 'day'
+            };
+    }
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────
@@ -119,12 +168,49 @@ function EmptyState({ message }: { message: string }) {
 // ─── Main Component ──────────────────────────────────────────────────
 
 export default function Home() {
-    const [dateRange, setDateRange] = useState<DateRangeFilter>('month');
-    const stats = useDashboardStats(dateRange);
+    const [preset, setPreset] = useState<DatePreset>('month');
+    
+    // Custom date state
+    const [startA, setStartA] = useState<string>(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
+    const [endA, setEndA] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+    const [enableCompare, setEnableCompare] = useState<boolean>(false);
+    const [startB, setStartB] = useState<string>(format(startOfMonth(subMonths(new Date(), 1)), 'yyyy-MM-dd'));
+    const [endB, setEndB] = useState<string>(format(subDays(startOfMonth(new Date()), 1), 'yyyy-MM-dd'));
 
-    const showComparison = dateRange !== 'all';
+    // Actual filter sent to hook
+    const [filter, setFilter] = useState<DashboardFilter>(() => getPresetFilter('month'));
 
-    // Memoized tooltip formatter to avoid re-creating on every render
+    // Sync filter when preset or custom dates change
+    useEffect(() => {
+        if (preset !== 'custom') {
+            setFilter(getPresetFilter(preset));
+        } else {
+            const dA = new Date(startA + "T00:00:00");
+            const eA = new Date(endA + "T23:59:59");
+            
+            let pB = null;
+            if (enableCompare) {
+                pB = {
+                    start: new Date(startB + "T00:00:00"),
+                    end: new Date(endB + "T23:59:59")
+                };
+            }
+            
+            // Auto detect trend group by range length A
+            const diffDays = (eA.getTime() - dA.getTime()) / (1000 * 3600 * 24);
+            const trendGroupBy = diffDays <= 2 ? 'hour' : diffDays <= 60 ? 'day' : 'month';
+
+            setFilter({
+                periodA: { start: dA, end: eA },
+                periodB: pB,
+                trendGroupBy
+            });
+        }
+    }, [preset, startA, endA, startB, endB, enableCompare]);
+
+    const stats = useDashboardStats(filter);
+    const showComparison = filter.periodB !== null;
+
     const tooltipFormatter = useCallback((value: ValueType | undefined) => {
         return formatCurrency(Number(value ?? 0));
     }, []);
@@ -175,12 +261,12 @@ export default function Home() {
             }
 
             const timestamp = new Date().toISOString().slice(0, 10);
-            XLSX.writeFile(wb, `Reporte_${DATE_RANGE_LABELS[dateRange]}_${timestamp}.xlsx`);
+            XLSX.writeFile(wb, `Reporte_${PRESET_LABELS[preset]}_${timestamp}.xlsx`);
         } catch (error) {
             console.error('Error al exportar Excel:', error);
             alert('Ocurrió un error al intentar exportar el reporte.');
         }
-    }, [stats, dateRange]);
+    }, [stats, preset]);
 
     // KPI cards config
     const kpiCards: KpiCardProps[] = useMemo(() => [
@@ -233,7 +319,7 @@ export default function Home() {
                     <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-2">Error al cargar datos</h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">{stats.error}</p>
                     <button
-                        onClick={() => setDateRange(prev => prev)}
+                        onClick={() => setPreset(prev => prev)}
                         className="inline-flex items-center gap-2 bg-[#85a3bf] hover:bg-[#6383a1] text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
                     >
                         <RefreshCw className="w-4 h-4" />
@@ -250,7 +336,7 @@ export default function Home() {
             <div className="max-w-7xl mx-auto">
 
                 {/* Header */}
-                <header className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <header className="mb-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                     <div>
                         <h1 className="text-3xl md:text-4xl font-extrabold text-slate-800 dark:text-white tracking-tight">
                             Panel Analítico
@@ -262,10 +348,10 @@ export default function Home() {
                     <div className="flex gap-3 flex-wrap">
                         <select
                             className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#85a3bf] cursor-pointer"
-                            value={dateRange}
-                            onChange={(e) => setDateRange(e.target.value as DateRangeFilter)}
+                            value={preset}
+                            onChange={(e) => setPreset(e.target.value as DatePreset)}
                         >
-                            {(Object.entries(DATE_RANGE_LABELS) as [DateRangeFilter, string][]).map(([key, label]) => (
+                            {(Object.entries(PRESET_LABELS) as [DatePreset, string][]).map(([key, label]) => (
                                 <option key={key} value={key}>{label}</option>
                             ))}
                         </select>
@@ -279,6 +365,76 @@ export default function Home() {
                         </button>
                     </div>
                 </header>
+
+                {/* Custom Date Controls */}
+                {preset === 'custom' && (
+                    <div className="mb-8 bg-white dark:bg-slate-800 p-4 md:p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                        <div className="flex flex-col xl:flex-row gap-6 items-start xl:items-center">
+                            
+                            {/* Periodo A */}
+                            <div className="flex-1 w-full">
+                                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                    <Calendar className="w-3.5 h-3.5" />
+                                    Periodo Principal
+                                </label>
+                                <div className="flex items-center gap-3">
+                                    <input 
+                                        type="date" 
+                                        value={startA} 
+                                        onChange={(e) => setStartA(e.target.value)}
+                                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-[#85a3bf]"
+                                    />
+                                    <span className="text-slate-400 text-sm">a</span>
+                                    <input 
+                                        type="date" 
+                                        value={endA} 
+                                        onChange={(e) => setEndA(e.target.value)}
+                                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-[#85a3bf]"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Separator / Switch */}
+                            <div className="hidden xl:flex items-center justify-center pt-6">
+                                <ArrowRightLeft className="w-5 h-5 text-slate-300 dark:text-slate-600" />
+                            </div>
+
+                            {/* Periodo B */}
+                            <div className="flex-1 w-full">
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                                        <TrendingUp className="w-3.5 h-3.5" />
+                                        Comparar contra
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={enableCompare} 
+                                            onChange={(e) => setEnableCompare(e.target.checked)}
+                                            className="rounded text-[#85a3bf] focus:ring-[#85a3bf]"
+                                        />
+                                        <span className="text-xs text-slate-500 font-medium">Activar</span>
+                                    </label>
+                                </div>
+                                <div className={`flex items-center gap-3 transition-opacity ${!enableCompare ? 'opacity-40 pointer-events-none' : ''}`}>
+                                    <input 
+                                        type="date" 
+                                        value={startB} 
+                                        onChange={(e) => setStartB(e.target.value)}
+                                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-[#85a3bf]"
+                                    />
+                                    <span className="text-slate-400 text-sm">a</span>
+                                    <input 
+                                        type="date" 
+                                        value={endB} 
+                                        onChange={(e) => setEndB(e.target.value)}
+                                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-[#85a3bf]"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* ── Row 1: KPI Cards ── */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6">

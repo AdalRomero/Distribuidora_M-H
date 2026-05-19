@@ -252,6 +252,7 @@ export default function Prices() {
           plantilla = await plantillasDb.create((r: any) => {
             r._raw.id = Crypto.randomUUID();
             r.nombre = formData.nombreLista;
+            r.estado = true; // default active
             r.created_at = Date.now();
             r.updated_at = Date.now();
           });
@@ -414,6 +415,7 @@ export default function Prices() {
   // ==========================================
   const startEdit = (item: PriceListSummary) => {
     setEditData({
+      id: item.id,
       nombreLista: item.nombreLista,
       reglas: item.reglas,
       clientesIds: item.clientesIds,

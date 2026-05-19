@@ -21,6 +21,7 @@ import { database } from "../../../src/services/DB/indexBD";
 import {
     InvoiceLayoutFlow
 } from "./InvoiceBlockRenderer";
+import { LotSelectionModal } from "./LotSelectionModal";
 
 interface AddInvoiceProps {
   isOpen: boolean;
@@ -41,12 +42,14 @@ interface Concepto {
   descuento: string;
   porcImpuesto: string;
   productoId: string;
+  selectedLotes?: { loteId: string; cantidad: number }[];
 }
 interface InvoiceForm {
   serie: string;
   folio: string;
   fecha: string;
   hora: string;
+  tipoDocumento: "factura" | "prefactura" | "cotizacion";
   tipoComprobante: string;
   lugarExpedicion: string;
   metodoPago: string;
@@ -89,6 +92,7 @@ interface ProductoItem {
   precioMenudeo: number;
   estado: boolean;
   stock: number;
+  familiaId: string;
 }
 interface PrecioEspecial {
   id: string;
@@ -96,6 +100,36 @@ interface PrecioEspecial {
   productoId: string;
   descuentoPorcentaje: number;
   precioFijo: number;
+}
+interface PrecioEspecialFamilia {
+  clienteId: string;
+  familiaId: string;
+  descuentoPorcentaje: number;
+}
+interface ClientePlantilla {
+  clienteId: string;
+  plantillaId: string;
+}
+interface ReglaPlantilla {
+  plantillaId: string;
+  tipo: string;
+  targetId: string;
+  descuentoPorcentaje: number;
+  precioFijo: number;
+}
+interface PlantillaPrecio {
+  id: string;
+  estado: boolean;
+}
+interface ProductoImpuesto {
+  productoId: string;
+  impuestoId: string;
+}
+interface Impuesto {
+  id: string;
+  nombre: string;
+  tasa: number;
+  activo: boolean;
 }
 
 const newConcepto = (): Concepto => ({
@@ -114,6 +148,7 @@ const initialForm: InvoiceForm = {
   folio: "1",
   fecha: new Date().toISOString().split("T")[0],
   hora: new Date().toTimeString().slice(0, 5),
+  tipoDocumento: "factura",
   tipoComprobante: "I",
   lugarExpedicion: "83554",
   metodoPago: "PPD",
@@ -285,9 +320,16 @@ export default function AddInvoice({
   // Data from DB
   const [clientes, setClientes] = useState<ClienteItem[]>([]);
   const [productos, setProductos] = useState<ProductoItem[]>([]);
-  const [preciosEspeciales, setPreciosEspeciales] = useState<PrecioEspecial[]>(
-    [],
-  );
+  const [preciosEspeciales, setPreciosEspeciales] = useState<PrecioEspecial[]>([]);
+  const [preciosFam, setPreciosFam] = useState<PrecioEspecialFamilia[]>([]);
+  const [clientesPlantillas, setClientesPlantillas] = useState<ClientePlantilla[]>([]);
+  const [reglasPlantilla, setReglasPlantilla] = useState<ReglaPlantilla[]>([]);
+  const [plantillas, setPlantillas] = useState<PlantillaPrecio[]>([]);
+  const [prodImpuestos, setProdImpuestos] = useState<ProductoImpuesto[]>([]);
+  const [impuestos, setImpuestos] = useState<Impuesto[]>([]);
+  const [lotesState, setLotesState] = useState<any[]>([]);
+  const [modalLotesConceptoId, setModalLotesConceptoId] = useState<string | null>(null);
+  
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [invoiceLayout, setInvoiceLayout] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -337,20 +379,41 @@ export default function AddInvoice({
       const clientesDb = database.collections.get("clientes");
       const productosDb = database.collections.get("productos");
       const preciosDb = database.collections.get("precios_especiales_clientes");
-
       const lotesDb = database.collections.get("lotes");
-      const [allC, allP, allPE, allL] = await Promise.all([
+      const preciosFamDb = database.collections.get("precios_especiales_familias_clientes");
+      const clientesPlantillasDb = database.collections.get("clientes_plantillas");
+      const reglasPlantillasDb = database.collections.get("reglas_plantilla");
+      const plantillasDb = database.collections.get("plantillas_precios");
+      const prodImpDb = database.collections.get("producto_impuestos");
+      const impDb = database.collections.get("impuestos");
+
+      const [allC, allP, allPE, allL, allPEF, allCP, allRP, allPlantillas, allPI, allI] = await Promise.all([
         clientesDb.query().fetch(),
         productosDb.query().fetch(),
         preciosDb.query().fetch(),
         lotesDb.query(Q.where("estado", true)).fetch(),
+        preciosFamDb.query().fetch(),
+        clientesPlantillasDb.query().fetch(),
+        reglasPlantillasDb.query().fetch(),
+        plantillasDb.query(Q.where("estado", true)).fetch(),
+        prodImpDb.query().fetch(),
+        impDb.query(Q.where("activo", true)).fetch()
       ]);
 
       const stockMap: Record<string, number> = {};
-      allL.forEach((lote: any) => {
+      const allLotesParsed = allL.map((lote: any) => {
         const pid = lote._raw.producto_id;
-        stockMap[pid] = (stockMap[pid] || 0) + (lote.cantidad || 0);
+        const qty = lote.cantidad || 0;
+        stockMap[pid] = (stockMap[pid] || 0) + qty;
+        return {
+          id: lote.id,
+          codigo_lote: lote.codigo_lote,
+          fecha_caducidad: lote.fecha_caducidad,
+          cantidad: qty,
+          producto_id: pid
+        };
       });
+      setLotesState(allLotesParsed);
 
       setClientes(
         allC.map((c: any) => ({
@@ -382,6 +445,7 @@ export default function AddInvoice({
             precioMenudeo: p.precioMenudeo || 0,
             estado: p.estado,
             stock: stockMap[p.id] || 0,
+            familiaId: p._raw.familia_id || "",
           })),
       );
 
@@ -394,6 +458,13 @@ export default function AddInvoice({
           precioFijo: pe.precioFijo || 0,
         })),
       );
+
+      setPreciosFam(allPEF.map((pef: any) => ({ clienteId: pef._raw.cliente_id, familiaId: pef._raw.familia_id, descuentoPorcentaje: pef.descuentoPorcentaje })));
+      setClientesPlantillas(allCP.map((cp: any) => ({ clienteId: cp._raw.cliente_id, plantillaId: cp._raw.plantilla_id })));
+      setReglasPlantilla(allRP.map((rp: any) => ({ plantillaId: rp._raw.plantilla_id, tipo: rp.tipo, targetId: rp.targetId, descuentoPorcentaje: rp.descuentoPorcentaje, precioFijo: rp.precioFijo })));
+      setPlantillas(allPlantillas.map((p: any) => ({ id: p.id, estado: p.estado })));
+      setProdImpuestos(allPI.map((pi: any) => ({ productoId: pi._raw.producto_id, impuestoId: pi._raw.impuesto_id })));
+      setImpuestos(allI.map((i: any) => ({ id: i.id, nombre: i.nombre, tasa: i.tasa, activo: i.activo })));
 
       // Auto-generar folio si es nueva factura (no recovery)
       if (!recoverData) {
@@ -437,6 +508,7 @@ export default function AddInvoice({
           ? new Date(recoverData.fecha).toISOString().split("T")[0]
           : initialForm.fecha,
         hora: initialForm.hora,
+        tipoDocumento: recoverData.tipoDocumento || recoverData.tipo || "factura",
         tipoComprobante: recoverData.tipoComprobante || "I",
         lugarExpedicion: recoverData.lugarExpedicion || "83554",
         metodoPago: recoverData.metodoPago || "PPD",
@@ -470,7 +542,76 @@ export default function AddInvoice({
   }, [recoverData]);
 
   // ==========================================
-  // SELECCIÓN DE CLIENTE → AUTO-FILL
+  // MOTOR ERP: CÁLCULO DE PRECIOS, DESCUENTOS E IMPUESTOS
+  // ==========================================
+  const calcularPrecioYDescuentoProducto = (clienteId: string, prod: ProductoItem) => {
+    const selectedCliente = clientes.find((c) => c.id === clienteId);
+
+    // Jerarquía 1 & 2
+    const precioEsp = preciosEspeciales.find(pe => pe.clienteId === clienteId && pe.productoId === prod.id);
+    const precioEspFam = preciosFam.find(pef => pef.clienteId === clienteId && pef.familiaId === prod.familiaId);
+
+    // Jerarquía 3: Plantillas
+    const cp = clientesPlantillas.find(cp => cp.clienteId === clienteId);
+    const plantillaActiva = cp ? plantillas.find(p => p.id === cp.plantillaId && p.estado) : null;
+    
+    let reglaPlantillaProd = null;
+    let reglaPlantillaFam = null;
+    let reglaPlantillaGlobal = null;
+    
+    if (plantillaActiva) {
+      reglaPlantillaProd = reglasPlantilla.find(r => r.plantillaId === plantillaActiva.id && r.tipo === 'producto' && r.targetId === prod.id);
+      reglaPlantillaFam = reglasPlantilla.find(r => r.plantillaId === plantillaActiva.id && r.tipo === 'familia' && r.targetId === prod.familiaId);
+      reglaPlantillaGlobal = reglasPlantilla.find(r => r.plantillaId === plantillaActiva.id && r.tipo === 'global');
+    }
+
+    // Impuestos dinámicos
+    const impuestosDelProducto = prodImpuestos.filter(pi => pi.productoId === prod.id);
+    let totalImpuestoPorcentaje = 0;
+    impuestosDelProducto.forEach(pi => {
+      const imp = impuestos.find(i => i.id === pi.impuestoId);
+      if (imp && imp.activo) totalImpuestoPorcentaje += imp.tasa;
+    });
+
+    // Precio base y descuento global
+    let precio = prod.precioLista;
+    let descuentoTotal = 0;
+
+    if (selectedCliente) {
+      switch (selectedCliente.listaPrecioBase) {
+        case "mayoreo": precio = prod.precioMayoreo || prod.precioLista; break;
+        case "menudeo": precio = prod.precioMenudeo || prod.precioLista; break;
+        default: precio = prod.precioLista; break;
+      }
+      if (selectedCliente.descuentoGlobal > 0) {
+        descuentoTotal += selectedCliente.descuentoGlobal;
+      }
+    }
+
+    // Evaluación estricta de jerarquía ERP
+    if (precioEsp && (precioEsp.precioFijo > 0 || precioEsp.descuentoPorcentaje > 0)) {
+        if (precioEsp.precioFijo > 0) precio = precioEsp.precioFijo;
+        if (precioEsp.descuentoPorcentaje > 0) descuentoTotal += precioEsp.descuentoPorcentaje;
+    } else if (precioEspFam && precioEspFam.descuentoPorcentaje > 0) {
+        descuentoTotal += precioEspFam.descuentoPorcentaje;
+    } else if (reglaPlantillaProd && (reglaPlantillaProd.precioFijo > 0 || reglaPlantillaProd.descuentoPorcentaje > 0)) {
+        if (reglaPlantillaProd.precioFijo > 0) precio = reglaPlantillaProd.precioFijo;
+        if (reglaPlantillaProd.descuentoPorcentaje > 0) descuentoTotal += reglaPlantillaProd.descuentoPorcentaje;
+    } else if (reglaPlantillaFam && reglaPlantillaFam.descuentoPorcentaje > 0) {
+        descuentoTotal += reglaPlantillaFam.descuentoPorcentaje;
+    } else if (reglaPlantillaGlobal && reglaPlantillaGlobal.descuentoPorcentaje > 0) {
+        descuentoTotal += reglaPlantillaGlobal.descuentoPorcentaje;
+    }
+
+    return {
+      precio,
+      descuento: descuentoTotal > 0 ? String(descuentoTotal) : "",
+      impuesto: String(totalImpuestoPorcentaje)
+    };
+  };
+
+  // ==========================================
+  // SELECCIÓN DE CLIENTE → AUTO-FILL Y RECÁLCULO
   // ==========================================
   const handleSelectCliente = (cliente: ClienteItem) => {
     const direccion = [
@@ -481,6 +622,19 @@ export default function AddInvoice({
     ]
       .filter(Boolean)
       .join(", ");
+      
+    // Recalcular conceptos existentes con el nuevo cliente
+    const nuevosConceptos = form.conceptos.map(c => {
+      if (c.productoId && c.productoId !== "manual") {
+        const prod = productos.find(p => p.id === c.productoId);
+        if (prod) {
+          const calc = calcularPrecioYDescuentoProducto(cliente.id, prod);
+          return { ...c, valorUnitario: String(calc.precio), descuento: calc.descuento, porcImpuesto: calc.impuesto };
+        }
+      }
+      return c;
+    });
+
     setForm((prev) => ({
       ...prev,
       clienteId: cliente.id,
@@ -488,6 +642,7 @@ export default function AddInvoice({
       nombre: cliente.nombre,
       rfc: cliente.rfc || "XAXX010101000",
       domicilio: direccion,
+      conceptos: nuevosConceptos
     }));
   };
 
@@ -495,50 +650,7 @@ export default function AddInvoice({
   // SELECCIÓN DE PRODUCTO → AUTO-FILL CONCEPTO
   // ==========================================
   const handleSelectProducto = (conceptoId: string, producto: ProductoItem) => {
-    const selectedCliente = clientes.find((c) => c.id === form.clienteId);
-
-    // Buscar precio especial para este cliente+producto
-    const precioEsp = preciosEspeciales.find(
-      (pe) => pe.clienteId === form.clienteId && pe.productoId === producto.id,
-    );
-
-    let precio = producto.precioLista; // default
-    let descuento = "";
-
-    let descuentoTotal = 0;
-
-    if (selectedCliente) {
-      // Determinar precio según lista del cliente
-      switch (selectedCliente.listaPrecioBase) {
-        case "mayoreo":
-          precio = producto.precioMayoreo || producto.precioLista;
-          break;
-        case "menudeo":
-          precio = producto.precioMenudeo || producto.precioLista;
-          break;
-        default:
-          precio = producto.precioLista;
-          break;
-      }
-
-      // Acumular descuento global del cliente si existe
-      if (selectedCliente.descuentoGlobal > 0) {
-        descuentoTotal += selectedCliente.descuentoGlobal;
-      }
-    }
-
-    // Agregar precio especial / descuento especial acumulado
-    if (precioEsp) {
-      if (precioEsp.precioFijo > 0) {
-        precio = precioEsp.precioFijo;
-      } else if (precioEsp.descuentoPorcentaje > 0) {
-        descuentoTotal += precioEsp.descuentoPorcentaje;
-      }
-    }
-
-    if (descuentoTotal > 0) {
-      descuento = String(descuentoTotal);
-    }
+    const calc = calcularPrecioYDescuentoProducto(form.clienteId, producto);
 
     setForm((prev) => ({
       ...prev,
@@ -549,8 +661,9 @@ export default function AddInvoice({
               productoId: producto.id,
               concepto: producto.descripcion,
               claveSat: producto.claveSat,
-              valorUnitario: String(precio),
-              descuento: descuento,
+              valorUnitario: String(calc.precio),
+              descuento: calc.descuento,
+              porcImpuesto: calc.impuesto
             }
           : c,
       ),
@@ -619,13 +732,15 @@ export default function AddInvoice({
       }
     }
 
-    for (const [prodId, cant] of Object.entries(cantidadesPorProducto)) {
-      const prod = productos.find((p) => p.id === prodId);
-      if (prod && cant > prod.stock) {
-        setSaveError(
-          `Inventario insuficiente para el producto "${prod.descripcion}". Stock disponible: ${prod.stock}, Cantidad solicitada en total: ${cant}`,
-        );
-        return;
+    if (form.tipoDocumento === "factura") {
+      for (const [prodId, cant] of Object.entries(cantidadesPorProducto)) {
+        const prod = productos.find((p) => p.id === prodId);
+        if (prod && cant > prod.stock) {
+          setSaveError(
+            `Inventario insuficiente para el producto "${prod.descripcion}". Stock disponible: ${prod.stock}, Cantidad solicitada en total: ${cant}`,
+          );
+          return;
+        }
       }
     }
 
@@ -642,8 +757,8 @@ export default function AddInvoice({
           doc._raw.id = docId;
           doc._raw.cliente_id = form.clienteId || "publico_general";
           doc._raw.usuario_id = userId || "unknown";
-          doc.tipo = "factura";
-          doc._raw.tipo = "factura";
+          doc.tipo = form.tipoDocumento;
+          doc._raw.tipo = form.tipoDocumento;
           doc.folio = folioCompleto;
           doc._raw.folio = folioCompleto;
           doc.estado = "generada";
@@ -690,11 +805,11 @@ export default function AddInvoice({
             det._raw.json_impuestos_aplicados = impJson;
           });
 
-          // 3. Deducción de inventario (FIFO) si no es concepto manual
-          if (concepto.productoId && concepto.productoId !== "manual") {
+          // 3. Deducción de inventario (FEFO / Manual) - SÓLO FACTURAS
+          if (form.tipoDocumento === "factura" && concepto.productoId && concepto.productoId !== "manual") {
             let cantDeducir = parseFloat(concepto.cantidad);
 
-            // Obtener lotes activos del producto
+            // Obtener lotes de este producto
             const lotesProducto = await lotesCollection
               .query(
                 Q.where("producto_id", concepto.productoId),
@@ -702,19 +817,40 @@ export default function AddInvoice({
               )
               .fetch();
 
-            // Ordenar por fecha de caducidad (FIFO)
-            const lotesOrdenados = lotesProducto.sort((a: any, b: any) => {
-              const dateA = a.fecha_caducidad || Number.MAX_SAFE_INTEGER;
-              const dateB = b.fecha_caducidad || Number.MAX_SAFE_INTEGER;
-              return dateA - dateB;
-            });
+            let lotesADescontar: {loteModel: any, cantidad: number}[] = [];
 
-            for (const lote of lotesOrdenados as any[]) {
-              if (cantDeducir <= 0) break;
-              if (lote.cantidad <= 0) continue;
+            if (concepto.selectedLotes && concepto.selectedLotes.length > 0) {
+              // Modo Manual
+              for (const sl of concepto.selectedLotes) {
+                const model = lotesProducto.find((l: any) => l.id === sl.loteId);
+                if (model) {
+                  lotesADescontar.push({ loteModel: model, cantidad: sl.cantidad });
+                }
+              }
+            } else {
+              // Modo Automático (FEFO)
+              const lotesOrdenados = lotesProducto.sort((a: any, b: any) => {
+                const dateA = a.fecha_caducidad || Number.MAX_SAFE_INTEGER;
+                const dateB = b.fecha_caducidad || Number.MAX_SAFE_INTEGER;
+                return dateA - dateB;
+              });
+              
+              let remaining = cantDeducir;
+              for (const lote of lotesOrdenados as any[]) {
+                if (remaining <= 0) break;
+                if (lote.cantidad <= 0) continue;
+                const qty = Math.min(lote.cantidad, remaining);
+                lotesADescontar.push({ loteModel: lote, cantidad: qty });
+                remaining -= qty;
+              }
+            }
 
-              const descuentoActual = Math.min(lote.cantidad, cantDeducir);
-              const nuevaCantidadLote = lote.cantidad - descuentoActual;
+            for (const item of lotesADescontar) {
+              const lote = item.loteModel;
+              const qtyToDeduct = item.cantidad;
+              if (qtyToDeduct <= 0) continue;
+
+              const nuevaCantidadLote = lote.cantidad - qtyToDeduct;
 
               // Actualizar lote
               await lote.update((l: any) => {
@@ -731,16 +867,16 @@ export default function AddInvoice({
                 mov._raw.usuario_id = userId || "unknown";
                 mov.tipo = "SALIDA_VENTA";
                 mov._raw.tipo = "SALIDA_VENTA";
-                mov.cantidad = descuentoActual;
-                mov._raw.cantidad = descuentoActual;
+                mov.cantidad = qtyToDeduct;
+                mov._raw.cantidad = qtyToDeduct;
               });
-
-              cantDeducir -= descuentoActual;
+              
+              cantDeducir -= qtyToDeduct;
             }
 
             if (cantDeducir > 0) {
               throw new Error(
-                `Inconsistencia en lotes para ${concepto.concepto}`,
+                `Inconsistencia en lotes para ${concepto.concepto} (Faltan ${cantDeducir})`,
               );
             }
           }
@@ -771,7 +907,8 @@ export default function AddInvoice({
       const html2pdf = (await import("html2pdf.js")).default;
 
       const element = previewRef.current;
-      const folioName = `Factura_${form.serie}-${form.folio}_${form.nombre.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30)}`;
+      const tipoStr = form.tipoDocumento === "factura" ? "Factura" : form.tipoDocumento === "prefactura" ? "Prefactura" : "Cotizacion";
+      const folioName = `${tipoStr}_${form.serie}-${form.folio}_${form.nombre.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30)}`;
 
       const opt = {
         margin: [4, 4, 4, 4] as [number, number, number, number],
@@ -1248,6 +1385,7 @@ export default function AddInvoice({
                   <th className="p-2 font-medium w-24">U. SAT</th>
                   <th className="p-2 font-medium w-28">C. SAT</th>
                   <th className="p-2 font-medium min-w-[200px]">Concepto</th>
+                  <th className="p-2 font-medium w-24 text-center">Lotes</th>
                   <th className="p-2 font-medium w-32">V. Unitario</th>
                   <th className="p-2 font-medium w-28">Descuento</th>
                   <th className="p-2 font-medium w-24">% Imp.</th>
@@ -1264,16 +1402,27 @@ export default function AddInvoice({
                       <SearchableDropdown<ProductoItem>
                         items={productos}
                         value={c.productoId}
-                        onChange={(prod) => handleSelectProducto(c.id, prod)}
+                        onChange={(prod) => {
+                          if (prod.stock <= 0 && form.tipoDocumento === 'factura') {
+                            alert(`El producto "${prod.descripcion}" está agotado y no puede ser facturado directamente. Cambia el tipo de documento a Prefactura o Cotización.`);
+                            return;
+                          }
+                          handleSelectProducto(c.id, prod);
+                        }}
                         renderItem={(p) => (
-                          <div className="flex justify-between items-center gap-4">
-                            <span>
-                              <span className="font-mono text-[10px] text-slate-400 mr-1.5">
-                                {p.codigoInterno}
+                          <div className={`flex justify-between items-center gap-4 ${p.stock <= 0 ? 'opacity-50 grayscale' : ''}`}>
+                            <div className="flex flex-col">
+                              <span>
+                                <span className="font-mono text-[10px] text-slate-400 mr-1.5">
+                                  {p.codigoInterno}
+                                </span>
+                                {p.descripcion}
                               </span>
-                              {p.descripcion}
-                            </span>
-                            <span className="text-slate-400 shrink-0">
+                              <span className={`text-[10px] font-bold ${p.stock > 10 ? 'text-emerald-500' : p.stock > 0 ? 'text-orange-500' : 'text-red-500'}`}>
+                                {p.stock > 10 ? `Stock: ${p.stock}` : p.stock > 0 ? `Bajo Stock: ${p.stock}` : 'Agotado'}
+                              </span>
+                            </div>
+                            <span className="text-slate-500 font-medium shrink-0">
                               ${p.precioLista.toFixed(2)}
                             </span>
                           </div>
@@ -1335,6 +1484,19 @@ export default function AddInvoice({
                         placeholder="Concepto"
                       />
                     </td>
+                    <td className="p-2 align-top text-center">
+                      {c.productoId && c.productoId !== "manual" && parseFloat(c.cantidad) > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => setModalLotesConceptoId(c.id)}
+                          className={`text-[10px] px-2 py-1 rounded-md font-medium whitespace-nowrap ${c.selectedLotes?.length ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                        >
+                          {c.selectedLotes?.length ? `${c.selectedLotes.length} lotes` : "FEFO Auto"}
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-slate-400">N/A</span>
+                      )}
+                    </td>
                     <td className="p-2 align-top">
                       <input
                         type="number"
@@ -1358,17 +1520,9 @@ export default function AddInvoice({
                       />
                     </td>
                     <td className="p-2 align-top">
-                      <select
-                        value={c.porcImpuesto}
-                        onChange={(e) =>
-                          updateConcepto(c.id, "porcImpuesto", e.target.value)
-                        }
-                        className={inputClass}
-                      >
-                        <option value="16">16%</option>
-                        <option value="8">8%</option>
-                        <option value="0">0%</option>
-                      </select>
+                      <div className="flex items-center h-[34px] px-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-500 dark:text-slate-400 text-xs font-medium cursor-not-allowed" title="Cálculo dinámico por ERP">
+                        {c.porcImpuesto}% (Auto)
+                      </div>
                     </td>
                     <td className="p-2 text-center align-top">
                       {form.conceptos.length > 1 && (
@@ -1417,16 +1571,27 @@ export default function AddInvoice({
                   <SearchableDropdown<ProductoItem>
                     items={productos}
                     value={c.productoId}
-                    onChange={(prod) => handleSelectProducto(c.id, prod)}
+                    onChange={(prod) => {
+                      if (prod.stock <= 0 && form.tipoDocumento === 'factura') {
+                        alert(`El producto "${prod.descripcion}" está agotado y no puede ser facturado directamente. Cambia el tipo de documento a Prefactura o Cotización.`);
+                        return;
+                      }
+                      handleSelectProducto(c.id, prod);
+                    }}
                     renderItem={(p) => (
-                      <div className="flex justify-between items-center gap-4">
-                        <span>
-                          <span className="font-mono text-[10px] text-slate-400 mr-1.5">
-                            {p.codigoInterno}
+                      <div className={`flex justify-between items-center gap-4 ${p.stock <= 0 ? 'opacity-50 grayscale' : ''}`}>
+                        <div className="flex flex-col">
+                          <span>
+                            <span className="font-mono text-[10px] text-slate-400 mr-1.5">
+                              {p.codigoInterno}
+                            </span>
+                            {p.descripcion}
                           </span>
-                          {p.descripcion}
-                        </span>
-                        <span className="text-slate-400 shrink-0">
+                          <span className={`text-[10px] font-bold ${p.stock > 10 ? 'text-emerald-500' : p.stock > 0 ? 'text-orange-500' : 'text-red-500'}`}>
+                            {p.stock > 10 ? `Stock: ${p.stock}` : p.stock > 0 ? `Bajo Stock: ${p.stock}` : 'Agotado'}
+                          </span>
+                        </div>
+                        <span className="text-slate-500 font-medium shrink-0">
                           ${p.precioLista.toFixed(2)}
                         </span>
                       </div>
@@ -1490,6 +1655,22 @@ export default function AddInvoice({
                     />
                   </div>
                   <div>
+                    <label className={labelClass}>Lotes</label>
+                    <div className="h-[34px] flex items-center">
+                    {c.productoId && c.productoId !== "manual" && parseFloat(c.cantidad) > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setModalLotesConceptoId(c.id)}
+                        className={`w-full h-full text-xs rounded-lg font-medium transition-colors ${c.selectedLotes?.length ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'}`}
+                      >
+                        {c.selectedLotes?.length ? `${c.selectedLotes.length} lotes seleccionados` : "Modo Automático (FEFO)"}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-slate-400 w-full text-center">No aplicable</span>
+                    )}
+                    </div>
+                  </div>
+                  <div>
                     <label className={labelClass}>Valor Unitario</label>
                     <input
                       type="number"
@@ -1514,18 +1695,29 @@ export default function AddInvoice({
                     />
                   </div>
                   <div>
-                    <label className={labelClass}>% Impuesto</label>
-                    <select
-                      value={c.porcImpuesto}
-                      onChange={(e) =>
-                        updateConcepto(c.id, "porcImpuesto", e.target.value)
-                      }
-                      className={inputClass}
-                    >
-                      <option value="16">16% IVA</option>
-                      <option value="8">8% IVA</option>
-                      <option value="0">0% Exento</option>
-                    </select>
+                    <label className={labelClass}>Impuestos Aplicados</label>
+                    <div className="flex flex-wrap gap-1 items-center min-h-[34px] px-2 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-500 dark:text-slate-400 text-xs font-semibold cursor-not-allowed">
+                      {(() => {
+                        if (!c.productoId || c.productoId === "manual") {
+                          return <span className="text-[10px] text-slate-400">Sin impuestos</span>;
+                        }
+                        const pImps = prodImpuestos.filter(pi => pi.productoId === c.productoId);
+                        const activeImps = pImps
+                          .map(pi => impuestos.find(i => i.id === pi.impuestoId))
+                          .filter((imp): imp is typeof impuestos[0] => !!imp && imp.activo);
+                        if (activeImps.length === 0) {
+                          return <span className="text-[10px] text-slate-400">Exento</span>;
+                        }
+                        return activeImps.map((imp, i) => (
+                          <span
+                            key={i}
+                            className="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-[9px] font-extrabold border border-blue-200 dark:border-blue-800"
+                          >
+                            {imp.nombre} ({imp.tasa}%)
+                          </span>
+                        ));
+                      })()}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1629,7 +1821,7 @@ export default function AddInvoice({
             }}
           >
             <p style={{ fontWeight: "bold", fontSize: 11, marginBottom: 6 }}>
-              Factura
+              {form.tipoDocumento === "factura" ? "Factura" : form.tipoDocumento === "prefactura" ? "Prefactura" : "Cotización"}
             </p>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <tbody>
@@ -2200,7 +2392,8 @@ export default function AddInvoice({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50">
+    <>
+      <div className="fixed inset-0 z-50">
       <div
         className="fixed inset-0 bg-black/50 backdrop-blur-sm"
         onClick={handleClose}
@@ -2215,7 +2408,7 @@ export default function AddInvoice({
               </div>
               <div>
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white">
-                  Generar Factura — CFDI 4.0
+                  {form.tipoDocumento === "factura" ? "Generar Factura" : form.tipoDocumento === "prefactura" ? "Generar Prefactura" : "Generar Cotización"} — CFDI 4.0
                 </h3>
                 {isLoadingData && (
                   <span className="flex items-center gap-1 text-xs text-blue-500">
@@ -2227,23 +2420,63 @@ export default function AddInvoice({
             </div>
             <div className="flex items-center gap-4">
               {!readonlyMode && (
-                <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
-                  <button
-                    onClick={() => setViewMode("simultaneous")}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === "simultaneous" ? "bg-white dark:bg-slate-600 shadow-sm text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"}`}
-                  >
-                    Vista Dividida
-                  </button>
-                  <button
-                    onClick={() => {
-                      setViewMode("tabular");
-                      setStep("capture");
-                    }}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === "tabular" ? "bg-white dark:bg-slate-600 shadow-sm text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"}`}
-                  >
-                    Modo Tabular
-                  </button>
-                </div>
+                <>
+                  {/* Selector de Tipo de Documento Premium (Botones Segmentados) */}
+                  <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => setForm(prev => ({ ...prev, tipoDocumento: 'factura' }))}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
+                        form.tipoDocumento === "factura"
+                          ? "bg-white dark:bg-slate-600 shadow-sm text-blue-600 dark:text-blue-400"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+                      }`}
+                    >
+                      Factura
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForm(prev => ({ ...prev, tipoDocumento: 'prefactura' }))}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
+                        form.tipoDocumento === "prefactura"
+                          ? "bg-white dark:bg-slate-600 shadow-sm text-amber-600 dark:text-amber-400"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+                      }`}
+                    >
+                      Prefactura
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForm(prev => ({ ...prev, tipoDocumento: 'cotizacion' }))}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
+                        form.tipoDocumento === "cotizacion"
+                          ? "bg-white dark:bg-slate-600 shadow-sm text-indigo-600 dark:text-indigo-400"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+                      }`}
+                    >
+                      Cotización
+                    </button>
+                  </div>
+
+                  {/* Vista Dividida / Tabular */}
+                  <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
+                    <button
+                      onClick={() => setViewMode("simultaneous")}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === "simultaneous" ? "bg-white dark:bg-slate-600 shadow-sm text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"}`}
+                    >
+                      Vista Dividida
+                    </button>
+                    <button
+                      onClick={() => {
+                        setViewMode("tabular");
+                        setStep("capture");
+                      }}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === "tabular" ? "bg-white dark:bg-slate-600 shadow-sm text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"}`}
+                    >
+                      Modo Tabular
+                    </button>
+                  </div>
+                </>
               )}
               <button
                 onClick={handleClose}
@@ -2303,7 +2536,7 @@ export default function AddInvoice({
               {saveSuccess && (
                 <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 text-xs font-bold bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
                   <Check className="w-3.5 h-3.5" />
-                  Factura guardada y PDF generado
+                  Documento guardado y PDF generado
                 </span>
               )}
             </div>
@@ -2350,15 +2583,38 @@ export default function AddInvoice({
                       ) : (
                         <Printer className="w-4 h-4" />
                       )}
-                      {isSaving ? "Guardando..." : "Generar Factura"}
+                      {isSaving ? "Guardando..." : form.tipoDocumento === "factura" ? "Generar Factura" : form.tipoDocumento === "prefactura" ? "Generar Prefactura" : "Generar Cotización"}
                     </button>
                   )}
                 </>
               )}
             </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+      {/* ====== MODAL DE LOTES ====== */}
+      {modalLotesConceptoId && (() => {
+        const concepto = form.conceptos.find(c => c.id === modalLotesConceptoId);
+        if (!concepto || !concepto.productoId) return null;
+        
+        const prodName = concepto.concepto || productos.find(p => p.id === concepto.productoId)?.descripcion || "Producto";
+        const lotesProducto = lotesState.filter(l => l.producto_id === concepto.productoId);
+        
+        return (
+          <LotSelectionModal
+            isOpen={true}
+            onClose={() => setModalLotesConceptoId(null)}
+            productoNombre={prodName}
+            cantidadRequerida={parseFloat(concepto.cantidad) || 0}
+            lotesDisponibles={lotesProducto}
+            initialSelection={concepto.selectedLotes}
+            onSave={(selections) => {
+              updateConcepto(concepto.id, "selectedLotes", selections as any);
+            }}
+          />
+        );
+      })()}
+    </>
   );
 }

@@ -15,6 +15,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { usePagination } from "../../src/hooks/usePagination";
 import AddEntry from "../../components/ui/modals/AddEntry";
 import AddInventory from "../../components/ui/modals/AddInventory";
+import ExportInventoryModal from "../../components/ui/modals/ExportInventoryModal";
 import EditLote from "../../components/ui/modals/EditLote";
 import WarningModal from "../../components/ui/modals/WarningModal";
 import ProductLotsView from "../../components/ui/ProductLotsView";
@@ -43,6 +44,7 @@ function InventoryContent({ productos, familias, allLotes }: InventoryProps) {
   const [searchTerm, setSearchTerm] = useState((params.search as string) || "");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAddEntryOpen, setIsAddEntryOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [filterFamilia, setFilterFamilia] = useState("");
   const [editProduct, setEditProduct] = useState<ProductoModel | null>(null);
   const [deleteProduct, setDeleteProduct] = useState<ProductoModel | null>(
@@ -385,7 +387,7 @@ function InventoryContent({ productos, familias, allLotes }: InventoryProps) {
             </p>
           </div>
           <div className="flex gap-3">
-            <button className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900 transition-colors font-medium text-sm shadow-sm">
+            <button onClick={() => setIsExportModalOpen(true)} className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-slate-900 transition-colors font-medium text-sm shadow-sm">
               <Download className="w-4 h-4" />
               <span>Exportar</span>
             </button>
@@ -770,6 +772,10 @@ function InventoryContent({ productos, familias, allLotes }: InventoryProps) {
           isOpen={!!editLoteData}
           onClose={() => setEditLoteData(null)}
           lote={editLoteData}
+        />
+        <ExportInventoryModal 
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
         />
       </div>
     </div>

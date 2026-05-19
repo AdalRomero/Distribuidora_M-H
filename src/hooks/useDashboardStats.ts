@@ -1,11 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Q } from '@nozbe/watermelondb';
 import { database } from '../services/DB/indexBD';
-import {
-  startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear,
-  subDays, subWeeks, subMonths, subYears, format
-} from 'date-fns';
-import { es } from 'date-fns/locale';
 import type Documento from '../services/DB/models/registros/documento';
 import type DocumentoDetalle from '../services/DB/models/registros/documentoDetalle';
 import type Producto from '../services/DB/models/catalogo/producto';
@@ -14,7 +9,16 @@ import type Cliente from '../services/DB/models/bases/cliente';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-export type DateRangeFilter = 'today' | 'week' | 'month' | 'year' | 'all';
+export interface DateRange {
+  start: Date;
+  end: Date;
+}
+
+export interface DashboardFilter {
+  periodA: DateRange;
+  periodB: DateRange | null; // Null if no comparison is needed
+  trendGroupBy: 'hour' | 'day' | 'month'; // How to group trend data
+}
 
 export interface TopProduct {
   id: string;
@@ -82,74 +86,26 @@ function calcPercentChange(curr: number, prev: number): number {
   return ((curr - prev) / prev) * 100;
 }
 
-interface DateRange {
-  start: Date;
-  end: Date;
-}
-
-function getDateRanges(filter: DateRangeFilter): { current: DateRange; previous: DateRange | null } {
-  const now = new Date();
-  const todayEnd = endOfDay(now);
-
-  switch (filter) {
-    case 'today': {
-      const start = startOfDay(now);
-      const prevStart = startOfDay(subDays(now, 1));
-      const prevEnd = endOfDay(subDays(now, 1));
-      return { current: { start, end: todayEnd }, previous: { start: prevStart, end: prevEnd } };
-    }
-    case 'week': {
-      const start = startOfWeek(now, { locale: es });
-      const prevWeekRef = subWeeks(now, 1);
-      const prevStart = startOfWeek(prevWeekRef, { locale: es });
-      const prevEnd = endOfDay(subDays(start, 1));
-      return { current: { start, end: todayEnd }, previous: { start: prevStart, end: prevEnd } };
-    }
-    case 'month': {
-      const start = startOfMonth(now);
-      const prevMonthRef = subMonths(now, 1);
-      const prevStart = startOfMonth(prevMonthRef);
-      const prevEnd = endOfDay(subDays(start, 1));
-      return { current: { start, end: todayEnd }, previous: { start: prevStart, end: prevEnd } };
-    }
-    case 'year': {
-      const start = startOfYear(now);
-      const prevYearRef = subYears(now, 1);
-      const prevStart = startOfYear(prevYearRef);
-      const prevEnd = endOfDay(subDays(start, 1));
-      return { current: { start, end: todayEnd }, previous: { start: prevStart, end: prevEnd } };
-    }
-    case 'all':
-    default:
-      return { current: { start: new Date(0), end: todayEnd }, previous: null };
+function getTrendLabel(date: Date, groupBy: 'hour' | 'day' | 'month'): string {
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  switch (groupBy) {
+    case 'hour':
+      return `${pad(date.getHours())}:00`;
+    case 'day':
+      return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}`;
+    case 'month':
+      return `${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
   }
 }
 
-function getTrendLabel(date: Date, filter: DateRangeFilter): string {
-  switch (filter) {
-    case 'today':
-      return format(date, 'HH:mm');
-    case 'week':
-      return format(date, 'EEE', { locale: es });
+function getTrendSortKey(date: Date, groupBy: 'hour' | 'day' | 'month'): number {
+  switch (groupBy) {
+    case 'hour':
+      return new Date(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours()).getTime();
+    case 'day':
+      return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
     case 'month':
-      return format(date, 'dd MMM', { locale: es });
-    case 'year':
-      return format(date, 'MMM', { locale: es });
-    case 'all':
-      return format(date, 'MMM yyyy', { locale: es });
-  }
-}
-
-function getTrendSortKey(date: Date, filter: DateRangeFilter): number {
-  switch (filter) {
-    case 'today':
-      return date.getHours() * 60 + date.getMinutes();
-    case 'week':
-    case 'month':
-      return startOfDay(date).getTime();
-    case 'year':
-    case 'all':
-      return startOfMonth(date).getTime();
+      return new Date(date.getFullYear(), date.getMonth(), 1).getTime();
   }
 }
 
@@ -167,27 +123,26 @@ const INITIAL_STATS: DashboardStats = {
 
 // ─── Hook ────────────────────────────────────────────────────────────
 
-export function useDashboardStats(dateRange: DateRangeFilter): DashboardStats {
+export function useDashboardStats(filter: DashboardFilter): DashboardStats {
   const [stats, setStats] = useState<DashboardStats>(INITIAL_STATS);
 
-  const fetchStats = useCallback(async (filter: DateRangeFilter, mounted: { value: boolean }) => {
+  const fetchStats = useCallback(async (currentFilter: DashboardFilter, mounted: { value: boolean }) => {
     if (mounted.value) setStats(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      const { current, previous } = getDateRanges(filter);
+      const { periodA, periodB, trendGroupBy } = currentFilter;
 
       // ── Fetch documents ────────────────────────────────────────
       const docsCollection = database.get<Documento>('documentos');
 
-      const currentDocs = filter === 'all'
-        ? await docsCollection.query().fetch()
-        : await docsCollection.query(
-            Q.where('created_at', Q.between(current.start.getTime(), current.end.getTime()))
-          ).fetch();
+      // Fetch strictly within bounds to save resources! No "fetch all" ever.
+      const currentDocs = await docsCollection.query(
+        Q.where('created_at', Q.between(periodA.start.getTime(), periodA.end.getTime()))
+      ).fetch();
 
-      const prevDocs = previous
+      const prevDocs = periodB
         ? await docsCollection.query(
-            Q.where('created_at', Q.between(previous.start.getTime(), previous.end.getTime()))
+            Q.where('created_at', Q.between(periodB.start.getTime(), periodB.end.getTime()))
           ).fetch()
         : [];
 
@@ -218,14 +173,14 @@ export function useDashboardStats(dateRange: DateRangeFilter): DashboardStats {
             clientsMap.set(clientId, { amount: total, name: '' });
           }
 
-          // Currency aggregation (hardcoded MXN since the schema has no moneda field)
+          // Currency aggregation (hardcoded MXN)
           const currency = 'MXN';
           currencyMap.set(currency, (currencyMap.get(currency) || 0) + total);
 
           // Trend aggregation
           const docDate = new Date((doc as any)._raw.created_at);
-          const label = getTrendLabel(docDate, filter);
-          const sortKey = getTrendSortKey(docDate, filter);
+          const label = getTrendLabel(docDate, trendGroupBy);
+          const sortKey = getTrendSortKey(docDate, trendGroupBy);
           const trendEntry = trendMap.get(label);
           if (trendEntry) {
             trendEntry.total += total;
@@ -273,6 +228,7 @@ export function useDashboardStats(dateRange: DateRangeFilter): DashboardStats {
       const familiesMap = new Map<string, { revenue: number; name: string }>();
 
       if (validDocIds.length > 0) {
+        // Optimized: only fetch details for active documents
         const detalles = await database.get<DocumentoDetalle>('documentos_detalles')
           .query(Q.where('documento_id', Q.oneOf(validDocIds)))
           .fetch();
@@ -291,7 +247,7 @@ export function useDashboardStats(dateRange: DateRangeFilter): DashboardStats {
           }
         }
 
-        // Fetch product names + family mapping
+        // Fetch product names + family mapping in single query
         const prodIds = Array.from(productsMap.keys());
         if (prodIds.length > 0) {
           const productos = await database.get<Producto>('productos')
@@ -351,17 +307,17 @@ export function useDashboardStats(dateRange: DateRangeFilter): DashboardStats {
       const topProducts: TopProduct[] = Array.from(productsMap.entries())
         .map(([id, v]) => ({ id, name: v.name, qty: v.qty, revenue: v.revenue }))
         .sort((a, b) => b.qty - a.qty)
-        .slice(0, 5);
+        .slice(0, 10);
 
       const topFamilies: TopFamily[] = Array.from(familiesMap.entries())
         .map(([id, v]) => ({ id, name: v.name, revenue: v.revenue, value: v.revenue }))
         .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 5);
+        .slice(0, 10);
 
       const topClients: TopClient[] = Array.from(clientsMap.entries())
         .map(([id, v]) => ({ id, name: v.name, amount: v.amount }))
         .sort((a, b) => b.amount - a.amount)
-        .slice(0, 5);
+        .slice(0, 10);
 
       const currencyBreakdown: CurrencyEntry[] = Array.from(currencyMap.entries())
         .map(([name, value]) => ({ name, value }));
@@ -396,11 +352,12 @@ export function useDashboardStats(dateRange: DateRangeFilter): DashboardStats {
     }
   }, []);
 
+  // Use JSON.stringify to trigger re-fetches only when dates actually change
   useEffect(() => {
     const mounted = { value: true };
-    fetchStats(dateRange, mounted);
+    fetchStats(filter, mounted);
     return () => { mounted.value = false; };
-  }, [dateRange, fetchStats]);
+  }, [JSON.stringify(filter), fetchStats]);
 
   return stats;
 }

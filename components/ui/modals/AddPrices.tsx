@@ -1,4 +1,4 @@
-import { Calculator, Info, Loader2, Search, X, Plus, Trash2, Users, Tag, Box, Globe } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, Calculator, Loader2, Search, X, Plus, Trash2, Users, Tag, Box, Globe } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { usePagination } from "../../../src/hooks/usePagination";
 import { database } from "../../../src/services/DB/indexBD";
@@ -14,6 +14,7 @@ export interface TemplateRule {
 }
 
 export interface TemplateFormData {
+    id?: string; // optional id for editing existing list
     nombreLista: string;
     reglas: TemplateRule[];
     clientesIds: string[];
@@ -44,6 +45,15 @@ export default function AddPrices({
     const [nombreLista, setNombreLista] = useState("");
     const [reglas, setReglas] = useState<TemplateRule[]>([]);
     const [selectedClientes, setSelectedClientes] = useState<string[]>([]);
+    // Map clientId -> listName (for clients already assigned to another list)
+    const [clientListMap, setClientListMap] = useState<Map<string, string>>(new Map());
+    // Conflict modal state
+    const [conflictModal, setConflictModal] = useState<{
+        isOpen: boolean;
+        clientId: string;
+        clientName: string;
+        currentList: string;
+    }>({ isOpen: false, clientId: '', clientName: '', currentList: '' });
 
     const [clientes, setClientes] = useState<SelectOption[]>([]);
     const [productos, setProductos] = useState<SelectOption[]>([]);
@@ -75,6 +85,8 @@ export default function AddPrices({
             setNombreLista(editData.nombreLista);
             setReglas(editData.reglas);
             setSelectedClientes(editData.clientesIds);
+            // Preserve id for edit operations
+            // No need to store id in state; it will be passed through editData when saving
         } else if (isOpen && !editData) {
             setNombreLista("");
             setReglas([]);
@@ -99,6 +111,14 @@ export default function AddPrices({
                     label: c.nombre || "Sin nombre",
                 }))
             );
+            // Build map: clientId -> listName (only for clients that have a list)
+            const map = new Map<string, string>();
+            allClientes.forEach((c: any) => {
+                if (c.lista_precio_base?.trim()) {
+                    map.set(c.id, c.lista_precio_base.trim());
+                }
+            });
+            setClientListMap(map);
 
             const productosDb = database.collections.get("productos");
             const allProductos = await productosDb.query().fetch();
@@ -170,14 +190,52 @@ export default function AddPrices({
     };
 
     const toggleCliente = (id: string) => {
-        setSelectedClientes(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+        // If already selected, just deselect
+        if (selectedClientes.includes(id)) {
+            setSelectedClientes(prev => prev.filter(x => x !== id));
+            return;
+        }
+        // Check if client belongs to a DIFFERENT list
+        const existingList = clientListMap.get(id);
+        const currentListName = nombreLista.trim();
+        if (existingList && existingList !== currentListName) {
+            const clientName = clientes.find(c => c.id === id)?.label ?? id;
+            setConflictModal({ isOpen: true, clientId: id, clientName, currentList: existingList });
+            return;
+        }
+        setSelectedClientes(prev => [...prev, id]);
     };
 
     const selectAllClientes = () => {
         if (selectedClientes.length === filteredClientes.length) {
             setSelectedClientes([]);
-        } else {
-            setSelectedClientes(filteredClientes.map(c => c.id));
+            return;
+        }
+        const currentListName = nombreLista.trim();
+        // Separate: no conflict vs conflict
+        const noConflict: string[] = [];
+        const withConflict: string[] = [];
+        filteredClientes.forEach(c => {
+            if (selectedClientes.includes(c.id)) { noConflict.push(c.id); return; }
+            const existingList = clientListMap.get(c.id);
+            if (existingList && existingList !== currentListName) {
+                withConflict.push(c.id);
+            } else {
+                noConflict.push(c.id);
+            }
+        });
+        // Add non-conflicting right away
+        setSelectedClientes(noConflict);
+        // If there are conflicting ones, warn the user
+        if (withConflict.length > 0) {
+            const names = withConflict
+                .map(id => clientes.find(c => c.id === id)?.label ?? id)
+                .join(', ');
+            setErrorModal({
+                isOpen: true,
+                title: `${withConflict.length} cliente(s) con lista asignada`,
+                message: `Los siguientes clientes ya pertenecen a otra lista y no se agregaron automáticamente: ${names}. Selecciónalos individualmente para moverlos.`,
+            });
         }
     };
 
@@ -191,23 +249,19 @@ export default function AddPrices({
             return;
         }
 
-        // Validar si el nombre ya existe
+        // Validar si el nombre ya existe (excepto cuando editamos la misma lista)
         try {
             const plantillasDb = database.collections.get("plantillas_precios");
             const existing = await plantillasDb.query().fetch();
-            
-            // Si estamos editando, permitimos el mismo nombre que ya tiene
-            // Si es nueva, o el nombre cambió a uno que ya existe, bloqueamos
             const isDuplicate = existing.some((p: any) => 
-                p.nombre.toLowerCase() === nombreLista.trim().toLowerCase() && 
-                (!editData || p.nombre.toLowerCase() !== editData.nombreLista.toLowerCase())
+                p.nombre.toLowerCase() === nombreLista.trim().toLowerCase() &&
+                (!editData?.id || p.id !== editData.id)
             );
-
             if (isDuplicate) {
                 setErrorModal({
                     isOpen: true,
                     title: "Nombre duplicado",
-                    message: `Ya existe una lista con el nombre "${nombreLista.trim()}". Por favor, elige un nombre diferente.`
+                    message: `Ya existe una lista con el nombre "${nombreLista.trim()}". Elige otro nombre.`
                 });
                 return;
             }
@@ -217,6 +271,7 @@ export default function AddPrices({
 
         if (onSave) {
             await onSave({
+                id: editData?.id,
                 nombreLista,
                 reglas,
                 clientesIds: selectedClientes
@@ -486,17 +541,37 @@ export default function AddPrices({
                                                 </label>
                                             </div>
                                         <div className="max-h-[250px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700/50 bg-white dark:bg-slate-800 p-1">
-                                                {visibleClientes.map(c => (
-                                                    <label key={c.id} className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${selectedClientes.includes(c.id) ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
-                                                        <input 
-                                                            type="checkbox" 
-                                                            checked={selectedClientes.includes(c.id)}
-                                                            onChange={() => toggleCliente(c.id)}
-                                                            className="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                                                        />
-                                                        <span className={`text-sm ${selectedClientes.includes(c.id) ? 'font-bold text-emerald-900 dark:text-emerald-300' : 'text-slate-700 dark:text-slate-300'}`}>{c.label}</span>
-                                                    </label>
-                                                ))}
+                                            {visibleClientes.map(c => {
+                                                const isSelected = selectedClientes.includes(c.id);
+                                                const otherList = clientListMap.get(c.id);
+                                                const hasConflict = !!otherList && otherList !== nombreLista.trim() && !isSelected;
+                                                return (
+                                                <label key={c.id} className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                                                    isSelected ? 'bg-emerald-50 dark:bg-emerald-900/20'
+                                                    : hasConflict ? 'bg-amber-50 dark:bg-amber-900/10 hover:bg-amber-100 dark:hover:bg-amber-900/20'
+                                                    : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                                                }`}>
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={isSelected}
+                                                        onChange={() => toggleCliente(c.id)}
+                                                        className="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                                    />
+                                                    <div className="flex-1 min-w-0">
+                                                        <span className={`text-sm block truncate ${
+                                                            isSelected ? 'font-bold text-emerald-900 dark:text-emerald-300'
+                                                            : hasConflict ? 'text-amber-800 dark:text-amber-300'
+                                                            : 'text-slate-700 dark:text-slate-300'
+                                                        }`}>{c.label}</span>
+                                                        {hasConflict && (
+                                                            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
+                                                                <ArrowRightLeft className="w-3 h-3" /> En lista: {otherList}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </label>
+                                                );
+                                            })}
                                                 {filteredClientes.length === 0 && <p className="p-4 text-center text-slate-400 text-sm">No hay clientes con ese nombre.</p>}
                                                 {hasMoreClientes && (
                                                     <div ref={observerTarget} className="w-full py-4 flex justify-center items-center gap-2 text-slate-400">
@@ -531,6 +606,48 @@ export default function AddPrices({
                 title={errorModal.title}
                 message={errorModal.message}
             />
+
+            {/* Conflict Resolution Modal */}
+            {conflictModal.isOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+                    <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-md p-6 z-10">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="p-2.5 bg-amber-100 dark:bg-amber-900/30 rounded-xl">
+                                <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-slate-800 dark:text-white text-base">Cliente con lista asignada</h4>
+                                <p className="text-xs text-slate-500 mt-0.5">Este cliente ya pertenece a otra lista</p>
+                            </div>
+                        </div>
+                        <p className="text-sm text-slate-600 dark:text-slate-300 mb-2">
+                            <span className="font-bold text-slate-800 dark:text-white">{conflictModal.clientName}</span> ya está asignado a la lista{' '}
+                            <span className="font-bold text-amber-600 dark:text-amber-400">"{conflictModal.currentList}"</span>.
+                        </p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                            ¿Deseas moverlo a <span className="font-bold text-blue-600 dark:text-blue-400">"{nombreLista || 'esta lista'}"</span> y quitarlo de la anterior?
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setConflictModal(prev => ({ ...prev, isOpen: false }))}
+                                className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-sm"
+                            >
+                                Mantener en "{conflictModal.currentList}"
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setSelectedClientes(prev => [...prev, conflictModal.clientId]);
+                                    setConflictModal(prev => ({ ...prev, isOpen: false }));
+                                }}
+                                className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition-colors text-sm flex items-center justify-center gap-2"
+                            >
+                                <ArrowRightLeft className="w-4 h-4" /> Mover a esta lista
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
