@@ -396,7 +396,7 @@ export default function NotificationFlyoutMenu() {
           {/* ── Header ── */}
           <div className="bg-[radial-gradient(ellipse_at_center,_#15335c_0%,_#15335c_100%)] px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-white dark:bg-slate-800/10 rounded-xl">
+              <div className="p-2 bg-white/10 dark:bg-white/5 border border-white/10 rounded-xl">
                 <Bell size={16} className="text-white" />
               </div>
               <div>

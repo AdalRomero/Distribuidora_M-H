@@ -356,7 +356,11 @@ export default function Login() {
         <button
           type="button"
           onClick={() => setIsFormLeft(!isFormLeft)}
-          className="absolute top-6 right-6 z-20 p-2.5 rounded-full bg-white dark:bg-slate-800/20 hover:bg-white dark:bg-slate-800/30 backdrop-blur-sm transition-colors text-white"
+          className={`absolute top-6 right-6 z-20 p-2.5 rounded-full bg-white dark:bg-slate-800 shadow-lg border border-gray-200/50 dark:border-slate-700/50 transition-all duration-300 hover:scale-110 active:scale-95
+            ${isCaja 
+              ? "text-[#15335c] hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-slate-700" 
+              : "text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-slate-700"
+            }`}
           title="Intercambiar vista"
         >
           <svg
