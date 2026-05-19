@@ -31,6 +31,8 @@ import {
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+import ErrorModal from '../../components/ui/modals/ErrorModal';
+
 import {
     useDashboardStats,
     type CurrencyEntry,
@@ -171,6 +173,8 @@ export default function Home() {
     const [preset, setPreset] = useState<DatePreset>('month');
     
     // Custom date state
+    const [isExporting, setIsExporting] = useState(false);
+    const [errorModal, setErrorModal] = useState<{isOpen: boolean, title: string, message: string}>({isOpen: false, title: '', message: ''});
     const [startA, setStartA] = useState<string>(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
     const [endA, setEndA] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
     const [enableCompare, setEnableCompare] = useState<boolean>(false);
@@ -264,7 +268,11 @@ export default function Home() {
             XLSX.writeFile(wb, `Reporte_${PRESET_LABELS[preset]}_${timestamp}.xlsx`);
         } catch (error) {
             console.error('Error al exportar Excel:', error);
-            alert('Ocurrió un error al intentar exportar el reporte.');
+            setErrorModal({
+                isOpen: true,
+                title: 'Error de Exportación',
+                message: 'Ocurrió un error al intentar exportar el reporte.'
+            });
         }
     }, [stats, preset]);
 
@@ -652,6 +660,12 @@ export default function Home() {
                     </div>
                 </div>
             </div>
+            <ErrorModal 
+                isOpen={errorModal.isOpen} 
+                title={errorModal.title} 
+                message={errorModal.message} 
+                onClose={() => setErrorModal(prev => ({...prev, isOpen: false}))} 
+            />
         </div>
     );
 }

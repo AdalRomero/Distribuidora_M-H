@@ -3,6 +3,7 @@ import { X, Download, FileText, FileSpreadsheet, Loader2, Filter, Columns, FileT
 import * as XLSX from "xlsx";
 import { database } from "../../../src/services/DB/indexBD";
 import { Q } from "@nozbe/watermelondb";
+import ErrorModal from "./ErrorModal";
 
 interface ExportInventoryModalProps {
   isOpen: boolean;
@@ -57,6 +58,7 @@ export default function ExportInventoryModal({ isOpen, onClose }: ExportInventor
   const [preset, setPreset] = useState<Preset>("general");
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+  const [errorModal, setErrorModal] = useState<{isOpen: boolean, title: string, message: string}>({isOpen: false, title: '', message: ''});
   const pdfContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -176,7 +178,11 @@ export default function ExportInventoryModal({ isOpen, onClose }: ExportInventor
       console.error("Export error", e);
       setIsExporting(false);
       setExportProgress(0);
-      alert("Error al exportar");
+      setErrorModal({
+        isOpen: true,
+        title: "Error al exportar",
+        message: "Ocurrió un error inesperado al intentar generar el archivo."
+      });
     }
   };
 
@@ -547,6 +553,12 @@ export default function ExportInventoryModal({ isOpen, onClose }: ExportInventor
         </div>
       </div>
       <div ref={pdfContainerRef} style={{ position: 'absolute', top: '-9999px', left: '-9999px' }}></div>
+      <ErrorModal 
+        isOpen={errorModal.isOpen} 
+        title={errorModal.title} 
+        message={errorModal.message} 
+        onClose={() => setErrorModal(prev => ({...prev, isOpen: false}))} 
+      />
     </div>
   );
 }

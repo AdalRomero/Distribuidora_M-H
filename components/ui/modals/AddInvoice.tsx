@@ -18,6 +18,7 @@ import { useEffect, useRef, useState } from "react";
 import { LOGO_MH_B64 } from "../../../constants/logo_base64";
 import { useAuth } from "../../../src/context/AuthContext";
 import { database } from "../../../src/services/DB/indexBD";
+import ErrorModal from "./ErrorModal";
 import {
     InvoiceLayoutFlow
 } from "./InvoiceBlockRenderer";
@@ -335,6 +336,7 @@ export default function AddInvoice({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [errorModal, setErrorModal] = useState<{isOpen: boolean, title: string, message: string}>({isOpen: false, title: '', message: ''});
 
   // ==========================================
   // CARGAR DATOS AL ABRIR
@@ -1404,7 +1406,11 @@ export default function AddInvoice({
                         value={c.productoId}
                         onChange={(prod) => {
                           if (prod.stock <= 0 && form.tipoDocumento === 'factura') {
-                            alert(`El producto "${prod.descripcion}" está agotado y no puede ser facturado directamente. Cambia el tipo de documento a Prefactura o Cotización.`);
+                            setErrorModal({
+                              isOpen: true,
+                              title: "Producto Agotado",
+                              message: `El producto "${prod.descripcion}" está agotado y no puede ser facturado directamente. Cambia el tipo de documento a Prefactura o Cotización.`
+                            });
                             return;
                           }
                           handleSelectProducto(c.id, prod);
@@ -1573,7 +1579,11 @@ export default function AddInvoice({
                     value={c.productoId}
                     onChange={(prod) => {
                       if (prod.stock <= 0 && form.tipoDocumento === 'factura') {
-                        alert(`El producto "${prod.descripcion}" está agotado y no puede ser facturado directamente. Cambia el tipo de documento a Prefactura o Cotización.`);
+                        setErrorModal({
+                          isOpen: true,
+                          title: "Producto Agotado",
+                          message: `El producto "${prod.descripcion}" está agotado y no puede ser facturado directamente. Cambia el tipo de documento a Prefactura o Cotización.`
+                        });
                         return;
                       }
                       handleSelectProducto(c.id, prod);
@@ -2615,6 +2625,12 @@ export default function AddInvoice({
           />
         );
       })()}
+      <ErrorModal
+        isOpen={errorModal.isOpen}
+        title={errorModal.title}
+        message={errorModal.message}
+        onClose={() => setErrorModal(prev => ({...prev, isOpen: false}))}
+      />
     </>
   );
 }
