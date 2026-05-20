@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from "@nozbe/watermelondb";
 
 export const mySchema = appSchema({
-  version: 30,
+  version: 31,
   tables: [
     // ==================
     // 1. USUARIOS Y PERMISOS
@@ -12,6 +12,10 @@ export const mySchema = appSchema({
         { name: "usuario", type: "string", isOptional: true },
         { name: "estado", type: "boolean" },
         { name: "hash_local", type: "string", isOptional: true },
+        { name: "device_id", type: "string", isOptional: true },
+        { name: "last_online_at", type: "number", isOptional: true },
+        { name: "offline_ttl_hours", type: "number", isOptional: true },
+        { name: "cached_permissions_json", type: "string", isOptional: true },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
@@ -42,6 +46,20 @@ export const mySchema = appSchema({
         { name: "updated_at", type: "number" },
       ],
     }),
+    tableSchema({
+      name: "sesiones_dispositivo",
+      columns: [
+        { name: "perfil_id", type: "string", isIndexed: true },
+        { name: "device_id", type: "string" },
+        { name: "device_name", type: "string", isOptional: true },
+        { name: "last_online_at", type: "number" },
+        { name: "offline_ttl_hours", type: "number" },
+        { name: "is_active", type: "boolean" },
+        { name: "revoked_at", type: "number", isOptional: true },
+        { name: "created_at", type: "number" },
+        { name: "updated_at", type: "number" },
+      ],
+    }),
 
     // ==================
     // 2. CATÁLOGOS INDEPENDIENTES
@@ -52,6 +70,8 @@ export const mySchema = appSchema({
         { name: "codigo_familia", type: "string" },
         { name: "nombre", type: "string" },
         { name: "estado", type: "boolean" },
+        { name: "deleted_at", type: "number", isOptional: true },
+        { name: "deleted_by", type: "string", isOptional: true },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
@@ -62,6 +82,8 @@ export const mySchema = appSchema({
         { name: "nombre", type: "string" },
         { name: "tasa", type: "number" },
         { name: "activo", type: "boolean" },
+        { name: "deleted_at", type: "number", isOptional: true },
+        { name: "deleted_by", type: "string", isOptional: true },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
@@ -71,6 +93,8 @@ export const mySchema = appSchema({
       columns: [
         { name: "nombre", type: "string" },
         { name: "estado", type: "boolean" },
+        { name: "deleted_at", type: "number", isOptional: true },
+        { name: "deleted_by", type: "string", isOptional: true },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
@@ -81,6 +105,8 @@ export const mySchema = appSchema({
         { name: "nombre", type: "string" },
         { name: "porcentaje", type: "number" },
         { name: "estado", type: "boolean" },
+        { name: "deleted_at", type: "number", isOptional: true },
+        { name: "deleted_by", type: "string", isOptional: true },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
@@ -94,6 +120,11 @@ export const mySchema = appSchema({
         { name: "telefono", type: "string", isOptional: true },
         { name: "correo_contacto", type: "string", isOptional: true },
         { name: "estado", type: "boolean" },
+        { name: "_version", type: "number" },
+        { name: "updated_by", type: "string", isOptional: true },
+        { name: "updated_device", type: "string", isOptional: true },
+        { name: "deleted_at", type: "number", isOptional: true },
+        { name: "deleted_by", type: "string", isOptional: true },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
@@ -103,6 +134,8 @@ export const mySchema = appSchema({
       columns: [
         { name: "nombre", type: "string" },
         { name: "estado", type: "boolean" },
+        { name: "deleted_at", type: "number", isOptional: true },
+        { name: "deleted_by", type: "string", isOptional: true },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
@@ -121,6 +154,11 @@ export const mySchema = appSchema({
         { name: "cp", type: "string", isOptional: true },
         { name: "ciudad", type: "string", isOptional: true },
         { name: "estado", type: "boolean" },
+        { name: "_version", type: "number" },
+        { name: "updated_by", type: "string", isOptional: true },
+        { name: "updated_device", type: "string", isOptional: true },
+        { name: "deleted_at", type: "number", isOptional: true },
+        { name: "deleted_by", type: "string", isOptional: true },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
@@ -178,10 +216,15 @@ export const mySchema = appSchema({
         { name: "ultimo_costo_base", type: "number" },
         { name: "clave_sat", type: "string", isOptional: true },
         { name: "imagen", type: "string", isOptional: true },
-        { name: "estado", type: "boolean" }, // BORRADO LÓGICO
+        { name: "estado", type: "boolean" },
         { name: "umbral_verde_dias", type: "number" },
         { name: "umbral_amarillo_dias", type: "number" },
         { name: "umbral_rojo_dias", type: "number" },
+        { name: "_version", type: "number" },
+        { name: "updated_by", type: "string", isOptional: true },
+        { name: "updated_device", type: "string", isOptional: true },
+        { name: "deleted_at", type: "number", isOptional: true },
+        { name: "deleted_by", type: "string", isOptional: true },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
@@ -213,6 +256,11 @@ export const mySchema = appSchema({
         { name: "fecha_caducidad", type: "number", isOptional: true },
         { name: "estado", type: "boolean" },
         { name: "cantidad", type: "number" },
+        { name: "_version", type: "number" },
+        { name: "updated_by", type: "string", isOptional: true },
+        { name: "updated_device", type: "string", isOptional: true },
+        { name: "deleted_at", type: "number", isOptional: true },
+        { name: "deleted_by", type: "string", isOptional: true },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
@@ -251,8 +299,13 @@ export const mySchema = appSchema({
         { name: "producto_id", type: "string", isIndexed: true },
         { name: "lote_id", type: "string", isIndexed: true, isOptional: true },
         { name: "usuario_id", type: "string", isIndexed: true },
+        { name: "documento_id", type: "string", isOptional: true, isIndexed: true },
         { name: "tipo", type: "string" },
         { name: "cantidad", type: "number" },
+        { name: "cantidad_anterior", type: "number" },
+        { name: "cantidad_posterior", type: "number" },
+        { name: "referencia", type: "string", isOptional: true },
+        { name: "device_id", type: "string", isOptional: true },
         { name: "created_at", type: "number" },
       ],
     }),
@@ -267,6 +320,9 @@ export const mySchema = appSchema({
         { name: "subtotal", type: "number" },
         { name: "total_impuestos", type: "number" },
         { name: "total", type: "number" },
+        { name: "_version", type: "number" },
+        { name: "updated_by", type: "string", isOptional: true },
+        { name: "updated_device", type: "string", isOptional: true },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
@@ -277,7 +333,7 @@ export const mySchema = appSchema({
         { name: "documento_id", type: "string", isIndexed: true },
         { name: "producto_id", type: "string", isIndexed: true },
         { name: "cantidad", type: "number" },
-        { name: "descripcion_aplicada", type: "string", isOptional: true }, // FOTOGRAFÍA DEL NOMBRE
+        { name: "descripcion_aplicada", type: "string", isOptional: true },
         { name: "precio_unitario_aplicado", type: "number" },
         { name: "descuento_aplicado", type: "number" },
         { name: "json_impuestos_aplicados", type: "string", isOptional: true },
@@ -285,22 +341,52 @@ export const mySchema = appSchema({
         { name: "updated_at", type: "number" },
       ],
     }),
+    tableSchema({
+      name: "operaciones_documento",
+      columns: [
+        { name: "documento_id", type: "string", isIndexed: true },
+        { name: "tipo_operacion", type: "string" },
+        { name: "usuario_id", type: "string" },
+        { name: "device_id", type: "string", isOptional: true },
+        { name: "motivo", type: "string", isOptional: true },
+        { name: "monto", type: "number", isOptional: true },
+        { name: "documento_relacionado_id", type: "string", isOptional: true },
+        { name: "metadata_json", type: "string", isOptional: true },
+        { name: "created_at", type: "number" },
+      ],
+    }),
+
     // ==================
     // 5. AUDITORÍA Y ERRORES
     // ==================
     tableSchema({
       name: "bitacora_errores",
       columns: [
-        { name: "tabla_origen", type: "string" }, // ej. 'productos', 'documentos'
-        { name: "registro_id", type: "string", isIndexed: true }, // ID del registro problemático
-        { name: "accion", type: "string" }, // 'crear', 'editar', 'sincronizar'
-        { name: "payload_json", type: "string", isOptional: true }, // Respaldo de los datos para no perderlos
-        { name: "mensaje_error", type: "string" }, // Lo que falló (ej. "Código duplicado")
-        { name: "estado", type: "string" }, // 'pendiente', 'resuelto', 'ignorado'
+        { name: "tabla_origen", type: "string" },
+        { name: "registro_id", type: "string", isIndexed: true },
+        { name: "accion", type: "string" },
+        { name: "payload_json", type: "string", isOptional: true },
+        { name: "mensaje_error", type: "string" },
+        { name: "estado", type: "string" },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
     }),
+    tableSchema({
+      name: "audit_log",
+      columns: [
+        { name: "tabla", type: "string", isIndexed: true },
+        { name: "registro_id", type: "string", isIndexed: true },
+        { name: "accion", type: "string" },
+        { name: "usuario_id", type: "string", isIndexed: true },
+        { name: "device_id", type: "string" },
+        { name: "campos_cambiados", type: "string", isOptional: true },
+        { name: "valores_anteriores", type: "string", isOptional: true },
+        { name: "valores_nuevos", type: "string", isOptional: true },
+        { name: "created_at", type: "number", isIndexed: true },
+      ],
+    }),
+
     // ==================
     // 6. CONFIGURACIONES
     // ==================
@@ -310,6 +396,8 @@ export const mySchema = appSchema({
         { name: "name", type: "string" },
         { name: "layout_json", type: "string" },
         { name: "is_default", type: "boolean" },
+        { name: "deleted_at", type: "number", isOptional: true },
+        { name: "deleted_by", type: "string", isOptional: true },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
@@ -319,6 +407,11 @@ export const mySchema = appSchema({
       columns: [
         { name: "nombre", type: "string" },
         { name: "estado", type: "boolean" },
+        { name: "_version", type: "number" },
+        { name: "updated_by", type: "string", isOptional: true },
+        { name: "updated_device", type: "string", isOptional: true },
+        { name: "deleted_at", type: "number", isOptional: true },
+        { name: "deleted_by", type: "string", isOptional: true },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
       ],
@@ -342,6 +435,36 @@ export const mySchema = appSchema({
         { name: "plantilla_id", type: "string", isIndexed: true },
         { name: "created_at", type: "number" },
         { name: "updated_at", type: "number" },
+      ],
+    }),
+
+    // ==================
+    // 7. DIAGNÓSTICO Y CACHÉ LOCAL
+    // ==================
+    tableSchema({
+      name: "sync_journal",
+      columns: [
+        { name: "sync_id", type: "string" },
+        { name: "direction", type: "string" },
+        { name: "status", type: "string" },
+        { name: "tables_affected", type: "string" },
+        { name: "records_pulled", type: "number" },
+        { name: "records_pushed", type: "number" },
+        { name: "records_rejected", type: "number" },
+        { name: "conflicts_detected", type: "number" },
+        { name: "duration_ms", type: "number" },
+        { name: "error_message", type: "string", isOptional: true },
+        { name: "device_id", type: "string" },
+        { name: "created_at", type: "number" },
+      ],
+    }),
+    tableSchema({
+      name: "stats_cache",
+      columns: [
+        { name: "fecha", type: "string" },
+        { name: "tipo_metrica", type: "string" },
+        { name: "valor", type: "number" },
+        { name: "created_at", type: "number" },
       ],
     }),
   ],

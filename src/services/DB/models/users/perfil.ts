@@ -17,6 +17,10 @@ export default class Perfil extends Model {
   @text("usuario") usuario!: string;
   @field("estado") estado!: boolean;
   @text("hash_local") hashLocal?: string;
+  @text("device_id") deviceId?: string;
+  @field("last_online_at") lastOnlineAt?: number;
+  @field("offline_ttl_hours") offlineTtlHours?: number;
+  @text("cached_permissions_json") cachedPermissionsJson?: string;
   @readonly @date("updated_at") updatedAt!: number;
 
   // ==========================================

@@ -91,6 +91,7 @@ export default function Login() {
       // ==========================================
       let accesoConcedido = false;
       let userId: string | null = null;
+      let isOnlineSession = false;
 
       try {
         console.log("Intentando inicio de sesión ONLINE con Supabase...");
@@ -124,6 +125,7 @@ export default function Login() {
 
         // SI LLEGAMOS AQUÍ, LA CONTRASEÑA ES CORRECTA EN LA NUBE
         userId = data.user.id;
+        isOnlineSession = true;
 
         // VERIFICAR ESTADO EN LA NUBE
         const { data: perfilData, error: perfilError } = await supabase
@@ -234,7 +236,7 @@ export default function Login() {
       // ==========================================
       if (accesoConcedido && userId) {
         // Le pasamos la estafeta (el UUID) al AuthContext
-        await loginLocal(userId);
+        await loginLocal(userId, isOnlineSession);
 
         // Redirigimos al Home
         router.replace("/home" as any);
@@ -249,6 +251,9 @@ export default function Login() {
       if (errorReal.includes("primer_ingreso_requiere_correo")) {
         mensajeAmigable =
           "Por ser la primera vez en este equipo, ingresa con tu Correo electrónico. Después podrás usar tu Usuario.";
+      } else if (errorReal.includes("SESION_OFFLINE_EXPIRADA")) {
+        mensajeAmigable =
+          "Tu sesión offline ha expirado. Debes iniciar sesión con conexión a internet para renovarla.";
       } else if (errorReal.includes("USUARIO_DESHABILITADO")) {
         mensajeAmigable =
           "Tu cuenta ha sido deshabilitada. No tienes permitido iniciar sesión.";

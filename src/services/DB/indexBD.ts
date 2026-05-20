@@ -30,6 +30,11 @@ import MovimientoInventario from "./models/registros/movimientoInventario";
 import InformacionPerfil from "./models/users/informacionPerfil";
 import Perfil from "./models/users/perfil";
 import Permiso from "./models/users/permiso";
+import SesionDispositivo from "./models/users/sesionDispositivo";
+import OperacionDocumento from "./models/registros/operacionDocumento";
+import SyncJournal from "./models/registros/syncJournal";
+import AuditLog from "./models/registros/auditLog";
+import StatsCache from "./models/registros/statsCache";
 import InvoiceTemplate from "./models/configuracion/invoiceTemplate";
 
 const adapter = getAdapter();
@@ -40,6 +45,7 @@ export const database = new Database({
     Perfil,
     InformacionPerfil,
     Permiso,
+    SesionDispositivo,
 
     Familia,
     Impuesto,
@@ -65,7 +71,11 @@ export const database = new Database({
     MovimientoInventario,
     Documento,
     DocumentoDetalle,
+    OperacionDocumento,
     BitacoraError,
+    AuditLog,
+    SyncJournal,
+    StatsCache,
     InvoiceTemplate,
   ],
 });

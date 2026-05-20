@@ -22,6 +22,10 @@ import Lote from "../../../src/services/DB/models/catalogo/lote";
 import Producto from "../../../src/services/DB/models/catalogo/producto";
 import ProductoImpuesto from "../../../src/services/DB/models/catalogo/productoImpuesto";
 import MovimientoInventario from "../../../src/services/DB/models/registros/movimientoInventario";
+import { useAuth } from "../../../src/context/AuthContext";
+import { getDeviceId } from "../../../src/services/device";
+import { logAudit } from "../../../src/utils/auditHelper";
+import { recalcularStockLote } from "../../../src/services/inventoryService";
 
 interface AddEntryInnerProps {
   isOpen: boolean;
@@ -46,6 +50,7 @@ function AddEntryInner({
   recoverData,
   onSaveSuccess,
 }: AddEntryInnerProps) {
+  const { userId } = useAuth();
   const [productoId, setProductoId] = useState("");
   const [almacenId, setAlmacenId] = useState("");
   const [lote, setLote] = useState("");
@@ -180,36 +185,53 @@ function AddEntryInner({
       }
       setIsSaving(true);
 
+      const uId = userId || "system";
+      const devId = getDeviceId();
+      const qtyNum = parseInt(cantidad, 10) || 0;
+      const costoNum = parseFloat(costo) || 0;
+
+      let nuevoLoteId = "";
+      let nuevoMovimientoId = "";
+
       await database.write(async () => {
         // 1. Create Lote
-        const nuevoLote = await database.get<Lote>("lotes").create((l) => {
-          (l as any)._raw.id = Crypto.randomUUID();
-          (l as any)._raw.producto_id = productoId;
+        const nuevoLote = await database.get<Lote>("lotes").create((l: any) => {
+          l._raw.id = Crypto.randomUUID();
+          l._raw.producto_id = productoId;
           l.identificadorLote = lote;
           l.unidadMedida = unidad;
-          l.costoAdquisicion = parseFloat(costo) || 0;
-          l.cantidad = parseInt(cantidad, 10) || 0;
+          l.costoAdquisicion = costoNum;
+          l.cantidad = qtyNum;
           l.estado = true;
+          l.version = 1;
+          l.updatedBy = uId;
+          l.updatedDevice = devId;
           if (caducidad) {
             const parsed = new Date(caducidad).getTime();
             if (!isNaN(parsed) && parsed > 0) {
-              (l as any)._raw.fecha_caducidad = parsed;
+              l._raw.fecha_caducidad = parsed;
             }
           }
         });
+        nuevoLoteId = nuevoLote.id;
 
         // 2. Create MovimientoInventario
-        await database
+        const nuevoMovimiento = await database
           .get<MovimientoInventario>("movimientos_inventario")
-          .create((mi) => {
-            (mi as any)._raw.id = Crypto.randomUUID();
-            (mi as any)._raw.almacen_id = almacenId;
-            (mi as any)._raw.producto_id = productoId;
-            (mi as any)._raw.lote_id = nuevoLote.id;
-            mi.usuarioId = "system"; // TODO: Usar el rol de la sesión
+          .create((mi: any) => {
+            mi._raw.id = Crypto.randomUUID();
+            mi._raw.almacen_id = almacenId;
+            mi._raw.producto_id = productoId;
+            mi._raw.lote_id = nuevoLoteId;
+            mi.usuarioId = uId;
             mi.tipo = "ENTRADA_COMPRA";
-            mi.cantidad = parseInt(cantidad, 10);
+            mi.cantidad = qtyNum;
+            mi.cantidadAnterior = 0;
+            mi.cantidadPosterior = qtyNum;
+            mi.referencia = `Entrada de mercancía - Lote ${lote}`;
+            mi.deviceId = devId;
           });
+        nuevoMovimientoId = nuevoMovimiento.id;
 
         // 3. Create CodigoAlterno records if provided
         for (const code of codigosAlternos) {
@@ -222,6 +244,46 @@ function AddEntryInner({
             });
         }
       });
+
+      // 4. Log audit trails
+      await logAudit({
+        tabla: "lotes",
+        registroId: nuevoLoteId,
+        accion: "create",
+        userId: uId,
+        deviceId: devId,
+        valoresNuevos: {
+          producto_id: productoId,
+          identificador_lote: lote,
+          unidad_medida: unidad,
+          costo_adquisicion: costoNum,
+          cantidad: qtyNum,
+          estado: true,
+        },
+      });
+
+      await logAudit({
+        tabla: "movimientos_inventario",
+        registroId: nuevoMovimientoId,
+        accion: "create",
+        userId: uId,
+        deviceId: devId,
+        valoresNuevos: {
+          almacen_id: almacenId,
+          producto_id: productoId,
+          lote_id: nuevoLoteId,
+          usuario_id: uId,
+          tipo: "ENTRADA_COMPRA",
+          cantidad: qtyNum,
+          cantidad_anterior: 0,
+          cantidad_posterior: qtyNum,
+          referencia: `Entrada de mercancía - Lote ${lote}`,
+          device_id: devId,
+        },
+      });
+
+      // 5. Final stock recalculation to ensure parity
+      await recalcularStockLote(nuevoLoteId);
 
       // Sync to Supabase
       syncApp().catch(console.error);

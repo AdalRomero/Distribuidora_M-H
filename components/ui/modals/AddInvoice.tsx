@@ -19,6 +19,9 @@ import { LOGO_MH_B64 } from "../../../constants/logo_base64";
 import { useAuth } from "../../../src/context/AuthContext";
 import { database } from "../../../src/services/DB/indexBD";
 import ErrorModal from "./ErrorModal";
+import { getDeviceId } from "../../../src/services/device";
+import { logAudit } from "../../../src/utils/auditHelper";
+import { recalcularStockLote } from "../../../src/services/inventoryService";
 import {
     InvoiceLayoutFlow
 } from "./InvoiceBlockRenderer";
@@ -749,6 +752,9 @@ export default function AddInvoice({
     setIsSaving(true);
     try {
       const folioCompleto = `${form.serie}-${form.folio}`;
+      const devId = getDeviceId();
+      const uId = userId || "system";
+      const lotesModificados: string[] = [];
 
       await database.write(async () => {
         const docId = Crypto.randomUUID();
@@ -758,7 +764,7 @@ export default function AddInvoice({
         await docsCollection.create((doc: any) => {
           doc._raw.id = docId;
           doc._raw.cliente_id = form.clienteId || "publico_general";
-          doc._raw.usuario_id = userId || "unknown";
+          doc._raw.usuario_id = uId;
           doc.tipo = form.tipoDocumento;
           doc._raw.tipo = form.tipoDocumento;
           doc.folio = folioCompleto;
@@ -771,6 +777,9 @@ export default function AddInvoice({
           doc._raw.total_impuestos = totalImpuestos;
           doc.total = totalFinal;
           doc._raw.total = totalFinal;
+          doc.version = 1;
+          doc.updatedBy = uId;
+          doc.updatedDevice = devId;
         });
 
         // 2. Crear detalles por cada concepto válido y procesar inventario
@@ -852,26 +861,70 @@ export default function AddInvoice({
               const qtyToDeduct = item.cantidad;
               if (qtyToDeduct <= 0) continue;
 
-              const nuevaCantidadLote = lote.cantidad - qtyToDeduct;
+              const cantidadAnterior = lote.cantidad || 0;
+              const nuevaCantidadLote = cantidadAnterior - qtyToDeduct;
+              const versionAnterior = lote.version || 1;
 
               // Actualizar lote
               await lote.update((l: any) => {
                 l.cantidad = nuevaCantidadLote;
-                l._raw.cantidad = nuevaCantidadLote;
+                l.version = versionAnterior + 1;
+                l.updatedBy = uId;
+                l.updatedDevice = devId;
               });
 
               // Registrar movimiento
+              const nuevoMovimientoId = Crypto.randomUUID();
               await movsCollection.create((mov: any) => {
-                mov._raw.id = Crypto.randomUUID();
+                mov._raw.id = nuevoMovimientoId;
                 mov._raw.almacen_id = "default";
                 mov._raw.producto_id = concepto.productoId;
                 mov._raw.lote_id = lote.id;
-                mov._raw.usuario_id = userId || "unknown";
+                mov._raw.usuario_id = uId;
                 mov.tipo = "SALIDA_VENTA";
-                mov._raw.tipo = "SALIDA_VENTA";
                 mov.cantidad = qtyToDeduct;
-                mov._raw.cantidad = qtyToDeduct;
+                mov.cantidadAnterior = cantidadAnterior;
+                mov.cantidadPosterior = nuevaCantidadLote;
+                mov.referencia = `Salida por venta - Folio ${folioCompleto}`;
+                mov.deviceId = devId;
+                mov._raw.documento_id = docId;
               });
+
+              // Audit Lote Update
+              await logAudit({
+                tabla: "lotes",
+                registroId: lote.id,
+                accion: "update",
+                userId: uId,
+                deviceId: devId,
+                camposChanged: ["cantidad", "version", "updated_by", "updated_device"],
+                valoresAnteriores: { cantidad: cantidadAnterior, version: versionAnterior },
+                valoresNuevos: { cantidad: nuevaCantidadLote, version: versionAnterior + 1 },
+              });
+
+              // Audit Movimiento Creation
+              await logAudit({
+                tabla: "movimientos_inventario",
+                registroId: nuevoMovimientoId,
+                accion: "create",
+                userId: uId,
+                deviceId: devId,
+                valoresNuevos: {
+                  almacen_id: "default",
+                  producto_id: concepto.productoId,
+                  lote_id: lote.id,
+                  usuario_id: uId,
+                  tipo: "SALIDA_VENTA",
+                  cantidad: qtyToDeduct,
+                  cantidad_anterior: cantidadAnterior,
+                  cantidad_posterior: nuevaCantidadLote,
+                  referencia: `Salida por venta - Folio ${folioCompleto}`,
+                  device_id: devId,
+                  documento_id: docId,
+                },
+              });
+
+              lotesModificados.push(lote.id);
               
               cantDeducir -= qtyToDeduct;
             }
@@ -883,7 +936,28 @@ export default function AddInvoice({
             }
           }
         }
+
+        // Audit Document Creation
+        await logAudit({
+          tabla: "documentos",
+          registroId: docId,
+          accion: "create",
+          userId: uId,
+          deviceId: devId,
+          valoresNuevos: {
+            cliente_id: form.clienteId || "publico_general",
+            tipo: form.tipoDocumento,
+            folio: folioCompleto,
+            estado: "generada",
+            total: totalFinal,
+          },
+        });
       });
+
+      // 4. Recalculate stock for all modified lotes
+      for (const idLote of lotesModificados) {
+        await recalcularStockLote(idLote);
+      }
 
       setSaveSuccess(true);
       if (onSaveSuccess) onSaveSuccess();
