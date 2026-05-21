@@ -25,10 +25,11 @@ BEGIN
   EXECUTE 'DROP FUNCTION IF EXISTS public.pull_changes(BIGINT, TEXT, UUID);';
 
   pull_sql := 'CREATE OR REPLACE FUNCTION public.pull_changes(last_pulled_at BIGINT, platform TEXT DEFAULT NULL, usuario_id UUID DEFAULT NULL) RETURNS JSONB LANGUAGE plpgsql AS $func$ ' ||
+              '#variable_conflict use_column ' ||
               'DECLARE _server_time BIGINT; _result JSONB; v_role TEXT; ' ||
               'BEGIN _server_time := (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT; ' ||
-              'IF usuario_id IS NOT NULL THEN ' ||
-              '  SELECT rol INTO v_role FROM public.informacion_perfil WHERE id = usuario_id; ' ||
+              'IF pull_changes.usuario_id IS NOT NULL THEN ' ||
+              '  SELECT rol INTO v_role FROM public.informacion_perfil WHERE id = pull_changes.usuario_id; ' ||
               'END IF; ' ||
               'IF v_role IS NULL THEN v_role := ''Vendedor''; END IF; ' ||
               '_result := jsonb_build_object(''changes'', jsonb_build_object(';
@@ -93,7 +94,7 @@ BEGIN
     update_assigns := rtrim(update_assigns, ', ');
 
     IF has_updated_at THEN
-      updated_cond := '(EXTRACT(EPOCH FROM updated_at)*1000) > last_pulled_at AND (EXTRACT(EPOCH FROM created_at)*1000) <= last_pulled_at';
+      updated_cond := '(EXTRACT(EPOCH FROM updated_at)*1000) > pull_changes.last_pulled_at AND (EXTRACT(EPOCH FROM created_at)*1000) <= pull_changes.last_pulled_at';
     ELSE
       updated_cond := 'false';
     END IF;
@@ -124,7 +125,7 @@ BEGIN
     -- Pull logic for table
     pull_tables := array_append(pull_tables, 
       '''' || t || ''', jsonb_build_object(' ||
-      '''created'', (SELECT COALESCE(jsonb_agg(jsonb_build_object(' || json_args || ')), ''[]''::jsonb) FROM public.' || t || ' WHERE (EXTRACT(EPOCH FROM created_at)*1000) > last_pulled_at AND ' || extra_filter || '), ' ||
+      '''created'', (SELECT COALESCE(jsonb_agg(jsonb_build_object(' || json_args || ')), ''[]''::jsonb) FROM public.' || t || ' WHERE (EXTRACT(EPOCH FROM created_at)*1000) > pull_changes.last_pulled_at AND ' || extra_filter || '), ' ||
       '''updated'', (SELECT COALESCE(jsonb_agg(jsonb_build_object(' || json_args || ')), ''[]''::jsonb) FROM public.' || t || ' WHERE ' || updated_cond || ' AND ' || extra_filter || '), ' ||
       '''deleted'', ''[]''::jsonb)'
     );
