@@ -1,7 +1,7 @@
 DO $$
 DECLARE
   table_names text[] := ARRAY[
-    'perfiles', 'informacion_perfil', 'permisos', 'familias', 'impuestos', 'almacenes', 'margenes', 'proveedores', 'categorias_clientes', 'clientes', 'contactos', 'precios_especiales_familias_clientes', 'productos', 'producto_impuestos', 'codigos_alternos', 'lotes', 'proveedor_productos', 'precios_especiales_clientes', 'movimientos_inventario', 'documentos', 'documentos_detalles', 'bitacora_errores', 'invoice_templates', 'plantillas_precios', 'reglas_plantilla'
+    'perfiles', 'informacion_perfil', 'permisos', 'familias', 'impuestos', 'almacenes', 'margenes', 'proveedores', 'categorias_clientes', 'clientes', 'contactos', 'precios_especiales_familias_clientes', 'productos', 'producto_impuestos', 'codigos_alternos', 'lotes', 'proveedor_productos', 'precios_especiales_clientes', 'movimientos_inventario', 'documentos', 'documentos_detalles', 'bitacora_errores', 'invoice_templates', 'plantillas_precios', 'reglas_plantilla', 'clientes_plantillas', 'proveedor_contactos', 'sesiones_dispositivo', 'operaciones_documento', 'audit_log'
   ];
   t text;
   c record;
@@ -17,11 +17,20 @@ DECLARE
   update_assigns text;
   has_updated_at boolean;
   updated_cond text;
+  extra_filter text;
 BEGIN
 
-  pull_sql := 'CREATE OR REPLACE FUNCTION public.pull_changes(last_pulled_at BIGINT) RETURNS JSONB LANGUAGE plpgsql AS $func$ ' ||
-              'DECLARE _server_time BIGINT; _result JSONB; ' ||
+  -- Drop existing pull_changes signatures to prevent overload conflicts
+  EXECUTE 'DROP FUNCTION IF EXISTS public.pull_changes(BIGINT);';
+  EXECUTE 'DROP FUNCTION IF EXISTS public.pull_changes(BIGINT, TEXT, UUID);';
+
+  pull_sql := 'CREATE OR REPLACE FUNCTION public.pull_changes(last_pulled_at BIGINT, platform TEXT DEFAULT NULL, usuario_id UUID DEFAULT NULL) RETURNS JSONB LANGUAGE plpgsql AS $func$ ' ||
+              'DECLARE _server_time BIGINT; _result JSONB; v_role TEXT; ' ||
               'BEGIN _server_time := (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT; ' ||
+              'IF usuario_id IS NOT NULL THEN ' ||
+              '  SELECT rol INTO v_role FROM public.informacion_perfil WHERE id = usuario_id; ' ||
+              'END IF; ' ||
+              'IF v_role IS NULL THEN v_role := ''Vendedor''; END IF; ' ||
               '_result := jsonb_build_object(''changes'', jsonb_build_object(';
 
   push_sql := 'CREATE OR REPLACE FUNCTION public.push_changes(changes JSONB) RETURNS JSONB LANGUAGE plpgsql AS $func$ ' ||
@@ -89,11 +98,34 @@ BEGIN
       updated_cond := 'false';
     END IF;
 
+    -- Setup extra filtering based on role and platform
+    IF t IN ('perfiles', 'informacion_perfil', 'permisos') THEN
+      extra_filter := '(id = pull_changes.usuario_id OR v_role IN (''Administrador'', ''DEV''))';
+    ELSIF t = 'sesiones_dispositivo' THEN
+      extra_filter := '(perfil_id = pull_changes.usuario_id OR v_role IN (''Administrador'', ''DEV''))';
+    ELSIF t = 'documentos' THEN
+      extra_filter := '(usuario_id = pull_changes.usuario_id OR v_role NOT IN (''Vendedor'', ''Empleado''))' ||
+                      ' AND (pull_changes.platform IS DISTINCT FROM ''web'' OR created_at > (NOW() - INTERVAL ''30 days''))';
+    ELSIF t = 'documentos_detalles' THEN
+      extra_filter := '(v_role NOT IN (''Vendedor'', ''Empleado'') OR documento_id IN (SELECT id FROM public.documentos WHERE usuario_id = pull_changes.usuario_id))' ||
+                      ' AND (pull_changes.platform IS DISTINCT FROM ''web'' OR documento_id IN (SELECT id FROM public.documentos WHERE created_at > (NOW() - INTERVAL ''30 days'')))';
+    ELSIF t = 'operaciones_documento' THEN
+      extra_filter := '(usuario_id = pull_changes.usuario_id OR v_role NOT IN (''Vendedor'', ''Empleado''))' ||
+                      ' AND (pull_changes.platform IS DISTINCT FROM ''web'' OR documento_id IN (SELECT id FROM public.documentos WHERE created_at > (NOW() - INTERVAL ''30 days'')))';
+    ELSIF t = 'movimientos_inventario' THEN
+      extra_filter := '(usuario_id = pull_changes.usuario_id OR v_role NOT IN (''Vendedor'', ''Empleado''))' ||
+                      ' AND (pull_changes.platform IS DISTINCT FROM ''web'')';
+    ELSIF t = 'audit_log' THEN
+      extra_filter := 'false'; -- Push-only, pull nothing
+    ELSE
+      extra_filter := 'true';
+    END IF;
+
     -- Pull logic for table
     pull_tables := array_append(pull_tables, 
       '''' || t || ''', jsonb_build_object(' ||
-      '''created'', (SELECT COALESCE(jsonb_agg(jsonb_build_object(' || json_args || ')), ''[]''::jsonb) FROM public.' || t || ' WHERE (EXTRACT(EPOCH FROM created_at)*1000) > last_pulled_at), ' ||
-      '''updated'', (SELECT COALESCE(jsonb_agg(jsonb_build_object(' || json_args || ')), ''[]''::jsonb) FROM public.' || t || ' WHERE ' || updated_cond || '), ' ||
+      '''created'', (SELECT COALESCE(jsonb_agg(jsonb_build_object(' || json_args || ')), ''[]''::jsonb) FROM public.' || t || ' WHERE (EXTRACT(EPOCH FROM created_at)*1000) > last_pulled_at AND ' || extra_filter || '), ' ||
+      '''updated'', (SELECT COALESCE(jsonb_agg(jsonb_build_object(' || json_args || ')), ''[]''::jsonb) FROM public.' || t || ' WHERE ' || updated_cond || ' AND ' || extra_filter || '), ' ||
       '''deleted'', ''[]''::jsonb)'
     );
 
