@@ -86,6 +86,7 @@ function validatePayload(changes: any): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   
   for (const [table, data] of Object.entries(changes)) {
+    if (table === "sync_journal") continue;
     for (const record of (data as any).created || []) {
       if (!record.id || record.id.length !== 36) {
         errors.push(`${table}: ID inválido ${record.id}`);
@@ -225,8 +226,11 @@ async function runSyncProcess(
       }
 
       // Send changes to Supabase
+      const changesToSend = { ...changes };
+      delete changesToSend.sync_journal;
+
       const { data, error } = await supabase.rpc("push_changes", {
-        changes: changes,
+        changes: changesToSend,
       });
 
       if (error) throw new Error(error.message);
