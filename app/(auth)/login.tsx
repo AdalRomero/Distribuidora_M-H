@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { Lock, Unlock, User } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../../src/services/api/supabaseClient";
 
 import { Q } from "@nozbe/watermelondb";
@@ -22,8 +22,8 @@ type BusinessType = "caja" | "pastel";
 export default function Login() {
   const router = useRouter();
 
-  // EXTRAEMOS LA FUNCIÓN DEL CONTEXTO
-  const { loginLocal } = useAuth();
+  // EXTRAEMOS LA FUNCIÓN Y EL ESTADO DE AUTENTICACIÓN
+  const { loginLocal, userId, loading: authLoading } = useAuth();
 
   const [accessNumber, setAccessNumber] = useState("");
   const [username, setUsername] = useState("");
@@ -32,6 +32,13 @@ export default function Login() {
   const [isFormLeft, setIsFormLeft] = useState(true);
   const [businessType, setBusinessType] = useState<BusinessType>("caja");
   const [showPassword, setShowPassword] = useState(false);
+
+  // Redirigir si ya tiene sesión
+  useEffect(() => {
+    if (userId && !authLoading) {
+      router.replace("/home" as any);
+    }
+  }, [userId, authLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

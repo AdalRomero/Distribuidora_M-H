@@ -9,13 +9,17 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Faltan las variables de entorno de Supabase");
 }
 
+// En web (Vercel/browser), usar localStorage nativo para que Supabase
+// pueda gestionar el refresh token correctamente. En React Native usar AsyncStorage.
+const isWeb = typeof window !== "undefined" && typeof localStorage !== "undefined";
+
 // Inicializamos el cliente
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    // Configuración recomendada para React Native
-    storage: AsyncStorage, // Para guardar el token de sesión(inicio de sesión)
-    persistSession: true, // Para mantener la sesión activa
-    autoRefreshToken: true, // Para refrescar el token automáticamente
-    detectSessionInUrl: false, // Para detectar la sesión en la URL
+    // En web usamos localStorage del browser; en native usamos AsyncStorage
+    storage: isWeb ? undefined : AsyncStorage,
+    persistSession: true,  // Mantener la sesión activa
+    autoRefreshToken: true, // Refrescar el token automáticamente
+    detectSessionInUrl: false, // No detectar sesión en URL (evita loops en Expo Router)
   },
 });

@@ -12,6 +12,7 @@ interface AuthContextType {
   userRole: string;
   isDev: boolean;
   canDelete: boolean;
+  loading: boolean;
   loginLocal: (id: string, isOnline?: boolean) => Promise<void>;
   logoutLocal: () => Promise<void>;
 }
@@ -23,6 +24,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [userName, setUserName] = useState("Usuario");
   const [userRole, setUserRole] = useState("Empleado");
   const [canDelete, setCanDelete] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const checkOfflineTtl = async (id: string): Promise<boolean> => {
     // Permitir el uso de la app de manera local sin límites de expiración temporal
@@ -45,6 +47,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       } catch (e) {
         console.log("No hay sesión guardada");
+      } finally {
+        setLoading(false);
       }
     };
     loadSession();
@@ -241,6 +245,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         userRole,
         isDev: userRole === "DEV",
         canDelete,
+        loading,
         loginLocal,
         logoutLocal,
       }}

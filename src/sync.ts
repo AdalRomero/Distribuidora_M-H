@@ -118,12 +118,14 @@ async function runSyncProcess(
   const tablesAffectedSet = new Set<string>();
 
   // LIMPIEZA DE EMERGENCIA: Eliminar registros locales con IDs corruptos que bloquean el sync
+  // Incluye sync_journal porque LokiJSAdapter (web) genera IDs cortos en vez de UUIDs de 36 chars
   await database.write(async () => {
     const collectionsToClean = [
       "plantillas_precios",
       "reglas_plantilla",
       "bitacora_errores",
       "clientes_plantillas",
+      "sync_journal",
     ];
     for (const col of collectionsToClean) {
       try {
