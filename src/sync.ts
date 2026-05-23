@@ -86,7 +86,7 @@ function validatePayload(changes: any): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   
   for (const [table, data] of Object.entries(changes)) {
-    if (table === "sync_journal") continue;
+    if (table === "sync_journal" || table === "stats_cache") continue;
     for (const record of (data as any).created || []) {
       if (!record.id || record.id.length !== 36) {
         errors.push(`${table}: ID inválido ${record.id}`);
@@ -118,14 +118,13 @@ async function runSyncProcess(
   const tablesAffectedSet = new Set<string>();
 
   // LIMPIEZA DE EMERGENCIA: Eliminar registros locales con IDs corruptos que bloquean el sync
-  // Incluye sync_journal porque LokiJSAdapter (web) genera IDs cortos en vez de UUIDs de 36 chars
+  // Excluye sync_journal porque es una tabla meramente local y en web sus registros legítimos tienen IDs cortos (16 chars)
   await database.write(async () => {
     const collectionsToClean = [
       "plantillas_precios",
       "reglas_plantilla",
       "bitacora_errores",
       "clientes_plantillas",
-      "sync_journal",
     ];
     for (const col of collectionsToClean) {
       try {
@@ -230,6 +229,7 @@ async function runSyncProcess(
       // Send changes to Supabase
       const changesToSend = { ...changes };
       delete changesToSend.sync_journal;
+      delete changesToSend.stats_cache;
 
       const { data, error } = await supabase.rpc("push_changes", {
         changes: changesToSend,
