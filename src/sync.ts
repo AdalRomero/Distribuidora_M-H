@@ -109,7 +109,8 @@ function validatePayload(changes: any): { valid: boolean; errors: string[] } {
 async function runSyncProcess(
   syncId: string,
   deviceId: string,
-  journalId: string
+  journalId: string,
+  overrideUserId?: string
 ) {
   let pulledCount = 0;
   let pushedCount = 0;
@@ -138,7 +139,7 @@ async function runSyncProcess(
     }
   });
 
-  const activeUserId = await AsyncStorage.getItem("activeUserId");
+  const activeUserId = overrideUserId || await AsyncStorage.getItem("activeUserId");
 
   await synchronize({
     database,
@@ -288,7 +289,7 @@ async function runSyncProcess(
   }
 }
 
-export async function syncApp() {
+export async function syncApp(overrideUserId?: string) {
   const syncId =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
@@ -320,7 +321,7 @@ export async function syncApp() {
   // 2. Retry loop
   for (let attempt = 0; attempt < RETRY_CONFIG.maxRetries; attempt++) {
     try {
-      await runSyncProcess(syncId, deviceId, journalId);
+      await runSyncProcess(syncId, deviceId, journalId, overrideUserId);
       return; // Success!
     } catch (error: any) {
       const code = extractErrorCode(error);

@@ -178,10 +178,17 @@ export default function Login() {
             );
           } catch (e) {
             console.log(
-              "Primer inicio de sesión detectado. Sincronizando catálogo antes de entrar...",
+              "Primer inicio de sesión detectado o nuevo usuario. Limpiando base de datos local y sincronizando...",
             );
 
-            await syncApp();
+            try {
+              await database.unsafeResetDatabase();
+              console.log("Base de datos local reseteada con éxito para nuevo usuario.");
+            } catch (resetErr) {
+              console.error("Error al limpiar base de datos local:", resetErr);
+            }
+
+            await syncApp(userId);
 
             try {
               const perfilDescargado = (await perfilesDb.find(userId)) as any;
