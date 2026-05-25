@@ -44,3 +44,7 @@ app-example
 
 .vercel
 .env*
+# Archivos de escritorio
+*.exe
+desktop/dist/
+desktop/dist-desktop/

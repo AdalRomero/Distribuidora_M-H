@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from "@nozbe/watermelondb";
 
 export const mySchema = appSchema({
-  version: 33,
+  version: 36,
   tables: [
     // ==================
     // 1. USUARIOS Y PERMISOS

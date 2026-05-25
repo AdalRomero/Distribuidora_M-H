@@ -126,6 +126,8 @@ async function runSyncProcess(
       "reglas_plantilla",
       "bitacora_errores",
       "clientes_plantillas",
+      "sesiones_dispositivo",
+      "audit_log"
     ];
     for (const col of collectionsToClean) {
       try {

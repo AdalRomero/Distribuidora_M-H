@@ -67,10 +67,14 @@ BEGIN
         insert_vals := insert_vals || 'to_timestamp((record->>''' || c.column_name || ''')::numeric / 1000.0), ';
       ELSIF c.data_type = 'boolean' THEN
         insert_vals := insert_vals || '(record->>''' || c.column_name || ''')::boolean, ';
-      ELSIF c.data_type = 'numeric' OR c.data_type = 'integer' THEN
+      ELSIF c.data_type = 'numeric' OR c.data_type = 'integer' OR c.data_type = 'bigint' THEN
         insert_vals := insert_vals || '(record->>''' || c.column_name || ''')::numeric, ';
+      ELSIF c.data_type = 'uuid' THEN
+        insert_vals := insert_vals || 'NULLIF(record->>''' || c.column_name || ''', '''')::uuid, ';
+      ELSIF c.data_type = 'jsonb' OR c.data_type = 'json' THEN
+        insert_vals := insert_vals || 'NULLIF(record->>''' || c.column_name || ''', '''')::jsonb, ';
       ELSE
-        insert_vals := insert_vals || 'record->>''' || c.column_name || ''', ';
+        insert_vals := insert_vals || 'NULLIF(record->>''' || c.column_name || ''', ''''), ';
       END IF;
 
       IF c.column_name != 'id' AND c.column_name != 'created_at' THEN
@@ -78,10 +82,14 @@ BEGIN
           update_assigns := update_assigns || c.column_name || ' = to_timestamp((record->>''' || c.column_name || ''')::numeric / 1000.0), ';
         ELSIF c.data_type = 'boolean' THEN
           update_assigns := update_assigns || c.column_name || ' = (record->>''' || c.column_name || ''')::boolean, ';
-        ELSIF c.data_type = 'numeric' OR c.data_type = 'integer' THEN
+        ELSIF c.data_type = 'numeric' OR c.data_type = 'integer' OR c.data_type = 'bigint' THEN
           update_assigns := update_assigns || c.column_name || ' = (record->>''' || c.column_name || ''')::numeric, ';
+        ELSIF c.data_type = 'uuid' THEN
+          update_assigns := update_assigns || c.column_name || ' = NULLIF(record->>''' || c.column_name || ''', '''')::uuid, ';
+        ELSIF c.data_type = 'jsonb' OR c.data_type = 'json' THEN
+          update_assigns := update_assigns || c.column_name || ' = NULLIF(record->>''' || c.column_name || ''', '''')::jsonb, ';
         ELSE
-          update_assigns := update_assigns || c.column_name || ' = record->>''' || c.column_name || ''', ';
+          update_assigns := update_assigns || c.column_name || ' = NULLIF(record->>''' || c.column_name || ''', ''''), ';
         END IF;
       END IF;
 

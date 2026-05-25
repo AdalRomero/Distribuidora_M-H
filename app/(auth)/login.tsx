@@ -182,7 +182,9 @@ export default function Login() {
             );
 
             try {
-              await database.unsafeResetDatabase();
+              await database.write(async () => {
+                await database.unsafeResetDatabase();
+              });
               console.log("Base de datos local reseteada con éxito para nuevo usuario.");
             } catch (resetErr) {
               console.error("Error al limpiar base de datos local:", resetErr);

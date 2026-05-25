@@ -9,7 +9,10 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build": "npx expo export -p web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "desktop:build-web": "npm run build && node scripts/copy-build.js",
+    "desktop:start": "npm run desktop:build-web && npm start --prefix desktop",
+    "desktop:pack": "npm run desktop:build-web && npm run build --prefix desktop"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

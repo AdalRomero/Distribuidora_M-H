@@ -1,6 +1,10 @@
 import { Database } from "@nozbe/watermelondb";
+import * as Crypto from "expo-crypto";
+import { setGenerator } from "@nozbe/watermelondb/utils/common/randomId";
 
 import { getAdapter } from "./databaseAdapter";
+
+setGenerator(() => Crypto.randomUUID());
 
 import Almacen from "./models/bases/almacen";
 import Cliente from "./models/bases/cliente";
