@@ -182,9 +182,17 @@ export default function Login() {
             );
 
             try {
-              await database.write(async () => {
-                await database.unsafeResetDatabase();
-              });
+              // En web (LokiJS), database.write() + unsafeResetDatabase() tiene un bug
+              // conocido donde isWriterRunning puede ser false. Accedemos al adapter directamente.
+              const adapter = (database.adapter as any);
+              if (typeof adapter.unsafeResetDatabase === 'function') {
+                await adapter.unsafeResetDatabase();
+              } else if (adapter._adapter && typeof adapter._adapter.unsafeResetDatabase === 'function') {
+                await adapter._adapter.unsafeResetDatabase();
+              }
+              // Limpiar caché de colecciones manualmente
+              const cols = (database as any).collections?.map;
+              if (cols) Object.values(cols).forEach((col: any) => col._cache?.unsafeClear?.());
               console.log("Base de datos local reseteada con éxito para nuevo usuario.");
             } catch (resetErr) {
               console.error("Error al limpiar base de datos local:", resetErr);

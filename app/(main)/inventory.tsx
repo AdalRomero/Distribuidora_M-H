@@ -25,6 +25,7 @@ import SyncErrorBanner, {
 } from "../../components/ui/SyncErrorBanner";
 import { useSyncErrors } from "../../src/hooks/useSyncErrors";
 import { useIntegrity } from "../../src/context/IntegrityContext";
+import { useAuth } from "../../src/context/AuthContext";
 import { useLocalSearchParams, router } from "expo-router";
 import { database } from "../../src/services/DB/indexBD";
 import FamiliaModel from "../../src/services/DB/models/bases/familia";
@@ -39,6 +40,7 @@ interface InventoryProps {
 }
 
 function InventoryContent({ productos, familias, allLotes }: InventoryProps) {
+  const { userId } = useAuth();
   const params = useLocalSearchParams();
   const { scan: scanIntegrity } = useIntegrity();
   const [searchTerm, setSearchTerm] = useState((params.search as string) || "");
@@ -361,7 +363,7 @@ function InventoryContent({ productos, familias, allLotes }: InventoryProps) {
           m.lote.id = deleteLote.id;
           m.tipo = "AJUSTE_EDICION";
           m.cantidad = 0; // Audit-only: no stock impact
-          m.usuarioId = "Local-App";
+          m.usuarioId = userId || "00000000-0000-0000-0000-000000000000";
         });
     });
     setDeleteLote(null);

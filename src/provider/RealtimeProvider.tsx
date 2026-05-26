@@ -12,7 +12,7 @@ export const RealtimeProvider = ({
 
   useEffect(() => {
     // 1. Sincronización inicial al cargar el componente
-    syncApp();
+    syncApp().catch(console.error);
 
     // 2. Suscribirse a los WebSockets de Supabase
     const channel = supabase
@@ -28,7 +28,7 @@ export const RealtimeProvider = ({
             console.log(
               `📡 Cambio remoto en tabla [${payload.table}]. Sincronizando...`,
             );
-            syncApp();
+            syncApp().catch(console.error);
           }, 1500); // Espera 1.5s después del último cambio para sincronizar
         },
       )
@@ -38,7 +38,7 @@ export const RealtimeProvider = ({
     const subscription = AppState.addEventListener("change", (nextAppState) => {
       if (nextAppState === "active") {
         console.log("📱 App activa. Sincronizando datos pendientes...");
-        syncApp();
+        syncApp().catch(console.error);
       }
     });
 

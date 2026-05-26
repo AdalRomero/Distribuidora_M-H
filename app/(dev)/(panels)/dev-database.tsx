@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { ArrowLeft, Database, Edit3, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { database } from "../../../src/services/DB/indexBD";
+import { mySchema } from "../../../src/services/DB/schema";
 import WarningModal from "../../../components/ui/modals/WarningModal";
 import ErrorModal from "../../../components/ui/modals/ErrorModal";
 
@@ -35,7 +36,7 @@ export default function DevDatabase() {
   });
 
   // Lista de todas las tablas en tu base de datos
-  const tables = ["perfiles", "informacion_perfil", "permisos"];
+  const tables = Object.keys(mySchema.tables);
 
   // Cargar registros cuando se cambia de tabla
   useEffect(() => {

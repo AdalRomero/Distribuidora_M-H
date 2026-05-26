@@ -3,6 +3,7 @@ import { X, Calendar, DollarSign, Edit3 } from 'lucide-react';
 import { database } from '../../../src/services/DB/indexBD';
 import { syncApp } from '../../../src/sync';
 import LoteModel from '../../../src/services/DB/models/catalogo/lote';
+import { useAuth } from '../../../src/context/AuthContext';
 
 import * as Crypto from 'expo-crypto';
 
@@ -13,6 +14,7 @@ interface EditLoteProps {
 }
 
 export default function EditLote({ isOpen, onClose, lote }: EditLoteProps) {
+    const { userId } = useAuth();
     const [identificadorLote, setIdentificadorLote] = useState("");
     const [costoAdquisicion, setCostoAdquisicion] = useState("");
     const [cantidad, setCantidad] = useState("");
@@ -89,7 +91,7 @@ export default function EditLote({ isOpen, onClose, lote }: EditLoteProps) {
                         m.lote.id = lote.id;
                         m.tipo = oldCantidad !== newCantidad ? 'AJUSTE_ABSOLUTO' : 'AJUSTE_EDICION'; // AJUSTE_EDICION para trazar cambios de costo
                         m.cantidad = newCantidad;
-                        m.usuarioId = 'Local-App'; 
+                        m.usuarioId = userId || '00000000-0000-0000-0000-000000000000'; 
                     });
                 }
 

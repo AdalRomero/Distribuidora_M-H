@@ -185,7 +185,7 @@ function AddEntryInner({
       }
       setIsSaving(true);
 
-      const uId = userId || "system";
+      const uId = userId || "00000000-0000-0000-0000-000000000000";
       const devId = getDeviceId();
       const qtyNum = parseInt(cantidad, 10) || 0;
       const costoNum = parseFloat(costo) || 0;

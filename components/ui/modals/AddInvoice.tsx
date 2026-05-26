@@ -753,7 +753,7 @@ export default function AddInvoice({
     try {
       const folioCompleto = `${form.serie}-${form.folio}`;
       const devId = getDeviceId();
-      const uId = userId || "system";
+      const uId = userId || "00000000-0000-0000-0000-000000000000";
       const lotesModificados: string[] = [];
 
       await database.write(async () => {

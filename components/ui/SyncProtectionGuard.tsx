@@ -68,10 +68,17 @@ export default function SyncProtectionGuard() {
     setLoading(true);
     setErrorMsg(null);
     try {
-      // 1. Reseteamos la base de datos local de forma segura
-      await database.write(async () => {
-        await database.unsafeResetDatabase();
-      });
+      // En web (LokiJS), database.write() + unsafeResetDatabase() tiene un bug conocido
+      // donde isWriterRunning puede ser false. Accedemos directamente al adapter.
+      const adapter = (database.adapter as any);
+      if (typeof adapter.unsafeResetDatabase === 'function') {
+        await adapter.unsafeResetDatabase();
+      } else if (adapter._adapter && typeof adapter._adapter.unsafeResetDatabase === 'function') {
+        await adapter._adapter.unsafeResetDatabase();
+      }
+      // Limpiar caché de colecciones manualmente
+      const cols = (database as any).collections?.map;
+      if (cols) Object.values(cols).forEach((col: any) => col._cache?.unsafeClear?.());
 
       // 2. Limpiamos las banderas de bloqueo e incidencias antiguas locales
       localStorage.removeItem("sync_blocked_reason");
