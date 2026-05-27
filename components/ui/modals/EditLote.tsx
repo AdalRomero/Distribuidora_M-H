@@ -86,11 +86,13 @@ export default function EditLote({ isOpen, onClose, lote }: EditLoteProps) {
 
                     await database.collections.get('movimientos_inventario').create((m: any) => {
                         m._raw.id = Crypto.randomUUID();
-                        m.almacen.id = almacenId;
-                        m.producto.id = lote.producto.id;
-                        m.lote.id = lote.id;
-                        m.tipo = oldCantidad !== newCantidad ? 'AJUSTE_ABSOLUTO' : 'AJUSTE_EDICION'; // AJUSTE_EDICION para trazar cambios de costo
+                        m._raw.almacen_id = almacenId;
+                        m._raw.producto_id = (lote as any)._raw.producto_id;
+                        m._raw.lote_id = lote.id;
+                        m.tipo = oldCantidad !== newCantidad ? 'AJUSTE_ABSOLUTO' : 'AJUSTE_EDICION';
                         m.cantidad = newCantidad;
+                        m.cantidadAnterior = oldCantidad;
+                        m.cantidadPosterior = newCantidad;
                         m.usuarioId = userId || '00000000-0000-0000-0000-000000000000'; 
                     });
                 }

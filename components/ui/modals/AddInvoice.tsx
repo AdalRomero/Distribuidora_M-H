@@ -881,7 +881,7 @@ export default function AddInvoice({
               const nuevaCantidadLote = cantidadAnterior - qtyToDeduct;
               const versionAnterior = lote.version || 1;
 
-              // Solo registrar movimiento — recalcularStockLote actualiza la cantidad
+              // Registrar movimiento de salida
               const nuevoMovimientoId = Crypto.randomUUID();
               await movsCollection.create((mov: any) => {
                 mov._raw.id = nuevoMovimientoId;
@@ -897,6 +897,7 @@ export default function AddInvoice({
                 mov.deviceId = devId;
                 mov._raw.documento_id = docId;
               });
+
 
               // Audit Lote Update removed as recalculation handles it
               // Audit Movimiento Creation
