@@ -460,7 +460,7 @@ export default function Home() {
                             Tendencia de Ventas
                         </h3>
                         {stats.salesTrend.length > 0 ? (
-                            <div className="h-64 md:h-72">
+                            <div className="h-64 md:h-72" style={{ minHeight: 256, minWidth: 0 }}>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={stats.salesTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -500,7 +500,7 @@ export default function Home() {
                             <span className="w-2.5 h-2.5 rounded-full bg-[#ccb9b2]" />
                             Desglose por Moneda
                         </h3>
-                        <div className="flex-1 flex flex-col items-center justify-center relative mt-3">
+                        <div className="flex-1 flex flex-col items-center justify-center relative mt-3" style={{ minHeight: 200, minWidth: 0 }}>
                             {stats.currencyBreakdown.reduce((sum, c) => sum + c.value, 0) > 0 ? (
                                 <>
                                     <ResponsiveContainer width="100%" height={200}>

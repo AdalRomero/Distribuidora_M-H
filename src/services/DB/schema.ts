@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from "@nozbe/watermelondb";
 
 export const mySchema = appSchema({
-  version: 40,
+  version: 41,
   tables: [
     // ==================
     // 1. USUARIOS Y PERMISOS
@@ -337,6 +337,15 @@ export const mySchema = appSchema({
         { name: "subtotal", type: "number" },
         { name: "total_impuestos", type: "number" },
         { name: "total", type: "number" },
+        { name: "agente", type: "string", isOptional: true },
+        { name: "observaciones", type: "string", isOptional: true },
+        { name: "cfdi_relacionado", type: "string", isOptional: true },
+        { name: "tipo_relacion", type: "string", isOptional: true },
+        { name: "uso_cfdi", type: "string", isOptional: true },
+        { name: "metodo_pago", type: "string", isOptional: true },
+        { name: "forma_pago", type: "string", isOptional: true },
+        { name: "moneda", type: "string", isOptional: true },
+        { name: "lugar_expedicion", type: "string", isOptional: true },
         { name: "_version", type: "number" },
         { name: "deleted", type: "boolean", isOptional: true },
         { name: "status", type: "string", isOptional: true },

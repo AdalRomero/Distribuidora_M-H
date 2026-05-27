@@ -4,11 +4,12 @@ import {
   Database,
   FlaskConical,
   MonitorCog,
+  Save,
   ShieldCheck,
   Terminal,
   Wrench,
 } from "lucide-react";
-import React from "react";
+import React, { useState } from "react";
 
 interface DevToolCard {
   id: string;
@@ -79,6 +80,8 @@ const devTools: DevToolCard[] = [
 ];
 
 export default function DevPanel() {
+  const [showBackupModal, setShowBackupModal] = useState(false);
+
   return (
     <div className="min-h-screen bg-gray-950 p-8">
       {/* Header */}
@@ -124,6 +127,50 @@ export default function DevPanel() {
           </Link>
         ))}
       </div>
+
+      {/* Botón de Backups */}
+      <div className="grid grid-cols-1 mt-5 max-w-5xl">
+        <button
+          onClick={() => setShowBackupModal(true)}
+          className="group relative flex flex-col gap-4 p-6 rounded-2xl bg-gray-900 border border-gray-800 hover:border-gray-700 transition-all duration-200 cursor-pointer hover:shadow-xl hover:shadow-black/30 hover:-translate-y-0.5 text-left w-full sm:w-1/2 lg:w-1/3"
+        >
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center text-white shadow-lg transition-transform duration-200 group-hover:scale-110">
+            <Save size={28} />
+          </div>
+
+          <div>
+            <h3 className="text-white font-semibold text-lg mb-1">
+              Backups
+            </h3>
+            <p className="text-slate-400 text-sm leading-relaxed">
+              Generar copia de seguridad de la base de datos local.
+            </p>
+          </div>
+
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+        </button>
+      </div>
+
+      {/* Modal de Backup (Temporal) */}
+      {showBackupModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mb-4">
+              <ShieldCheck size={32} className="text-emerald-500" />
+            </div>
+            <h2 className="text-xl font-bold text-white mb-2">Backup Generado</h2>
+            <p className="text-slate-400 mb-6">
+              La copia de seguridad se ha generado correctamente.
+            </p>
+            <button
+              onClick={() => setShowBackupModal(false)}
+              className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-medium transition-colors"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

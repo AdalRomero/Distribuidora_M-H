@@ -11,8 +11,8 @@ import { Q } from '@nozbe/watermelondb';
 
 interface Partida { id: string; producto: string; cantidad: number; precioUnitario: number; descuentoAplicado: number; }
 interface Invoice {
-    id: string; folio: string; tipoDocumento: 'Factura' | 'Prefactura/Cotización' | 'Nota de Devolución' | 'Nota de Crédito';
-    cliente: string; versionCFDI: string; estado: 'Timbrada/Pagada' | 'En espera (Standby)' | 'Cancelada' | 'Generada'; total: number; partidas: Partida[];
+    id: string; folio: string; tipoDocumento: 'Factura' | 'Prefactura' | 'Cotización' | 'Nota de Devolución' | 'Nota de Crédito';
+    cliente: string; versionCFDI: string; estado: 'Timbrada/Pagada' | 'En espera (Standby)' | 'Cancelada' | 'Generada' | 'Pendiente Timbrado' | 'Presupuesto'; total: number; partidas: Partida[];
 }
 
 export default function Invoices() {
@@ -53,31 +53,35 @@ export default function Invoices() {
                     }
                 } catch { /* cliente no encontrado */ }
 
-                // Mapear tipo
+                // Mapear tipo (doc.tipo se almacena en UPPERCASE)
+                const tipoRaw = (doc.tipo || 'factura').toLowerCase();
                 const tipoMap: Record<string, Invoice['tipoDocumento']> = {
                     'factura': 'Factura',
-                    'prefactura': 'Prefactura/Cotización',
-                    'cotizacion': 'Prefactura/Cotización',
+                    'prefactura': 'Prefactura',
+                    'cotizacion': 'Cotización',
                     'nota_devolucion': 'Nota de Devolución',
                     'nota_credito': 'Nota de Crédito',
                 };
 
                 // Mapear estado
+                const estadoRaw = (doc.estado || 'generada').toLowerCase();
                 const estadoMap: Record<string, Invoice['estado']> = {
                     'generada': 'Generada',
                     'timbrada': 'Timbrada/Pagada',
                     'pagada': 'Timbrada/Pagada',
                     'cancelada': 'Cancelada',
                     'standby': 'En espera (Standby)',
+                    'pendiente_timbrado': 'Pendiente Timbrado',
+                    'presupuesto': 'Presupuesto',
                 };
 
                 return {
                     id: doc.id,
                     folio: doc.folio || 'SIN-FOLIO',
-                    tipoDocumento: tipoMap[doc.tipo] || 'Factura',
+                    tipoDocumento: tipoMap[tipoRaw] || 'Factura',
                     cliente: clienteNombre,
-                    versionCFDI: doc.tipo === 'factura' ? 'CFDI v4.0' : 'N/A',
-                    estado: estadoMap[doc.estado] || 'Generada',
+                    versionCFDI: tipoRaw === 'factura' ? 'CFDI v4.0' : 'N/A',
+                    estado: estadoMap[estadoRaw] || 'Generada',
                     total: doc.total || 0,
                     partidas: detalles.map((d: any) => ({
                         id: d.id,
@@ -155,13 +159,17 @@ export default function Invoices() {
                         claveSat: '',
                     }
                 }),
-                usoCFDI: 'G03',
-                tipoComprobante: docRecord.tipo === 'factura' ? 'I' : 'I',
-                metodoPago: 'PUE',
-                formaPago: '01',
-                moneda: 'MXN',
-                lugarExpedicion: '83554',
-                tipoDocumento: action === 'convert' ? 'factura' : (docRecord.tipo || 'factura'),
+                usoCFDI: docRecord._raw.uso_cfdi || docRecord.uso_cfdi || 'G03',
+                tipoComprobante: 'I',
+                metodoPago: docRecord._raw.metodo_pago || docRecord.metodo_pago || 'PUE',
+                formaPago: docRecord._raw.forma_pago || docRecord.forma_pago || '01',
+                moneda: docRecord._raw.moneda || docRecord.moneda || 'MXN',
+                lugarExpedicion: docRecord._raw.lugar_expedicion || docRecord.lugar_expedicion || '83554',
+                agente: docRecord._raw.agente || docRecord.agente || '',
+                observaciones: docRecord._raw.observaciones || docRecord.observaciones || '',
+                cfdiRelacionado: docRecord._raw.cfdi_relacionado || docRecord.cfdi_relacionado || '',
+                tipoRelacion: docRecord._raw.tipo_relacion || docRecord.tipo_relacion || '',
+                tipoDocumento: action === 'convert' ? 'factura' : ((docRecord.tipo || 'factura').toLowerCase()),
             };
 
             setRecoverData(recData);
@@ -231,7 +239,8 @@ export default function Invoices() {
     const getTipoDocumentoBadge = (tipo: string) => {
         switch (tipo) {
             case 'Factura': return 'bg-blue-50 dark:bg-blue-900/30 text-mh-blue dark:text-blue-400 border-blue-100 dark:border-blue-800/50';
-            case 'Prefactura/Cotización': return 'bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700';
+            case 'Prefactura': return 'bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border-orange-100 dark:border-orange-800/50';
+            case 'Cotización': return 'bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700';
             case 'Nota de Devolución': case 'Nota de Crédito': return 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-500 border-amber-100 dark:border-amber-800/50';
             default: return 'bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700';
         }
@@ -243,6 +252,8 @@ export default function Invoices() {
             case 'En espera (Standby)': return 'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700';
             case 'Cancelada': return 'bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/50';
             case 'Generada': return 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800/50';
+            case 'Pendiente Timbrado': return 'bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800/50';
+            case 'Presupuesto': return 'bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 border-violet-200 dark:border-violet-800/50';
             default: return 'bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700';
         }
     };
@@ -276,11 +287,11 @@ export default function Invoices() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                         <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
                             <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-mh-blue dark:text-blue-500"><TrendingUp className="w-6 h-6" /></div>
-                            <div><p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Facturado</p><p className="text-xl font-bold text-mh-blue-dark dark:text-white">{formatCurrency(invoices.filter(i => i.total > 0).reduce((s, i) => s + i.total, 0))}</p></div>
+                            <div><p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Facturado</p><p className="text-xl font-bold text-mh-blue-dark dark:text-white">{formatCurrency(invoices.filter(i => i.total > 0 && i.tipoDocumento === 'Factura').reduce((s, i) => s + i.total, 0))}</p></div>
                         </div>
                         <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
                             <div className="w-12 h-12 rounded-xl bg-slate-50 dark:bg-slate-900 flex items-center justify-center text-slate-500 dark:text-slate-400"><Clock className="w-6 h-6" /></div>
-                            <div><p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Documentos Generados</p><p className="text-xl font-bold text-mh-blue-dark dark:text-white">{invoices.filter(i => i.estado === 'Generada').length}</p></div>
+                            <div><p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Facturas Generadas</p><p className="text-xl font-bold text-mh-blue-dark dark:text-white">{invoices.filter(i => i.tipoDocumento === 'Factura' && (i.estado === 'Generada' || i.estado === 'Timbrada/Pagada')).length}</p></div>
                         </div>
                         <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
                             <div className="w-12 h-12 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-500"><FileMinus className="w-6 h-6" /></div>
@@ -288,7 +299,7 @@ export default function Invoices() {
                         </div>
                         <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4">
                             <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-500"><FileCheck className="w-6 h-6" /></div>
-                            <div><p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Documentos</p><p className="text-xl font-bold text-mh-blue-dark dark:text-white">{invoices.length}</p></div>
+                            <div><p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Contabilizable</p><p className="text-xl font-bold text-mh-blue-dark dark:text-white">{invoices.filter(i => i.tipoDocumento === 'Factura' || i.tipoDocumento === 'Nota de Crédito' || i.tipoDocumento === 'Nota de Devolución').length}</p></div>
                         </div>
                     </div>
 
@@ -353,7 +364,7 @@ export default function Invoices() {
                                                         <button onClick={() => openInvoiceModal(inv.id, 'view')} className="p-1.5 text-slate-400 hover:text-mh-blue hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-mh-blue/20" title="Ver Detalle"><Eye className="w-4 h-4" /></button>
                                                         <button onClick={() => openInvoiceModal(inv.id, 'pdf')} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-200" title="Descargar PDF"><FileText className="w-4 h-4" /></button>
                                                         <button onClick={() => openInvoiceModal(inv.id, 'xml')} className="p-1.5 text-slate-400 hover:text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:bg-indigo-500/10 rounded-lg transition-colors border border-transparent hover:border-indigo-200" title="Descargar XML"><FileCode className="w-4 h-4" /></button>
-                                                        {inv.tipoDocumento === 'Prefactura/Cotización' && (
+                                                        {(inv.tipoDocumento === 'Prefactura' || inv.tipoDocumento === 'Cotización') && (
                                                             <button onClick={() => openInvoiceModal(inv.id, 'convert')} className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors border border-transparent hover:border-emerald-200" title="Convertir a Factura"><RefreshCw className="w-4 h-4" /></button>
                                                         )}
                                                     </div>

@@ -25,7 +25,7 @@ import {
   X
 } from "lucide-react";
 import React, { useState } from "react";
-import { Alert, Platform } from "react-native";
+import { Platform } from "react-native";
 import { supabase } from "../../../src/services/api/supabaseClient";
 import { database } from "../../../src/services/DB/indexBD";
 import FamiliaModel from "../../../src/services/DB/models/bases/familia";
@@ -89,6 +89,7 @@ function AddInventoryInner({
   const [isUploading, setIsUploading] = useState(false);
   const [selectedIcon, setSelectedIcon] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showImageSourceModal, setShowImageSourceModal] = useState(false);
 
   React.useEffect(() => {
     if (isOpen && recoverData?.data) {
@@ -224,18 +225,12 @@ function AddInventoryInner({
 
   const chooseImageSource = () => {
     if (Platform.OS === "web") {
-      pickImage("gallery");
+      // On web, show a custom modal instead of Alert.alert (which passes onPress to DOM elements)
+      setShowImageSourceModal(true);
       return;
     }
-    Alert.alert(
-      "Seleccionar Imagen",
-      "Elige de dónde quieres obtener la imagen",
-      [
-        { text: "Cámara", onPress: () => pickImage("camera") },
-        { text: "Galería", onPress: () => pickImage("gallery") },
-        { text: "Cancelar", style: "cancel" },
-      ],
-    );
+    // On native, we could use Alert.alert, but since this is a web-first app we use the modal everywhere
+    setShowImageSourceModal(true);
   };
 
   const pickImage = async (source: "camera" | "gallery") => {
@@ -972,6 +967,55 @@ function AddInventoryInner({
           </button>
         </div>
       </div>
+
+      {/* Image Source Selection Modal (replaces Alert.alert to avoid onPress on DOM) */}
+      {showImageSourceModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setShowImageSourceModal(false)}
+          />
+          <div className="relative z-10 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-xs flex flex-col gap-4">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-white text-center">
+              Seleccionar Imagen
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 text-center">
+              Elige de dónde quieres obtener la imagen
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowImageSourceModal(false);
+                  pickImage("camera");
+                }}
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-sm transition-colors"
+              >
+                <Camera className="w-4 h-4" />
+                Cámara
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowImageSourceModal(false);
+                  pickImage("gallery");
+                }}
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-medium text-sm transition-colors"
+              >
+                <ImagesIcon className="w-4 h-4" />
+                Galería
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowImageSourceModal(false)}
+                className="w-full py-2.5 px-4 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-xl font-medium text-sm transition-colors hover:bg-slate-100 dark:hover:bg-slate-700"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

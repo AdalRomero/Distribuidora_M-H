@@ -8,6 +8,7 @@ import {
   Loader2,
   Plus,
   Printer,
+  Save,
   Search,
   ShoppingCart,
   Trash2,
@@ -707,7 +708,7 @@ export default function AddInvoice({
   // ==========================================
   // GENERAR FACTURA: Guardar en DB + PDF
   // ==========================================
-  const handleGenerateInvoice = async () => {
+  const handleGenerateInvoice = async (downloadAfterSave = false) => {
     setSaveError(null);
     setSaveSuccess(false);
 
@@ -761,6 +762,8 @@ export default function AddInvoice({
       const opIdPdf = Crypto.randomUUID();
       const opIdXml = Crypto.randomUUID();
 
+      const documentState = form.tipoDocumento === "prefactura" ? "pendiente_timbrado" : form.tipoDocumento === "cotizacion" ? "presupuesto" : "generada";
+
       await database.write(async () => {
         // 1. Crear documento principal
         const docsCollection = database.collections.get("documentos");
@@ -772,8 +775,8 @@ export default function AddInvoice({
           doc._raw.tipo = form.tipoDocumento.toUpperCase();
           doc.folio = folioCompleto;
           doc._raw.folio = folioCompleto;
-          doc.estado = "generada";
-          doc._raw.estado = "generada";
+          doc.estado = documentState;
+          doc._raw.estado = documentState;
           doc.subtotal = totalSubtotal;
           doc._raw.subtotal = totalSubtotal;
           doc.total_impuestos = totalImpuestos;
@@ -943,7 +946,7 @@ export default function AddInvoice({
             cliente_id: form.clienteId || "publico_general",
             tipo: form.tipoDocumento.toUpperCase(),
             folio: folioCompleto,
-            estado: "generada",
+            estado: documentState,
             total: totalFinal,
           },
           inWriteBlock: true,
@@ -964,18 +967,20 @@ export default function AddInvoice({
           op._raw.metadata_json = JSON.stringify({ status: "pending", retryCount: 0 });
         });
 
-        await operacionesCollection.create((op: any) => {
-          op._raw.id = opIdXml;
-          op._raw.documento_id = docId;
-          op.tipoOperacion = "generacion_xml";
-          op._raw.tipo_operacion = "generacion_xml";
-          op.usuarioId = uId;
-          op._raw.usuario_id = uId;
-          op.deviceId = devId;
-          op._raw.device_id = devId;
-          op.metadataJson = JSON.stringify({ status: "pending", retryCount: 0 });
-          op._raw.metadata_json = JSON.stringify({ status: "pending", retryCount: 0 });
-        });
+        if (form.tipoDocumento !== "cotizacion") {
+          await operacionesCollection.create((op: any) => {
+            op._raw.id = opIdXml;
+            op._raw.documento_id = docId;
+            op.tipoOperacion = "generacion_xml";
+            op._raw.tipo_operacion = "generacion_xml";
+            op.usuarioId = uId;
+            op._raw.usuario_id = uId;
+            op.deviceId = devId;
+            op._raw.device_id = devId;
+            op.metadataJson = JSON.stringify({ status: "pending", retryCount: 0 });
+            op._raw.metadata_json = JSON.stringify({ status: "pending", retryCount: 0 });
+          });
+        }
 
       });
 
@@ -987,38 +992,48 @@ export default function AddInvoice({
       // 5. Generar y Subir PDF / XML a Storage
       try {
         const pdfBlob = await handleDownloadPDF(true) as Blob;
-        const xmlBlob = handleDownloadXML(true) as Blob;
+        let xmlBlob: Blob | null = null;
+        if (form.tipoDocumento !== "cotizacion") {
+          xmlBlob = handleDownloadXML(true) as Blob;
+        }
 
-        if (pdfBlob && xmlBlob) {
+        if (pdfBlob && (xmlBlob || form.tipoDocumento === "cotizacion")) {
           const tipoStr = form.tipoDocumento === "factura" ? "Factura" : form.tipoDocumento === "prefactura" ? "Prefactura" : "Cotizacion";
           const folioName = `${tipoStr}_${form.serie}-${form.folio}_${form.nombre.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30)}`;
 
-          // LOCAL DOWNLOAD FIRST (Offline Support)
-          try {
-            const pdfObjectUrl = URL.createObjectURL(pdfBlob);
-            const aPdf = document.createElement("a");
-            aPdf.href = pdfObjectUrl;
-            aPdf.download = `${folioName}.pdf`;
-            document.body.appendChild(aPdf);
-            aPdf.click();
-            document.body.removeChild(aPdf);
-            URL.revokeObjectURL(pdfObjectUrl);
+          // LOCAL DOWNLOAD (only when user clicks "Guardar y Descargar")
+          if (downloadAfterSave) {
+            try {
+              const pdfObjectUrl = URL.createObjectURL(pdfBlob);
+              const aPdf = document.createElement("a");
+              aPdf.href = pdfObjectUrl;
+              aPdf.download = `${folioName}.pdf`;
+              document.body.appendChild(aPdf);
+              aPdf.click();
+              document.body.removeChild(aPdf);
+              URL.revokeObjectURL(pdfObjectUrl);
 
-            const xmlObjectUrl = URL.createObjectURL(xmlBlob);
-            const aXml = document.createElement("a");
-            aXml.href = xmlObjectUrl;
-            aXml.download = `${folioName}.xml`;
-            document.body.appendChild(aXml);
-            aXml.click();
-            document.body.removeChild(aXml);
-            URL.revokeObjectURL(xmlObjectUrl);
-          } catch (dlErr) {
-            console.error("Error descargando archivos locales:", dlErr);
+              if (form.tipoDocumento !== "cotizacion" && xmlBlob) {
+                const xmlObjectUrl = URL.createObjectURL(xmlBlob);
+                const aXml = document.createElement("a");
+                aXml.href = xmlObjectUrl;
+                aXml.download = `${folioName}.xml`;
+                document.body.appendChild(aXml);
+                aXml.click();
+                document.body.removeChild(aXml);
+                URL.revokeObjectURL(xmlObjectUrl);
+              }
+            } catch (dlErr) {
+              console.error("Error descargando archivos locales:", dlErr);
+            }
           }
 
           // THEN UPLOAD (Might fail if offline)
           const pdfUrl = await uploadFile(pdfBlob, "invoices", `${docId}/${folioName}.pdf`, "application/pdf");
-          const xmlUrl = await uploadFile(xmlBlob, "invoices", `${docId}/${folioName}.xml`, "application/xml");
+          let xmlUrl = "";
+          if (form.tipoDocumento !== "cotizacion" && xmlBlob) {
+            xmlUrl = await uploadFile(xmlBlob, "invoices", `${docId}/${folioName}.xml`, "application/xml");
+          }
 
           // Update operaciones_documento status to completed
           await database.write(async () => {
@@ -1031,12 +1046,14 @@ export default function AddInvoice({
               op._raw.metadata_json = JSON.stringify(meta);
             });
 
-            const opXml = await operacionesCollection.find(opIdXml);
-            await opXml.update((op: any) => {
-              const meta = { status: "completed", url: xmlUrl, retryCount: 0 };
-              op.metadataJson = JSON.stringify(meta);
-              op._raw.metadata_json = JSON.stringify(meta);
-            });
+            if (form.tipoDocumento !== "cotizacion") {
+              const opXml = await operacionesCollection.find(opIdXml);
+              await opXml.update((op: any) => {
+                const meta = { status: "completed", url: xmlUrl, retryCount: 0 };
+                op.metadataJson = JSON.stringify(meta);
+                op._raw.metadata_json = JSON.stringify(meta);
+              });
+            }
           });
         }
       } catch (uploadErr) {
@@ -2767,19 +2784,34 @@ export default function AddInvoice({
                         Siguiente (Vista Previa)
                       </button>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={handleGenerateInvoice}
-                        disabled={isSaving}
-                        className={`flex items-center gap-2 px-6 py-2 rounded-xl text-white text-sm font-bold transition-all active:scale-95 shadow-md shadow-blue-500/20 ${isSaving ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`}
-                      >
-                        {isSaving ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Printer className="w-4 h-4" />
-                        )}
-                        {isSaving ? "Guardando..." : form.tipoDocumento === "factura" ? "Generar Factura" : form.tipoDocumento === "prefactura" ? "Generar Prefactura" : "Generar Cotización"}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleGenerateInvoice(false)}
+                          disabled={isSaving}
+                          className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-sm ${isSaving ? "bg-slate-300 dark:bg-slate-600 cursor-not-allowed text-slate-500" : "bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600"}`}
+                        >
+                          {isSaving ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Save className="w-4 h-4" />
+                          )}
+                          {isSaving ? "Guardando..." : "Guardar"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleGenerateInvoice(true)}
+                          disabled={isSaving}
+                          className={`flex items-center gap-2 px-5 py-2 rounded-xl text-white text-sm font-bold transition-all active:scale-95 shadow-md shadow-blue-500/20 ${isSaving ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`}
+                        >
+                          {isSaving ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Printer className="w-4 h-4" />
+                          )}
+                          {isSaving ? "Guardando..." : "Guardar y Descargar"}
+                        </button>
+                      </div>
                     )}
                   </>
                 )}
