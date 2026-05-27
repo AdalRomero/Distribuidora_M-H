@@ -10,11 +10,12 @@ export interface LogAuditParams {
   camposChanged?: string[];
   valoresAnteriores?: Record<string, any>;
   valoresNuevos?: Record<string, any>;
+  inWriteBlock?: boolean;
 }
 
 export async function logAudit(params: LogAuditParams) {
   try {
-    await database.write(async () => {
+    const createEntry = async () => {
       await database.get("audit_log").create((entry: any) => {
         entry.tabla = params.tabla;
         entry.registroId = params.registroId;
@@ -31,7 +32,15 @@ export async function logAudit(params: LogAuditParams) {
           ? JSON.stringify(params.valoresNuevos)
           : null;
       });
-    });
+    };
+
+    if (params.inWriteBlock) {
+      await createEntry();
+    } else {
+      await database.write(async () => {
+        await createEntry();
+      });
+    }
   } catch (error) {
     console.error("Error creating audit log entry:", error);
   }

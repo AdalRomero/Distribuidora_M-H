@@ -1,3 +1,4 @@
+import { Q } from "@nozbe/watermelondb";
 import { AlertTriangle, ArrowRightLeft, Calculator, Loader2, Search, X, Plus, Trash2, Users, Tag, Box, Globe } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { usePagination } from "../../../src/hooks/usePagination";
@@ -104,7 +105,7 @@ export default function AddPrices({
         setLoadingOptions(true);
         try {
             const clientesDb = database.collections.get("clientes");
-            const allClientes = await clientesDb.query().fetch();
+            const allClientes = await clientesDb.query(Q.where("estado", true)).fetch();
             setClientes(
                 allClientes.map((c: any) => ({
                     id: c.id,
@@ -114,8 +115,8 @@ export default function AddPrices({
             // Build map: clientId -> listName (only for clients that have a list)
             const map = new Map<string, string>();
             allClientes.forEach((c: any) => {
-                if (c.lista_precio_base?.trim()) {
-                    map.set(c.id, c.lista_precio_base.trim());
+                if (c.listaPrecioBase?.trim()) {
+                    map.set(c.id, c.listaPrecioBase.trim());
                 }
             });
             setClientListMap(map);

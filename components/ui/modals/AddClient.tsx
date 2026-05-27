@@ -238,7 +238,7 @@ export default function AddClient({
       setCategorias(allCats.map((c: any) => ({ id: c.id, nombre: c.nombre })));
 
       const plantillasDb = database.collections.get("plantillas_precios");
-      const allPlantillas = await plantillasDb.query().fetch();
+      const allPlantillas = await plantillasDb.query(Q.where("estado", true)).fetch();
       const loadedLists = allPlantillas.map((p: any) => p.nombre);
 
       if (editData && editData.listaPrecios && editData.listaPrecios !== "lista" && editData.listaPrecios !== "" && !loadedLists.includes(editData.listaPrecios)) {
@@ -319,6 +319,7 @@ export default function AddClient({
         await plantillasDb.create((p: any) => {
           p._raw.id = Crypto.randomUUID();
           p.nombre = name;
+          p.estado = true;
         });
       });
       setCustomPriceLists((prev) => [...prev, name]);
@@ -464,6 +465,28 @@ export default function AddClient({
       return;
     }
 
+    // Validar reglas vacías antes de guardar
+    if (isCustomList) {
+      const reglasInvalidas = form.discountRules.filter(
+        (r) => r.type !== 'global' && !r.targetId
+      );
+      if (reglasInvalidas.length > 0) {
+        setErrorModal({
+          isOpen: true,
+          title: "Reglas incompletas",
+          message: `Hay ${reglasInvalidas.length} regla(s) sin producto o familia seleccionada. Completa o elimina esas reglas antes de guardar.`,
+        });
+        return;
+      }
+      // Filtrar reglas con porcentaje 0 y targetId vacío automáticamente
+      setForm(prev => ({
+        ...prev,
+        discountRules: prev.discountRules.filter(
+          (r) => r.type === 'global' || r.targetId
+        )
+      }));
+    }
+
     let currentForm = { ...form };
 
     if (isCustomList) {
@@ -479,13 +502,15 @@ export default function AddClient({
 
                 if (existing.length > 0) {
                     plantillaRecord = existing[0];
-                    // Limpiar reglas anteriores para reemplazarlas
+                    // Reactivar si estaba desactivada y limpiar reglas anteriores
+                    await (existing[0] as any).update((p: any) => { p.estado = true; });
                     const oldRules = await reglasDb.query(Q.where('plantilla_id', plantillaRecord.id)).fetch();
                     for (const or of oldRules) await or.markAsDeleted();
                 } else {
                     plantillaRecord = await plantillasDb.create((p: any) => {
                         p._raw.id = Crypto.randomUUID();
                         p.nombre = autoName;
+                        p.estado = true;
                     });
                 }
 
@@ -824,24 +849,16 @@ export default function AddClient({
                           Lista de Precios Asignada
                         </label>
                         {!isAddingPriceList ? (
-                          <select
-                            name="listaPrecios"
+                          <SearchableSelect
+                            options={[
+                              { id: 'lista', label: 'Precio Lista (Base)' },
+                              ...customPriceLists.map(list => ({ id: list, label: list }))
+                            ]}
                             value={form.listaPrecios}
-                            onChange={(e) => {
-                              handlePriceListChange(e.target.value);
-                            }}
-                            className={inputClass}
-                          >
-                            <option value="" disabled hidden>
-                              Selecciona lista de precios
-                            </option>
-                            <option value="lista">Precio Lista (Base)</option>
-                            {customPriceLists.map((list) => (
-                              <option key={list} value={list}>
-                                {list}
-                              </option>
-                            ))}
-                          </select>
+                            onChange={(val) => handlePriceListChange(val)}
+                            placeholder="Selecciona lista de precios"
+                            searchPlaceholder="Buscar lista..."
+                          />
                         ) : (
                           <div className="flex flex-col gap-3 p-4 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/50 rounded-xl">
                             <div className="flex items-center justify-between mb-1">

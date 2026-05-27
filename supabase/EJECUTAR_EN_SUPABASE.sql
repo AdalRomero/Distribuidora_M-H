@@ -53,7 +53,10 @@ CREATE POLICY "contactos_insert" ON public.contactos FOR INSERT TO authenticated
 CREATE POLICY "contactos_update" ON public.contactos FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "contactos_delete" ON public.contactos FOR DELETE TO authenticated USING (true);
 
--- PASO 4: Ejecutar ahora el dynamic_rpc_creator.sql (ver archivo)
+-- PASO 4: Cambiar limite de longitud de lista_precio_base
+ALTER TABLE public.clientes ALTER COLUMN lista_precio_base TYPE text;
+
+-- PASO 5: Ejecutar ahora el dynamic_rpc_creator.sql (ver archivo)
 -- El script regenera pull_changes y push_changes con SECURITY DEFINER
 -- y manejo correcto de enums, fechas y tipos de ID.
 

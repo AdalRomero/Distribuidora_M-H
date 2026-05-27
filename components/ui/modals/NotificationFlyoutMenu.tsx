@@ -306,7 +306,7 @@ export default function NotificationFlyoutMenu() {
         }
 
         await database.write(async () => {
-          await record.destroyPermanently();
+          await record.markAsDeleted();
         });
       }
     setItems((prev) => prev.filter((n) => n.id !== id));

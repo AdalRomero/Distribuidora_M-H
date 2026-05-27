@@ -1,29 +1,30 @@
 import { Q } from "@nozbe/watermelondb";
 import * as Crypto from "expo-crypto";
 import {
-    AlertCircle,
-    Check,
-    ChevronDown,
-    FileText,
-    Loader2,
-    Plus,
-    Printer,
-    Search,
-    ShoppingCart,
-    Trash2,
-    User,
-    X,
+  AlertCircle,
+  Check,
+  ChevronDown,
+  FileText,
+  Loader2,
+  Plus,
+  Printer,
+  Search,
+  ShoppingCart,
+  Trash2,
+  User,
+  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { LOGO_MH_B64 } from "../../../constants/logo_base64";
 import { useAuth } from "../../../src/context/AuthContext";
 import { database } from "../../../src/services/DB/indexBD";
-import ErrorModal from "./ErrorModal";
+import { uploadFile } from "../../../src/services/api/supabaseClient";
 import { getDeviceId } from "../../../src/services/device";
-import { logAudit } from "../../../src/utils/auditHelper";
 import { recalcularStockLote } from "../../../src/services/inventoryService";
+import { logAudit } from "../../../src/utils/auditHelper";
+import ErrorModal from "./ErrorModal";
 import {
-    InvoiceLayoutFlow
+  InvoiceLayoutFlow
 } from "./InvoiceBlockRenderer";
 import { LotSelectionModal } from "./LotSelectionModal";
 
@@ -333,13 +334,13 @@ export default function AddInvoice({
   const [impuestos, setImpuestos] = useState<Impuesto[]>([]);
   const [lotesState, setLotesState] = useState<any[]>([]);
   const [modalLotesConceptoId, setModalLotesConceptoId] = useState<string | null>(null);
-  
+
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [invoiceLayout, setInvoiceLayout] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [errorModal, setErrorModal] = useState<{isOpen: boolean, title: string, message: string}>({isOpen: false, title: '', message: ''});
+  const [errorModal, setErrorModal] = useState<{ isOpen: boolean, title: string, message: string }>({ isOpen: false, title: '', message: '' });
 
   // ==========================================
   // CARGAR DATOS AL ABRIR
@@ -412,8 +413,8 @@ export default function AddInvoice({
         stockMap[pid] = (stockMap[pid] || 0) + qty;
         return {
           id: lote.id,
-          codigo_lote: lote.codigo_lote,
-          fecha_caducidad: lote.fecha_caducidad,
+          codigo_lote: lote.identificadorLote || lote._raw.identificador_lote || "S/N",
+          fecha_caducidad: lote.fechaCaducidad || lote._raw.fecha_caducidad || null,
           cantidad: qty,
           producto_id: pid
         };
@@ -531,16 +532,16 @@ export default function AddInvoice({
         clienteId: recoverData.clienteId || "",
         conceptos: recoverData.conceptos?.length
           ? recoverData.conceptos.map((c: any) => ({
-              id: Math.random().toString(36).slice(2),
-              cantidad: c.cantidad ? String(c.cantidad) : "",
-              unidadSat: c.unidadSat || "H87",
-              claveSat: c.claveSat || "",
-              concepto: c.concepto || "",
-              valorUnitario: c.valorUnitario ? String(c.valorUnitario) : "",
-              descuento: c.descuento ? String(c.descuento) : "",
-              porcImpuesto: c.porcImpuesto ? String(c.porcImpuesto) : "16",
-              productoId: c.productoId || "",
-            }))
+            id: Math.random().toString(36).slice(2),
+            cantidad: c.cantidad ? String(c.cantidad) : "",
+            unidadSat: c.unidadSat || "H87",
+            claveSat: c.claveSat || "",
+            concepto: c.concepto || "",
+            valorUnitario: c.valorUnitario ? String(c.valorUnitario) : "",
+            descuento: c.descuento ? String(c.descuento) : "",
+            porcImpuesto: c.porcImpuesto ? String(c.porcImpuesto) : "16",
+            productoId: c.productoId || "",
+          }))
           : [newConcepto()],
       });
     }
@@ -559,11 +560,11 @@ export default function AddInvoice({
     // Jerarquía 3: Plantillas
     const cp = clientesPlantillas.find(cp => cp.clienteId === clienteId);
     const plantillaActiva = cp ? plantillas.find(p => p.id === cp.plantillaId && p.estado) : null;
-    
+
     let reglaPlantillaProd = null;
     let reglaPlantillaFam = null;
     let reglaPlantillaGlobal = null;
-    
+
     if (plantillaActiva) {
       reglaPlantillaProd = reglasPlantilla.find(r => r.plantillaId === plantillaActiva.id && r.tipo === 'producto' && r.targetId === prod.id);
       reglaPlantillaFam = reglasPlantilla.find(r => r.plantillaId === plantillaActiva.id && r.tipo === 'familia' && r.targetId === prod.familiaId);
@@ -595,17 +596,17 @@ export default function AddInvoice({
 
     // Evaluación estricta de jerarquía ERP
     if (precioEsp && (precioEsp.precioFijo > 0 || precioEsp.descuentoPorcentaje > 0)) {
-        if (precioEsp.precioFijo > 0) precio = precioEsp.precioFijo;
-        if (precioEsp.descuentoPorcentaje > 0) descuentoTotal += precioEsp.descuentoPorcentaje;
+      if (precioEsp.precioFijo > 0) precio = precioEsp.precioFijo;
+      if (precioEsp.descuentoPorcentaje > 0) descuentoTotal += precioEsp.descuentoPorcentaje;
     } else if (precioEspFam && precioEspFam.descuentoPorcentaje > 0) {
-        descuentoTotal += precioEspFam.descuentoPorcentaje;
+      descuentoTotal += precioEspFam.descuentoPorcentaje;
     } else if (reglaPlantillaProd && (reglaPlantillaProd.precioFijo > 0 || reglaPlantillaProd.descuentoPorcentaje > 0)) {
-        if (reglaPlantillaProd.precioFijo > 0) precio = reglaPlantillaProd.precioFijo;
-        if (reglaPlantillaProd.descuentoPorcentaje > 0) descuentoTotal += reglaPlantillaProd.descuentoPorcentaje;
+      if (reglaPlantillaProd.precioFijo > 0) precio = reglaPlantillaProd.precioFijo;
+      if (reglaPlantillaProd.descuentoPorcentaje > 0) descuentoTotal += reglaPlantillaProd.descuentoPorcentaje;
     } else if (reglaPlantillaFam && reglaPlantillaFam.descuentoPorcentaje > 0) {
-        descuentoTotal += reglaPlantillaFam.descuentoPorcentaje;
+      descuentoTotal += reglaPlantillaFam.descuentoPorcentaje;
     } else if (reglaPlantillaGlobal && reglaPlantillaGlobal.descuentoPorcentaje > 0) {
-        descuentoTotal += reglaPlantillaGlobal.descuentoPorcentaje;
+      descuentoTotal += reglaPlantillaGlobal.descuentoPorcentaje;
     }
 
     return {
@@ -627,7 +628,7 @@ export default function AddInvoice({
     ]
       .filter(Boolean)
       .join(", ");
-      
+
     // Recalcular conceptos existentes con el nuevo cliente
     const nuevosConceptos = form.conceptos.map(c => {
       if (c.productoId && c.productoId !== "manual") {
@@ -662,14 +663,14 @@ export default function AddInvoice({
       conceptos: prev.conceptos.map((c) =>
         c.id === conceptoId
           ? {
-              ...c,
-              productoId: producto.id,
-              concepto: producto.descripcion,
-              claveSat: producto.claveSat,
-              valorUnitario: String(calc.precio),
-              descuento: calc.descuento,
-              porcImpuesto: calc.impuesto
-            }
+            ...c,
+            productoId: producto.id,
+            concepto: producto.descripcion,
+            claveSat: producto.claveSat,
+            valorUnitario: String(calc.precio),
+            descuento: calc.descuento,
+            porcImpuesto: calc.impuesto
+          }
           : c,
       ),
     }));
@@ -756,17 +757,19 @@ export default function AddInvoice({
       const uId = userId || "00000000-0000-0000-0000-000000000000";
       const lotesModificados: string[] = [];
 
-      await database.write(async () => {
-        const docId = Crypto.randomUUID();
+      const docId = Crypto.randomUUID();
+      const opIdPdf = Crypto.randomUUID();
+      const opIdXml = Crypto.randomUUID();
 
+      await database.write(async () => {
         // 1. Crear documento principal
         const docsCollection = database.collections.get("documentos");
         await docsCollection.create((doc: any) => {
           doc._raw.id = docId;
           doc._raw.cliente_id = form.clienteId || "publico_general";
           doc._raw.usuario_id = uId;
-          doc.tipo = form.tipoDocumento;
-          doc._raw.tipo = form.tipoDocumento;
+          doc.tipo = form.tipoDocumento.toUpperCase();
+          doc._raw.tipo = form.tipoDocumento.toUpperCase();
           doc.folio = folioCompleto;
           doc._raw.folio = folioCompleto;
           doc.estado = "generada";
@@ -821,14 +824,24 @@ export default function AddInvoice({
             let cantDeducir = parseFloat(concepto.cantidad);
 
             // Obtener lotes de este producto
-            const lotesProducto = await lotesCollection
+            const lotesDb = await lotesCollection
               .query(
                 Q.where("producto_id", concepto.productoId),
                 Q.where("estado", true),
               )
               .fetch();
+            
+            const lotesProducto = lotesDb.filter((l: any) => {
+              if ((l.cantidad || 0) <= 0) return false;
+              const caducidad = l.fechaCaducidad || l._raw.fecha_caducidad;
+              if (caducidad && (caducidad - Date.now() <= 0)) return false;
+              return true;
+            });
 
-            let lotesADescontar: {loteModel: any, cantidad: number}[] = [];
+            const almacenes = await database.collections.get("almacenes").query().fetch();
+            const almacenDefaultId = almacenes.length > 0 ? almacenes[0].id : "default";
+
+            let lotesADescontar: { loteModel: any, cantidad: number }[] = [];
 
             if (concepto.selectedLotes && concepto.selectedLotes.length > 0) {
               // Modo Manual
@@ -845,7 +858,7 @@ export default function AddInvoice({
                 const dateB = b.fecha_caducidad || Number.MAX_SAFE_INTEGER;
                 return dateA - dateB;
               });
-              
+
               let remaining = cantDeducir;
               for (const lote of lotesOrdenados as any[]) {
                 if (remaining <= 0) break;
@@ -865,19 +878,11 @@ export default function AddInvoice({
               const nuevaCantidadLote = cantidadAnterior - qtyToDeduct;
               const versionAnterior = lote.version || 1;
 
-              // Actualizar lote
-              await lote.update((l: any) => {
-                l.cantidad = nuevaCantidadLote;
-                l.version = versionAnterior + 1;
-                l.updatedBy = uId;
-                l.updatedDevice = devId;
-              });
-
-              // Registrar movimiento
+              // Solo registrar movimiento — recalcularStockLote actualiza la cantidad
               const nuevoMovimientoId = Crypto.randomUUID();
               await movsCollection.create((mov: any) => {
                 mov._raw.id = nuevoMovimientoId;
-                mov._raw.almacen_id = "default";
+                mov._raw.almacen_id = almacenDefaultId;
                 mov._raw.producto_id = concepto.productoId;
                 mov._raw.lote_id = lote.id;
                 mov._raw.usuario_id = uId;
@@ -890,18 +895,7 @@ export default function AddInvoice({
                 mov._raw.documento_id = docId;
               });
 
-              // Audit Lote Update
-              await logAudit({
-                tabla: "lotes",
-                registroId: lote.id,
-                accion: "update",
-                userId: uId,
-                deviceId: devId,
-                camposChanged: ["cantidad", "version", "updated_by", "updated_device"],
-                valoresAnteriores: { cantidad: cantidadAnterior, version: versionAnterior },
-                valoresNuevos: { cantidad: nuevaCantidadLote, version: versionAnterior + 1 },
-              });
-
+              // Audit Lote Update removed as recalculation handles it
               // Audit Movimiento Creation
               await logAudit({
                 tabla: "movimientos_inventario",
@@ -910,7 +904,7 @@ export default function AddInvoice({
                 userId: uId,
                 deviceId: devId,
                 valoresNuevos: {
-                  almacen_id: "default",
+                  almacen_id: almacenDefaultId,
                   producto_id: concepto.productoId,
                   lote_id: lote.id,
                   usuario_id: uId,
@@ -922,10 +916,11 @@ export default function AddInvoice({
                   device_id: devId,
                   documento_id: docId,
                 },
+                inWriteBlock: true,
               });
 
               lotesModificados.push(lote.id);
-              
+
               cantDeducir -= qtyToDeduct;
             }
 
@@ -946,12 +941,42 @@ export default function AddInvoice({
           deviceId: devId,
           valoresNuevos: {
             cliente_id: form.clienteId || "publico_general",
-            tipo: form.tipoDocumento,
+            tipo: form.tipoDocumento.toUpperCase(),
             folio: folioCompleto,
             estado: "generada",
             total: totalFinal,
           },
+          inWriteBlock: true,
         });
+
+        // Register operaciones_documento pending status
+        const operacionesCollection = database.collections.get("operaciones_documento");
+        await operacionesCollection.create((op: any) => {
+          op._raw.id = opIdPdf;
+          op._raw.documento_id = docId;
+          op.tipoOperacion = "generacion_pdf";
+          op._raw.tipo_operacion = "generacion_pdf";
+          op.usuarioId = uId;
+          op._raw.usuario_id = uId;
+          op.deviceId = devId;
+          op._raw.device_id = devId;
+          op.metadataJson = JSON.stringify({ status: "pending", retryCount: 0 });
+          op._raw.metadata_json = JSON.stringify({ status: "pending", retryCount: 0 });
+        });
+
+        await operacionesCollection.create((op: any) => {
+          op._raw.id = opIdXml;
+          op._raw.documento_id = docId;
+          op.tipoOperacion = "generacion_xml";
+          op._raw.tipo_operacion = "generacion_xml";
+          op.usuarioId = uId;
+          op._raw.usuario_id = uId;
+          op.deviceId = devId;
+          op._raw.device_id = devId;
+          op.metadataJson = JSON.stringify({ status: "pending", retryCount: 0 });
+          op._raw.metadata_json = JSON.stringify({ status: "pending", retryCount: 0 });
+        });
+
       });
 
       // 4. Recalculate stock for all modified lotes
@@ -959,13 +984,95 @@ export default function AddInvoice({
         await recalcularStockLote(idLote);
       }
 
+      // 5. Generar y Subir PDF / XML a Storage
+      try {
+        const pdfBlob = await handleDownloadPDF(true) as Blob;
+        const xmlBlob = handleDownloadXML(true) as Blob;
+
+        if (pdfBlob && xmlBlob) {
+          const tipoStr = form.tipoDocumento === "factura" ? "Factura" : form.tipoDocumento === "prefactura" ? "Prefactura" : "Cotizacion";
+          const folioName = `${tipoStr}_${form.serie}-${form.folio}_${form.nombre.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30)}`;
+
+          // LOCAL DOWNLOAD FIRST (Offline Support)
+          try {
+            const pdfObjectUrl = URL.createObjectURL(pdfBlob);
+            const aPdf = document.createElement("a");
+            aPdf.href = pdfObjectUrl;
+            aPdf.download = `${folioName}.pdf`;
+            document.body.appendChild(aPdf);
+            aPdf.click();
+            document.body.removeChild(aPdf);
+            URL.revokeObjectURL(pdfObjectUrl);
+
+            const xmlObjectUrl = URL.createObjectURL(xmlBlob);
+            const aXml = document.createElement("a");
+            aXml.href = xmlObjectUrl;
+            aXml.download = `${folioName}.xml`;
+            document.body.appendChild(aXml);
+            aXml.click();
+            document.body.removeChild(aXml);
+            URL.revokeObjectURL(xmlObjectUrl);
+          } catch (dlErr) {
+            console.error("Error descargando archivos locales:", dlErr);
+          }
+
+          // THEN UPLOAD (Might fail if offline)
+          const pdfUrl = await uploadFile(pdfBlob, "invoices", `${docId}/${folioName}.pdf`, "application/pdf");
+          const xmlUrl = await uploadFile(xmlBlob, "invoices", `${docId}/${folioName}.xml`, "application/xml");
+
+          // Update operaciones_documento status to completed
+          await database.write(async () => {
+            const operacionesCollection = database.collections.get("operaciones_documento");
+
+            const opPdf = await operacionesCollection.find(opIdPdf);
+            await opPdf.update((op: any) => {
+              const meta = { status: "completed", url: pdfUrl, retryCount: 0 };
+              op.metadataJson = JSON.stringify(meta);
+              op._raw.metadata_json = JSON.stringify(meta);
+            });
+
+            const opXml = await operacionesCollection.find(opIdXml);
+            await opXml.update((op: any) => {
+              const meta = { status: "completed", url: xmlUrl, retryCount: 0 };
+              op.metadataJson = JSON.stringify(meta);
+              op._raw.metadata_json = JSON.stringify(meta);
+            });
+          });
+        }
+      } catch (uploadErr) {
+        console.warn("Hubo un problema al subir PDF/XML a la nube (posiblemente offline):", uploadErr);
+
+        await database.write(async () => {
+          const operacionesCollection = database.collections.get("operaciones_documento");
+
+          try {
+            const opPdf = await operacionesCollection.find(opIdPdf);
+            await opPdf.update((op: any) => {
+              const meta = { status: "failed", error: String(uploadErr), retryCount: 0 };
+              op.metadataJson = JSON.stringify(meta);
+              op._raw.metadata_json = JSON.stringify(meta);
+            });
+          } catch (e) { }
+
+          try {
+            const opXml = await operacionesCollection.find(opIdXml);
+            await opXml.update((op: any) => {
+              const meta = { status: "failed", error: String(uploadErr), retryCount: 0 };
+              op.metadataJson = JSON.stringify(meta);
+              op._raw.metadata_json = JSON.stringify(meta);
+            });
+          } catch (e) { }
+        });
+
+        // Set non-blocking error, user is notified but creation still succeeded
+        setSaveError("Factura guardada localmente, pero hubo error al subir el PDF a la nube.");
+      }
+
       setSaveSuccess(true);
       if (onSaveSuccess) onSaveSuccess();
 
-      // Generar y descargar PDF
-      await handleDownloadPDF();
     } catch (err: any) {
-      console.error("Error al guardar factura:", err);
+      console.warn("Error al guardar factura:", err);
       setSaveError("Error al guardar: " + (err.message || "Error desconocido"));
     } finally {
       setIsSaving(false);
@@ -975,7 +1082,7 @@ export default function AddInvoice({
   // ==========================================
   // DESCARGAR PDF
   // ==========================================
-  const handleDownloadPDF = async () => {
+  const handleDownloadPDF = async (returnBlob = false): Promise<Blob | void> => {
     if (!previewRef.current) return;
 
     try {
@@ -1003,9 +1110,14 @@ export default function AddInvoice({
         },
       };
 
-      await html2pdf().set(opt).from(element).save();
+      if (returnBlob) {
+        return await html2pdf().set(opt).from(element).outputPdf("blob");
+      } else {
+        await html2pdf().set(opt).from(element).save();
+      }
     } catch (err) {
       console.error("Error al generar PDF:", err);
+      if (returnBlob) throw err;
       // Fallback: abrir ventana de impresión
       const printWindow = window.open("", "_blank", "width=800,height=1000");
       if (printWindow && previewRef.current) {
@@ -1021,24 +1133,24 @@ export default function AddInvoice({
   // ==========================================
   // DESCARGAR XML
   // ==========================================
-  const handleDownloadXML = () => {
+  const handleDownloadXML = (returnBlob = false): Blob | void => {
     const xmlString = `<?xml version="1.0" encoding="utf-8"?>
-<cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/4" Version="4.0" Serie="${form.serie}" Folio="${form.folio}" Fecha="${form.fecha}T${form.hora}:00" FormaPago="${form.formaPago}" SubTotal="${totalSubtotal.toFixed(2)}" Moneda="${form.moneda}" Total="${totalFinal.toFixed(2)}" TipoDeComprobante="${form.tipoComprobante}" MetodoPago="${form.metodoPago}" LugarExpedicion="${form.lugarExpedicion}">
+<cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/4" Version="4.0" Serie="${form.serie}" Folio="${form.folio}" Fecha="${form.fecha}T${form.hora}:00" Sello="" FormaPago="${form.formaPago}" NoCertificado="" Certificado="" SubTotal="${totalSubtotal.toFixed(2)}" Moneda="${form.moneda}" Total="${totalFinal.toFixed(2)}" TipoDeComprobante="${form.tipoComprobante}" MetodoPago="${form.metodoPago}" LugarExpedicion="${form.lugarExpedicion}">
   <cfdi:Emisor Rfc="MICV9209288D2" Nombre="VIANEY OMARA MIRANDA CASTRO" RegimenFiscal="612" />
   <cfdi:Receptor Rfc="${form.rfc || "XAXX010101000"}" Nombre="${form.nombre}" DomicilioFiscalReceptor="${form.domicilio}" UsoCFDI="${form.usoCFDI}" />
   <cfdi:Conceptos>
     ${form.conceptos
-      .map((c) => {
-        const { subtotal, descMonto, impuestos } = calcConcepto(c);
-        return `<cfdi:Concepto ClaveProdServ="${c.claveSat}" Cantidad="${c.cantidad}" ClaveUnidad="${c.unidadSat}" Descripcion="${c.concepto}" ValorUnitario="${parseFloat(c.valorUnitario).toFixed(2)}" Importe="${subtotal.toFixed(2)}" Descuento="${descMonto.toFixed(2)}">
+        .map((c) => {
+          const { subtotal, descMonto, impuestos } = calcConcepto(c);
+          return `<cfdi:Concepto ClaveProdServ="${c.claveSat}" Cantidad="${c.cantidad}" ClaveUnidad="${c.unidadSat}" Descripcion="${c.concepto}" ValorUnitario="${parseFloat(c.valorUnitario).toFixed(2)}" Importe="${subtotal.toFixed(2)}" Descuento="${descMonto.toFixed(2)}">
       <cfdi:Impuestos>
         <cfdi:Traslados>
           <cfdi:Traslado Base="${(subtotal - descMonto).toFixed(2)}" Impuesto="002" TipoFactor="Tasa" TasaOCuota="${(parseFloat(c.porcImpuesto) / 100).toFixed(6)}" Importe="${impuestos.toFixed(2)}" />
         </cfdi:Traslados>
       </cfdi:Impuestos>
     </cfdi:Concepto>`;
-      })
-      .join("\n    ")}
+        })
+        .join("\n    ")}
   </cfdi:Conceptos>
   <cfdi:Impuestos TotalImpuestosTrasladados="${totalImpuestos.toFixed(2)}">
     <cfdi:Traslados>
@@ -1048,6 +1160,8 @@ export default function AddInvoice({
 </cfdi:Comprobante>`;
 
     const blob = new Blob([xmlString], { type: "application/xml" });
+    if (returnBlob) return blob;
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -1307,15 +1421,15 @@ export default function AddInvoice({
                     )}
                     {preciosEspeciales.filter((pe) => pe.clienteId === cl.id)
                       .length > 0 && (
-                      <span className="px-2 py-0.5 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded text-[10px] font-bold border border-amber-100 dark:border-amber-800">
-                        {
-                          preciosEspeciales.filter(
-                            (pe) => pe.clienteId === cl.id,
-                          ).length
-                        }{" "}
-                        precio(s) especial(es)
-                      </span>
-                    )}
+                        <span className="px-2 py-0.5 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded text-[10px] font-bold border border-amber-100 dark:border-amber-800">
+                          {
+                            preciosEspeciales.filter(
+                              (pe) => pe.clienteId === cl.id,
+                            ).length
+                          }{" "}
+                          precio(s) especial(es)
+                        </span>
+                      )}
                   </>
                 );
               })()}
@@ -1741,17 +1855,17 @@ export default function AddInvoice({
                   <div>
                     <label className={labelClass}>Lotes</label>
                     <div className="h-[34px] flex items-center">
-                    {c.productoId && c.productoId !== "manual" && parseFloat(c.cantidad) > 0 ? (
-                      <button
-                        type="button"
-                        onClick={() => setModalLotesConceptoId(c.id)}
-                        className={`w-full h-full text-xs rounded-lg font-medium transition-colors ${c.selectedLotes?.length ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'}`}
-                      >
-                        {c.selectedLotes?.length ? `${c.selectedLotes.length} lotes seleccionados` : "Modo Automático (FEFO)"}
-                      </button>
-                    ) : (
-                      <span className="text-xs text-slate-400 w-full text-center">No aplicable</span>
-                    )}
+                      {c.productoId && c.productoId !== "manual" && parseFloat(c.cantidad) > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => setModalLotesConceptoId(c.id)}
+                          className={`w-full h-full text-xs rounded-lg font-medium transition-colors ${c.selectedLotes?.length ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'}`}
+                        >
+                          {c.selectedLotes?.length ? `${c.selectedLotes.length} lotes seleccionados` : "Modo Automático (FEFO)"}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-slate-400 w-full text-center">No aplicable</span>
+                      )}
                     </div>
                   </div>
                   <div>
@@ -2308,7 +2422,7 @@ export default function AddInvoice({
             <tbody>
               <tr>
                 <td style={{ border: "1px solid #000", padding: "2px 8px" }}>
-                  Serie del Certificado del emisor: 00001000000508225085
+                  Serie del Certificado del emisor:
                 </td>
               </tr>
               <tr>
@@ -2319,7 +2433,7 @@ export default function AddInvoice({
                     padding: "2px 8px",
                   }}
                 >
-                  Folio Fiscal: FA476ECB-C78D-42F9-A9EB-D8A9322FB87C
+                  Folio Fiscal:
                 </td>
               </tr>
               <tr>
@@ -2330,7 +2444,7 @@ export default function AddInvoice({
                     padding: "2px 8px",
                   }}
                 >
-                  No. de serie del Certificado del SAT: 00001000000505142236
+                  No. de serie del Certificado del SAT:
                 </td>
               </tr>
               <tr>
@@ -2478,201 +2592,198 @@ export default function AddInvoice({
   return (
     <>
       <div className="fixed inset-0 z-50">
-      <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={handleClose}
-      />
-      <div className="fixed inset-0 flex items-center justify-center p-3">
-        <div className="w-[95vw] max-w-7xl h-[90vh] bg-white dark:bg-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden relative z-10">
-          {/* HEADER */}
-          <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                <FileText className="w-5 h-5 text-blue-700 dark:text-blue-400" />
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+          onClick={handleClose}
+        />
+        <div className="fixed inset-0 flex items-center justify-center p-3">
+          <div className="w-[95vw] max-w-7xl h-[90vh] bg-white dark:bg-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden relative z-10">
+            {/* HEADER */}
+            <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                  <FileText className="w-5 h-5 text-blue-700 dark:text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800 dark:text-white">
+                    {form.tipoDocumento === "factura" ? "Generar Factura" : form.tipoDocumento === "prefactura" ? "Generar Prefactura" : "Generar Cotización"} — CFDI 4.0
+                  </h3>
+                  {isLoadingData && (
+                    <span className="flex items-center gap-1 text-xs text-blue-500">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Cargando datos...
+                    </span>
+                  )}
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg font-bold text-slate-800 dark:text-white">
-                  {form.tipoDocumento === "factura" ? "Generar Factura" : form.tipoDocumento === "prefactura" ? "Generar Prefactura" : "Generar Cotización"} — CFDI 4.0
-                </h3>
-                {isLoadingData && (
-                  <span className="flex items-center gap-1 text-xs text-blue-500">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    Cargando datos...
+              <div className="flex items-center gap-4">
+                {!readonlyMode && (
+                  <>
+                    {/* Selector de Tipo de Documento Premium (Botones Segmentados) */}
+                    <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
+                      <button
+                        type="button"
+                        onClick={() => setForm(prev => ({ ...prev, tipoDocumento: 'factura' }))}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${form.tipoDocumento === "factura"
+                          ? "bg-white dark:bg-slate-600 shadow-sm text-blue-600 dark:text-blue-400"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+                          }`}
+                      >
+                        Factura
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setForm(prev => ({ ...prev, tipoDocumento: 'prefactura' }))}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${form.tipoDocumento === "prefactura"
+                          ? "bg-white dark:bg-slate-600 shadow-sm text-amber-600 dark:text-amber-400"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+                          }`}
+                      >
+                        Prefactura
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setForm(prev => ({ ...prev, tipoDocumento: 'cotizacion' }))}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${form.tipoDocumento === "cotizacion"
+                          ? "bg-white dark:bg-slate-600 shadow-sm text-indigo-600 dark:text-indigo-400"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+                          }`}
+                      >
+                        Cotización
+                      </button>
+                    </div>
+
+                    {/* Vista Dividida / Tabular */}
+                    <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
+                      <button
+                        onClick={() => setViewMode("simultaneous")}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === "simultaneous" ? "bg-white dark:bg-slate-600 shadow-sm text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"}`}
+                      >
+                        Vista Dividida
+                      </button>
+                      <button
+                        onClick={() => {
+                          setViewMode("tabular");
+                          setStep("capture");
+                        }}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === "tabular" ? "bg-white dark:bg-slate-600 shadow-sm text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"}`}
+                      >
+                        Modo Tabular
+                      </button>
+                    </div>
+                  </>
+                )}
+                <button
+                  onClick={handleClose}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* BODY */}
+            {viewMode === "simultaneous" ? (
+              <div className="flex-1 grid grid-cols-2 overflow-hidden">
+                {/* LEFT - Form */}
+                <div className="overflow-y-auto p-5 pr-3 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 space-y-4">
+                  {renderFormCards(false)}
+                </div>
+
+                {/* RIGHT - PDF Preview (Plantilla CFDI Inline) */}
+                <div
+                  className="w-full h-full bg-gray-200 overflow-auto"
+                  style={{ padding: 16 }}
+                >
+                  {renderPDFPreview()}
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-hidden flex flex-col">
+                {step === "capture" ? (
+                  <div className="flex-1 overflow-y-auto p-5 bg-slate-50 dark:bg-slate-900 space-y-4">
+                    {renderFormCards(true)}
+                  </div>
+                ) : (
+                  <div className="flex-1 w-full h-full bg-gray-200 overflow-auto flex justify-center items-start py-5">
+                    {renderPDFPreview()}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* FOOTER */}
+            <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0 flex justify-between items-center gap-3">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className="px-6 py-2 rounded-xl text-slate-500 dark:text-slate-400 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 transition-colors"
+                >
+                  {readonlyMode ? "Cerrar" : "Cancelar"}
+                </button>
+                {saveError && (
+                  <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400 text-xs font-medium bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {saveError}
+                  </span>
+                )}
+                {saveSuccess && (
+                  <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 text-xs font-bold bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                    <Check className="w-3.5 h-3.5" />
+                    Documento guardado y PDF generado
                   </span>
                 )}
               </div>
-            </div>
-            <div className="flex items-center gap-4">
-              {!readonlyMode && (
-                <>
-                  {/* Selector de Tipo de Documento Premium (Botones Segmentados) */}
-                  <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
-                    <button
-                      type="button"
-                      onClick={() => setForm(prev => ({ ...prev, tipoDocumento: 'factura' }))}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
-                        form.tipoDocumento === "factura"
-                          ? "bg-white dark:bg-slate-600 shadow-sm text-blue-600 dark:text-blue-400"
-                          : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
-                      }`}
-                    >
-                      Factura
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setForm(prev => ({ ...prev, tipoDocumento: 'prefactura' }))}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
-                        form.tipoDocumento === "prefactura"
-                          ? "bg-white dark:bg-slate-600 shadow-sm text-amber-600 dark:text-amber-400"
-                          : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
-                      }`}
-                    >
-                      Prefactura
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setForm(prev => ({ ...prev, tipoDocumento: 'cotizacion' }))}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
-                        form.tipoDocumento === "cotizacion"
-                          ? "bg-white dark:bg-slate-600 shadow-sm text-indigo-600 dark:text-indigo-400"
-                          : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
-                      }`}
-                    >
-                      Cotización
-                    </button>
-                  </div>
 
-                  {/* Vista Dividida / Tabular */}
-                  <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
-                    <button
-                      onClick={() => setViewMode("simultaneous")}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === "simultaneous" ? "bg-white dark:bg-slate-600 shadow-sm text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"}`}
-                    >
-                      Vista Dividida
-                    </button>
-                    <button
-                      onClick={() => {
-                        setViewMode("tabular");
-                        setStep("capture");
-                      }}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === "tabular" ? "bg-white dark:bg-slate-600 shadow-sm text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"}`}
-                    >
-                      Modo Tabular
-                    </button>
-                  </div>
-                </>
-              )}
-              <button
-                onClick={handleClose}
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
+              <div className="flex gap-3">
+                {readonlyMode ? (
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadPDF()}
+                    className="flex items-center gap-2 px-6 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition-all shadow-md"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Descargar PDF
+                  </button>
+                ) : (
+                  <>
+                    {viewMode === "tabular" && step === "preview" && (
+                      <button
+                        type="button"
+                        onClick={() => setStep("capture")}
+                        className="px-6 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
+                      >
+                        Atrás a Captura
+                      </button>
+                    )}
 
-          {/* BODY */}
-          {viewMode === "simultaneous" ? (
-            <div className="flex-1 grid grid-cols-2 overflow-hidden">
-              {/* LEFT - Form */}
-              <div className="overflow-y-auto p-5 pr-3 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 space-y-4">
-                {renderFormCards(false)}
+                    {viewMode === "tabular" && step === "capture" ? (
+                      <button
+                        type="button"
+                        onClick={() => setStep("preview")}
+                        className="px-6 py-2 rounded-xl bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white text-sm font-bold transition-all shadow-md"
+                      >
+                        Siguiente (Vista Previa)
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleGenerateInvoice}
+                        disabled={isSaving}
+                        className={`flex items-center gap-2 px-6 py-2 rounded-xl text-white text-sm font-bold transition-all active:scale-95 shadow-md shadow-blue-500/20 ${isSaving ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`}
+                      >
+                        {isSaving ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Printer className="w-4 h-4" />
+                        )}
+                        {isSaving ? "Guardando..." : form.tipoDocumento === "factura" ? "Generar Factura" : form.tipoDocumento === "prefactura" ? "Generar Prefactura" : "Generar Cotización"}
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
-
-              {/* RIGHT - PDF Preview (Plantilla CFDI Inline) */}
-              <div
-                className="w-full h-full bg-gray-200 overflow-auto"
-                style={{ padding: 16 }}
-              >
-                {renderPDFPreview()}
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 overflow-hidden flex flex-col">
-              {step === "capture" ? (
-                <div className="flex-1 overflow-y-auto p-5 bg-slate-50 dark:bg-slate-900 space-y-4">
-                  {renderFormCards(true)}
-                </div>
-              ) : (
-                <div className="flex-1 w-full h-full bg-gray-200 overflow-auto flex justify-center items-start py-5">
-                  {renderPDFPreview()}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* FOOTER */}
-          <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0 flex justify-between items-center gap-3">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleClose}
-                className="px-6 py-2 rounded-xl text-slate-500 dark:text-slate-400 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-800/50 transition-colors"
-              >
-                {readonlyMode ? "Cerrar" : "Cancelar"}
-              </button>
-              {saveError && (
-                <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400 text-xs font-medium bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800">
-                  <AlertCircle className="w-3.5 h-3.5" />
-                  {saveError}
-                </span>
-              )}
-              {saveSuccess && (
-                <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 text-xs font-bold bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                  <Check className="w-3.5 h-3.5" />
-                  Documento guardado y PDF generado
-                </span>
-              )}
-            </div>
-
-            <div className="flex gap-3">
-              {readonlyMode ? (
-                <button
-                  type="button"
-                  onClick={handleDownloadPDF}
-                  className="flex items-center gap-2 px-6 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition-all shadow-md"
-                >
-                  <FileText className="w-4 h-4" />
-                  Descargar PDF
-                </button>
-              ) : (
-                <>
-                  {viewMode === "tabular" && step === "preview" && (
-                    <button
-                      type="button"
-                      onClick={() => setStep("capture")}
-                      className="px-6 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
-                    >
-                      Atrás a Captura
-                    </button>
-                  )}
-
-                  {viewMode === "tabular" && step === "capture" ? (
-                    <button
-                      type="button"
-                      onClick={() => setStep("preview")}
-                      className="px-6 py-2 rounded-xl bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white text-sm font-bold transition-all shadow-md"
-                    >
-                      Siguiente (Vista Previa)
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleGenerateInvoice}
-                      disabled={isSaving}
-                      className={`flex items-center gap-2 px-6 py-2 rounded-xl text-white text-sm font-bold transition-all active:scale-95 shadow-md shadow-blue-500/20 ${isSaving ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`}
-                    >
-                      {isSaving ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Printer className="w-4 h-4" />
-                      )}
-                      {isSaving ? "Guardando..." : form.tipoDocumento === "factura" ? "Generar Factura" : form.tipoDocumento === "prefactura" ? "Generar Prefactura" : "Generar Cotización"}
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
             </div>
           </div>
         </div>
@@ -2681,10 +2792,15 @@ export default function AddInvoice({
       {modalLotesConceptoId && (() => {
         const concepto = form.conceptos.find(c => c.id === modalLotesConceptoId);
         if (!concepto || !concepto.productoId) return null;
-        
+
         const prodName = concepto.concepto || productos.find(p => p.id === concepto.productoId)?.descripcion || "Producto";
-        const lotesProducto = lotesState.filter(l => l.producto_id === concepto.productoId);
-        
+        const lotesProducto = lotesState.filter(l => {
+          if (l.producto_id !== concepto.productoId) return false;
+          if (l.cantidad <= 0) return false;
+          if (l.fecha_caducidad && (l.fecha_caducidad - Date.now() <= 0)) return false;
+          return true;
+        });
+
         return (
           <LotSelectionModal
             isOpen={true}
@@ -2703,7 +2819,7 @@ export default function AddInvoice({
         isOpen={errorModal.isOpen}
         title={errorModal.title}
         message={errorModal.message}
-        onClose={() => setErrorModal(prev => ({...prev, isOpen: false}))}
+        onClose={() => setErrorModal(prev => ({ ...prev, isOpen: false }))}
       />
     </>
   );

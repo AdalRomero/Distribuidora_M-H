@@ -7,15 +7,13 @@ import type { IntegrityRule } from '../types';
 
 // ─── Rule: Clients assigned to an inactive/deleted price template ─────────────
 
-interface ClientePlantillaJoin {
-  joinId: string;         // clientes_plantillas.id
+interface ClientePlantillaRota {
   clienteId: string;
   clienteNombre: string;
-  plantillaId: string;
-  plantillaNombre: string;
+  listaActual: string;
 }
 
-export const clienteConPlantillaInvalidaRule: IntegrityRule<ClientePlantillaJoin> = {
+export const clienteConPlantillaInvalidaRule: IntegrityRule<ClientePlantillaRota> = {
   id: 'cliente_plantilla_invalida',
   label: 'Clientes con plantilla de precios inválida',
   severity: 'medium',
@@ -26,53 +24,32 @@ export const clienteConPlantillaInvalidaRule: IntegrityRule<ClientePlantillaJoin
   actionUrl: '/clients',
 
   async detect() {
-    const joins = (await database.collections
-      .get('clientes_plantillas')
-      .query()
-      .fetch()) as any[];
-
     const plantillasDb = database.collections.get('plantillas_precios');
     const clientesDb = database.collections.get('clientes');
 
-    const broken: ClientePlantillaJoin[] = [];
+    const plantillas = (await plantillasDb.query().fetch()) as any[];
+    const activeNombres = new Set(
+      plantillas.filter(p => p.estado !== false && p.nombre).map(p => p.nombre.trim())
+    );
+    
+    // Nombres estándar válidos
+    activeNombres.add('lista');
+    activeNombres.add('mayoreo');
+    activeNombres.add('menudeo');
+    activeNombres.add('personalizada');
 
-    for (const join of joins) {
-      const plantillaId = join._raw.plantilla_id;
-      const clienteId = join._raw.cliente_id;
+    const clientes = (await clientesDb.query().fetch()) as any[];
+    const broken: ClientePlantillaRota[] = [];
 
-      try {
-        const plantilla = (await plantillasDb.find(plantillaId)) as any;
-        // If we can find it and it's active, it's fine
-        if (plantilla && plantilla.estado !== false) continue;
+    for (const c of clientes) {
+      const listaBase = c.listaPrecioBase?.trim();
+      if (!listaBase) continue;
 
-        // Broken: plantilla is inactive or deleted
-        let clienteNombre = clienteId;
-        try {
-          const cliente = (await clientesDb.find(clienteId)) as any;
-          clienteNombre = cliente?.nombre ?? clienteId;
-        } catch (_) {}
-
+      if (!activeNombres.has(listaBase)) {
         broken.push({
-          joinId: join.id,
-          clienteId,
-          clienteNombre,
-          plantillaId,
-          plantillaNombre: plantilla?.nombre ?? 'Lista eliminada',
-        });
-      } catch (_) {
-        // plantilla.find() threw — record is deleted, definitely broken
-        let clienteNombre = clienteId;
-        try {
-          const cliente = (await clientesDb.find(clienteId)) as any;
-          clienteNombre = cliente?.nombre ?? clienteId;
-        } catch (_2) {}
-
-        broken.push({
-          joinId: join.id,
-          clienteId,
-          clienteNombre,
-          plantillaId,
-          plantillaNombre: 'Lista eliminada',
+          clienteId: c.id,
+          clienteNombre: c.nombre ?? 'Cliente sin nombre',
+          listaActual: listaBase,
         });
       }
     }
@@ -82,10 +59,10 @@ export const clienteConPlantillaInvalidaRule: IntegrityRule<ClientePlantillaJoin
 
   formatItem(item) {
     return {
-      id: item.joinId,
+      id: item.clienteId,
       label: item.clienteNombre,
-      subtitle: `Cliente ID: ${item.clienteId}`,
-      currentValue: item.plantillaNombre,
+      subtitle: `ID: ${item.clienteId}`,
+      currentValue: item.listaActual,
     };
   },
 
@@ -95,32 +72,98 @@ export const clienteConPlantillaInvalidaRule: IntegrityRule<ClientePlantillaJoin
       .query()
       .fetch()) as any[];
 
-    return plantillas
+    const options = plantillas
       .filter((p) => p.estado !== false)
-      .map((p) => ({ id: p.id, label: p.nombre ?? 'Lista sin nombre' }));
+      .map((p) => ({ id: p.nombre, label: p.nombre ?? 'Lista sin nombre' }));
+      
+    // Solo añadimos Precio Lista si no existe ya una plantilla con ese nombre (case insensitive)
+    const existNamesLower = new Set(options.map(o => o.id.toLowerCase()));
+    if (!existNamesLower.has('lista')) {
+      options.unshift({ id: 'lista', label: 'Precio Lista' });
+    }
+    
+    // Quitar duplicados por id (ignorando case para evitar duplicados visuales confusos)
+    const uniqueOptions = [];
+    const seenLower = new Set();
+    for (const opt of options) {
+      const lower = opt.id.toLowerCase();
+      if (!seenLower.has(lower)) {
+        seenLower.add(lower);
+        uniqueOptions.push(opt);
+      }
+    }
+    
+    return uniqueOptions;
   },
 
   allowNoReplacement: true,
 
   async fix(selectedIds, newValueId) {
     await database.write(async () => {
-      for (const joinId of selectedIds) {
+      const clientesDb = database.collections.get('clientes');
+      const junctionDb = database.collections.get('clientes_plantillas');
+      const pProdDb = database.collections.get('precios_especiales_clientes');
+      const pFamDb = database.collections.get('precios_especiales_familias_clientes');
+      const plantillasDb = database.collections.get('plantillas_precios');
+      const reglasDb = database.collections.get('reglas_plantilla');
+      
+      for (const clienteId of selectedIds) {
         try {
-          const join = (await database.collections
-            .get('clientes_plantillas')
-            .find(joinId)) as any;
+          const client = (await clientesDb.find(clienteId)) as any;
+          await client.update((c: any) => {
+            c.listaPrecioBase = newValueId || 'lista';
+            if (newValueId === null || newValueId === 'lista' || newValueId === 'mayoreo' || newValueId === 'menudeo') {
+                c.descuentoGlobal = 0;
+            }
+          });
+          
+          // Limpiar associations y reglas anteriores
+          const oldJunctions = await junctionDb.query(Q.where('cliente_id', clienteId)).fetch();
+          for (const oj of oldJunctions) await (oj as any).markAsDeleted();
+          
+          const oldProdRules = await pProdDb.query(Q.where('cliente_id', clienteId)).fetch();
+          for (const or of oldProdRules) await (or as any).markAsDeleted();
+          
+          const oldFamRules = await pFamDb.query(Q.where('cliente_id', clienteId)).fetch();
+          for (const or of oldFamRules) await (or as any).markAsDeleted();
 
-          if (newValueId === null) {
-            // Remove the assignment
-            await join.markAsDeleted();
-          } else {
-            // Reassign to new template
-            await join.update((j: any) => {
-              j._raw.plantilla_id = newValueId;
-            });
+          if (newValueId && newValueId !== 'lista' && newValueId !== 'mayoreo' && newValueId !== 'menudeo' && newValueId !== 'personalizada') {
+              const [plantilla] = await plantillasDb.query(Q.where('nombre', newValueId)).fetch();
+              if (plantilla) {
+                  await junctionDb.create((j: any) => {
+                      j._raw.id = require('expo-crypto').randomUUID();
+                      j.clienteId = clienteId;
+                      j.plantillaId = plantilla.id;
+                  });
+                  
+                  // Copiar reglas de la plantilla al cliente
+                  const reglas = await reglasDb.query(Q.where('plantilla_id', plantilla.id)).fetch();
+                  for (const r of reglas as any[]) {
+                      if (r.tipo === 'global') {
+                          await client.update((c: any) => {
+                              c.descuentoGlobal = Number(r.descuentoPorcentaje) || 0;
+                          });
+                      } else if (r.tipo === 'producto') {
+                          await pProdDb.create((rec: any) => {
+                              rec._raw.id = require('expo-crypto').randomUUID();
+                              rec._raw.cliente_id = clienteId;
+                              rec._raw.producto_id = r.targetId;
+                              rec.descuentoPorcentaje = Number(r.descuentoPorcentaje) || 0;
+                              rec.precioFijo = Number(r.precioFijo) || 0;
+                          });
+                      } else if (r.tipo === 'familia') {
+                          await pFamDb.create((rec: any) => {
+                              rec._raw.id = require('expo-crypto').randomUUID();
+                              rec._raw.cliente_id = clienteId;
+                              rec._raw.familia_id = r.targetId;
+                              rec.descuentoPorcentaje = Number(r.descuentoPorcentaje) || 0;
+                          });
+                      }
+                  }
+              }
           }
         } catch (e) {
-          console.warn(`[integrity] Could not fix join ${joinId}:`, e);
+          console.warn(`[integrity] Could not fix client price list ${clienteId}:`, e);
         }
       }
     });

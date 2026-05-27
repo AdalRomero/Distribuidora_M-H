@@ -88,14 +88,12 @@ const LoteRow = ({ lote, producto, onEditLote, onToggleEstado, onAcknowledge, ac
                 </div>
             </td>
             <td className="px-6 py-4">
-            <td className="px-6 py-4">
                 <div className="flex items-center gap-2">
                     <div className={`w-3 h-3 rounded-full ${getAlertColor(effectiveLevel)}`}></div>
                     <span className={`text-xs font-extrabold ${getAlertTextColor(effectiveLevel)}`}>
                         {level === 'black' ? 'Vencido' : `${daysRemaining} días`}
                     </span>
                 </div>
-            </td>
             </td>
 
             <td className="px-6 py-4 text-center">

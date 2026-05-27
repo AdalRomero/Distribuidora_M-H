@@ -1,4 +1,4 @@
-import { Clock, Eye, FileCheck, FileCode, FileMinus, FileText, Loader2, Plus, Search, TrendingUp } from 'lucide-react';
+import { Clock, Eye, FileCheck, FileCode, FileMinus, FileText, Loader2, Plus, Search, TrendingUp, RefreshCw } from 'lucide-react';
 import { Fragment, useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
 import { usePagination } from '../../src/hooks/usePagination';
@@ -115,7 +115,7 @@ export default function Invoices() {
         setShowAddInvoice(true);
     };
 
-    const openInvoiceModal = async (invId: string, action: 'view' | 'pdf' | 'xml') => {
+    const openInvoiceModal = async (invId: string, action: 'view' | 'pdf' | 'xml' | 'convert') => {
         try {
             const docRecord: any = await database.collections.get('documentos').find(invId);
             const detalles = await database.collections.get('documentos_detalles').query(Q.where('documento_id', invId)).fetch();
@@ -160,11 +160,12 @@ export default function Invoices() {
                 metodoPago: 'PUE',
                 formaPago: '01',
                 moneda: 'MXN',
-                lugarExpedicion: '83554'
+                lugarExpedicion: '83554',
+                tipoDocumento: action === 'convert' ? 'factura' : (docRecord.tipo || 'factura'),
             };
 
             setRecoverData(recData);
-            setReadonlyMode(true);
+            setReadonlyMode(action !== 'convert');
             setAutoDownloadPDF(action === 'pdf');
             setAutoDownloadXML(action === 'xml');
             setShowAddInvoice(true);
@@ -352,6 +353,9 @@ export default function Invoices() {
                                                         <button onClick={() => openInvoiceModal(inv.id, 'view')} className="p-1.5 text-slate-400 hover:text-mh-blue hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-mh-blue/20" title="Ver Detalle"><Eye className="w-4 h-4" /></button>
                                                         <button onClick={() => openInvoiceModal(inv.id, 'pdf')} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-200" title="Descargar PDF"><FileText className="w-4 h-4" /></button>
                                                         <button onClick={() => openInvoiceModal(inv.id, 'xml')} className="p-1.5 text-slate-400 hover:text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:bg-indigo-500/10 rounded-lg transition-colors border border-transparent hover:border-indigo-200" title="Descargar XML"><FileCode className="w-4 h-4" /></button>
+                                                        {inv.tipoDocumento === 'Prefactura/Cotización' && (
+                                                            <button onClick={() => openInvoiceModal(inv.id, 'convert')} className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors border border-transparent hover:border-emerald-200" title="Convertir a Factura"><RefreshCw className="w-4 h-4" /></button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>

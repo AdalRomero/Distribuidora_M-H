@@ -269,7 +269,7 @@ export default function Clients() {
                 discountRules.push({
                     id: rp.id,
                     type: 'producto',
-                    targetId: rp.producto.id,
+                    targetId: rp._raw.producto_id,
                     targetName: '', 
                     percentage: String(rp.descuentoPorcentaje),
                 });
@@ -278,7 +278,7 @@ export default function Clients() {
                 discountRules.push({
                     id: rf.id,
                     type: 'familia',
-                    targetId: rf.familia.id,
+                    targetId: rf._raw.familia_id,
                     targetName: '', 
                     percentage: String(rf.descuentoPorcentaje),
                 });
@@ -387,15 +387,15 @@ export default function Clients() {
                          if (rule.type === 'producto') {
                              await pProdDb.create((r: any) => {
                                  r._raw.id = Crypto.randomUUID();
-                                 r.cliente.id = editingClientId;
-                                 r.producto.id = rule.targetId;
+                                 r._raw.cliente_id = editingClientId;
+                                 r._raw.producto_id = rule.targetId;
                                  r.descuentoPorcentaje = Number(rule.percentage) || 0;
                              });
                          } else if (rule.type === 'familia') {
                              await pFamDb.create((r: any) => {
                                  r._raw.id = Crypto.randomUUID();
-                                 r.cliente.id = editingClientId;
-                                 r.familia.id = rule.targetId;
+                                 r._raw.cliente_id = editingClientId;
+                                 r._raw.familia_id = rule.targetId;
                                  r.descuentoPorcentaje = Number(rule.percentage) || 0;
                              });
                          } 

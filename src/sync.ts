@@ -110,7 +110,8 @@ async function runSyncProcess(
   syncId: string,
   deviceId: string,
   journalId: string,
-  overrideUserId?: string
+  overrideUserId?: string,
+  signal?: AbortSignal
 ) {
   let pulledCount = 0;
   let pushedCount = 0;
@@ -146,12 +147,23 @@ async function runSyncProcess(
   await synchronize({
     database,
     pullChanges: async ({ lastPulledAt }) => {
+      if (signal?.aborted) throw new Error("SYNC_ABORTED");
       const platform = typeof window !== "undefined" ? "web" : "native";
-      const { data, error } = await supabase.rpc("pull_changes", {
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("PGRST_TIMEOUT")), 30000)
+      );
+
+      // Race against timeout
+      const pullReq = supabase.rpc("pull_changes", {
         last_pulled_at: lastPulledAt ?? 0,
         usuario_id: activeUserId || null,
         platform,
       });
+
+      const { data, error } = await Promise.race([pullReq, timeoutPromise]) as any;
+
+      if (signal?.aborted) throw new Error("SYNC_ABORTED");
 
       if (error) throw new Error(error.message);
 
@@ -230,13 +242,23 @@ async function runSyncProcess(
       }
 
       // Send changes to Supabase
-      const changesToSend = { ...changes };
+      const changesToSend: Record<string, any> = { ...changes };
       delete changesToSend.sync_journal;
       delete changesToSend.stats_cache;
 
-      const { data, error } = await supabase.rpc("push_changes", {
+      if (signal?.aborted) throw new Error("SYNC_ABORTED");
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("PGRST_TIMEOUT")), 30000)
+      );
+
+      const pushReq = supabase.rpc("push_changes", {
         changes: changesToSend,
       });
+
+      const { data, error } = await Promise.race([pushReq, timeoutPromise]) as any;
+
+      if (signal?.aborted) throw new Error("SYNC_ABORTED");
 
       if (error) throw new Error(error.message);
 
@@ -291,7 +313,22 @@ async function runSyncProcess(
   }
 }
 
+let globalSyncAbortController: AbortController | null = null;
+
+export function abortSync() {
+  if (globalSyncAbortController) {
+    globalSyncAbortController.abort();
+    globalSyncAbortController = null;
+  }
+}
+
 export async function syncApp(overrideUserId?: string) {
+  if (globalSyncAbortController) {
+    globalSyncAbortController.abort();
+  }
+  globalSyncAbortController = new AbortController();
+  const signal = globalSyncAbortController.signal;
+
   const syncId =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
@@ -323,13 +360,18 @@ export async function syncApp(overrideUserId?: string) {
   // 2. Retry loop
   for (let attempt = 0; attempt < RETRY_CONFIG.maxRetries; attempt++) {
     try {
-      await runSyncProcess(syncId, deviceId, journalId, overrideUserId);
+      if (signal.aborted) throw new Error("SYNC_ABORTED");
+      await runSyncProcess(syncId, deviceId, journalId, overrideUserId, signal);
+      
+      if (globalSyncAbortController?.signal === signal) {
+        globalSyncAbortController = null;
+      }
       return; // Success!
     } catch (error: any) {
       const code = extractErrorCode(error);
       console.warn(`Sync attempt ${attempt + 1} failed (Code: ${code}):`, error);
 
-      if (RETRY_CONFIG.nonRetryableErrors.includes(code) || attempt === RETRY_CONFIG.maxRetries - 1) {
+      if (RETRY_CONFIG.nonRetryableErrors.includes(code) || attempt === RETRY_CONFIG.maxRetries - 1 || code === "SYNC_ABORTED") {
         // Log final failure
         if (journalId) {
           try {

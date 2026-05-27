@@ -40,6 +40,7 @@ import SyncJournal from "./models/registros/syncJournal";
 import AuditLog from "./models/registros/auditLog";
 import StatsCache from "./models/registros/statsCache";
 import InvoiceTemplate from "./models/configuracion/invoiceTemplate";
+import Tombstone from "./models/Tombstone";
 
 const adapter = getAdapter();
 
@@ -81,5 +82,6 @@ export const database = new Database({
     SyncJournal,
     StatsCache,
     InvoiceTemplate,
+    Tombstone,
   ],
 });

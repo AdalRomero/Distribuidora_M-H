@@ -23,3 +23,33 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: false, // No detectar sesión en URL (evita loops en Expo Router)
   },
 });
+
+// Sube un archivo a Supabase Storage y retorna la URL pública
+export const uploadFile = async (
+  fileData: string | Blob | File,
+  bucket: string,
+  remotePath: string,
+  contentType: string
+): Promise<string> => {
+  try {
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(remotePath, fileData, {
+        contentType,
+        upsert: true,
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(remotePath);
+
+    return publicUrlData.publicUrl;
+  } catch (error) {
+    console.warn("Error al subir archivo a Supabase Storage (probablemente offline):", error);
+    throw error;
+  }
+};

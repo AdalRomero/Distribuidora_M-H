@@ -12,7 +12,7 @@ import {
     ToggleLeft,
     ToggleRight,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AddPrices, {
     TemplateFormData,
     TemplateRule,
@@ -103,124 +103,110 @@ export default function Prices() {
   }, [message]);
 
   // ==========================================
-  // CARGAR LISTAS (DESDE PLANTILLAS)uwu
+  // CARGAR LISTAS — REACTIVO EN TIEMPO REAL
   // ==========================================
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const loadPriceListsRef = useRef<(() => void) | null>(null);
-
-  const loadPriceLists = useCallback(async () => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(async () => {
-      setIsLoadingTable(true);
-      try {
-        const plantillasDb = database.collections.get("plantillas_precios");
-        const reglasDb = database.collections.get("reglas_plantilla");
-        const clientesDb = database.collections.get("clientes");
-        const productosDb = database.collections.get("productos");
-        const familiasDb = database.collections.get("familias");
-
-        const [
-          allPlantillas,
-          allReglas,
-          allClientes,
-          allProductos,
-          allFamilias,
-        ] = await Promise.all([
-          plantillasDb.query().fetch(),
-          reglasDb.query().fetch(),
-          clientesDb.query().fetch(),
-          productosDb.query().fetch(),
-          familiasDb.query().fetch(),
-        ]);
-
-        const productoMap = new Map();
-        allProductos.forEach((p: any) =>
-          productoMap.set(
-            p.id,
-            `${p.codigoInterno || "S/C"} — ${p.descripcion || "Sin descripción"}`,
-          ),
-        );
-        const familiaMap = new Map();
-        allFamilias.forEach((f: any) =>
-          familiaMap.set(
-            f.id,
-            `${f.codigoFamilia || "S/C"} — ${f.nombre || "Sin nombre"}`,
-          ),
-        );
-
-        const listToClients = new Map<string, string[]>();
-        allClientes.forEach((c: any) => {
-          const name = c.lista_precio_base?.trim();
-          if (name) {
-            if (!listToClients.has(name)) listToClients.set(name, []);
-            listToClients.get(name)!.push(c.id);
-          }
-        });
-
-        const summaries: PriceListSummary[] = allPlantillas.map((p: any) => {
-          const plantReglas = allReglas.filter(
-            (r: any) => r._raw.plantilla_id === p.id,
-          );
-          const mappedReglas: TemplateRule[] = plantReglas.map((r: any) => ({
-            id: r.id,
-            tipo: r.tipo as "producto" | "familia",
-            targetId: r.targetId,
-            targetName:
-              r.tipo === "global"
-                ? "Descuento Global"
-                : r.tipo === "producto"
-                ? productoMap.get(r.targetId)
-                : familiaMap.get(r.targetId),
-            descuentoPorcentaje: String(r.descuentoPorcentaje || 0),
-            precioFijo: String(r.precioFijo || 0),
-          }));
-
-          return {
-            id: p.id,
-            nombreLista: p.nombre,
-            estado: p.estado !== false,
-            clientesIds: listToClients.get(p.nombre) || [],
-            reglasCount: mappedReglas.length,
-            reglas: mappedReglas,
-          };
-        });
-
-        setPriceLists(
-          summaries.sort((a, b) => a.nombreLista.localeCompare(b.nombreLista)),
-        );
-      } catch (error) {
-        console.error("Error al cargar listas:", error);
-      } finally {
-        setIsLoadingTable(false);
-      }
-    }, 80);
-  }, []);
-
-  loadPriceListsRef.current = loadPriceLists;
-
   useEffect(() => {
-    const fire = () => {
-      loadPriceListsRef.current?.();
-    };
-
     const plantillasCol = database.collections.get("plantillas_precios");
     const reglasCol = database.collections.get("reglas_plantilla");
     const clientesCol = database.collections.get("clientes");
+    const productosCol = database.collections.get("productos");
+    const familiasCol = database.collections.get("familias");
 
     if (!plantillasCol || !reglasCol || !clientesCol) {
-      console.warn(
-        "Tablas de precios no encontradas en la DB local. ¿Migración pendiente?",
-      );
+      console.warn("Tablas de precios no encontradas en la DB local. ¿Migración pendiente?");
       return;
     }
 
+    let debounce: ReturnType<typeof setTimeout> | null = null;
+
+    const rebuild = () => {
+      if (debounce) clearTimeout(debounce);
+      debounce = setTimeout(async () => {
+        setIsLoadingTable(true);
+        try {
+          const [
+            allPlantillas,
+            allReglas,
+            allClientes,
+            allProductos,
+            allFamilias,
+          ] = await Promise.all([
+            plantillasCol.query().fetch(),
+            reglasCol.query().fetch(),
+            clientesCol.query().fetch(),
+            productosCol.query().fetch(),
+            familiasCol.query().fetch(),
+          ]);
+
+          const productoMap = new Map<string, string>();
+          allProductos.forEach((p: any) =>
+            productoMap.set(p.id, `${p.codigoInterno || "S/C"} — ${p.descripcion || "Sin descripción"}`)
+          );
+          const familiaMap = new Map<string, string>();
+          allFamilias.forEach((f: any) =>
+            familiaMap.set(f.id, `${f.codigoFamilia || "S/C"} — ${f.nombre || "Sin nombre"}`)
+          );
+
+          const listToClients = new Map<string, string[]>();
+          allClientes.forEach((c: any) => {
+            const name = c.listaPrecioBase?.trim();
+            if (name) {
+              if (!listToClients.has(name)) listToClients.set(name, []);
+              listToClients.get(name)!.push(c.id);
+            }
+          });
+
+          const summaries: PriceListSummary[] = allPlantillas.map((p: any) => {
+            const plantReglas = allReglas.filter((r: any) => r._raw.plantilla_id === p.id);
+            const mappedReglas: TemplateRule[] = plantReglas.map((r: any) => ({
+              id: r.id,
+              tipo: r.tipo as 'producto' | 'familia' | 'global',
+              targetId: r.targetId ?? '',
+              targetName: String(
+                r.tipo === 'global'
+                  ? 'Descuento Global'
+                  : r.tipo === 'producto'
+                  ? (productoMap.get(r.targetId) || r.targetId || '')
+                  : (familiaMap.get(r.targetId) || r.targetId || '')
+              ),
+              descuentoPorcentaje: String(r.descuentoPorcentaje || 0),
+              precioFijo: String(r.precioFijo || 0),
+            }));
+
+            return {
+              id: p.id,
+              nombreLista: p.nombre,
+              estado: p.estado !== false,
+              clientesIds: listToClients.get(p.nombre) || [],
+              reglasCount: mappedReglas.length,
+              reglas: mappedReglas,
+            };
+          });
+
+          setPriceLists(summaries.sort((a, b) => a.nombreLista.localeCompare(b.nombreLista)));
+        } catch (error) {
+          console.error("Error al cargar listas:", error);
+        } finally {
+          setIsLoadingTable(false);
+        }
+      }, 80);
+    };
+
     const subs = [
-      plantillasCol.query().observe().subscribe(fire),
-      reglasCol.query().observe().subscribe(fire),
-      clientesCol.query().observe().subscribe(fire),
+      plantillasCol.query().observe().subscribe(rebuild),
+      reglasCol.query().observe().subscribe(rebuild),
+      clientesCol.query().observe().subscribe(rebuild),
+      productosCol.query().observe().subscribe(rebuild),
+      familiasCol.query().observe().subscribe(rebuild),
     ];
-    fire();
-    return () => subs.forEach((s) => s.unsubscribe());
+
+    // Carga inicial
+    rebuild();
+
+    return () => {
+      if (debounce) clearTimeout(debounce);
+      subs.forEach((s) => s.unsubscribe());
+    };
   }, []);
 
   // ==========================================
@@ -240,22 +226,36 @@ export default function Prices() {
       await database.write(async () => {
         // 1. Guardar/Actualizar Plantilla
         let plantilla: any;
-        const existing = await plantillasDb
-          .query(Q.where("nombre", formData.nombreLista))
-          .fetch();
-        if (existing.length > 0) {
-          plantilla = existing[0];
-          await plantilla.update((r: any) => {
-            r.updated_at = Date.now();
-          });
-        } else {
-          plantilla = await plantillasDb.create((r: any) => {
-            r._raw.id = Crypto.randomUUID();
-            r.nombre = formData.nombreLista;
-            r.estado = true; // default active
-            r.created_at = Date.now();
-            r.updated_at = Date.now();
-          });
+        if (formData.id) {
+          try {
+            plantilla = await plantillasDb.find(formData.id);
+            await plantilla.update((r: any) => {
+              r.nombre = formData.nombreLista;
+              r.updated_at = Date.now();
+            });
+          } catch (e) {
+            // ID might not exist if it was deleted
+          }
+        }
+        
+        if (!plantilla) {
+          const existing = await plantillasDb
+            .query(Q.where("nombre", formData.nombreLista))
+            .fetch();
+          if (existing.length > 0) {
+            plantilla = existing[0];
+            await plantilla.update((r: any) => {
+              r.updated_at = Date.now();
+            });
+          } else {
+            plantilla = await plantillasDb.create((r: any) => {
+              r._raw.id = formData.id || Crypto.randomUUID(); // Keep ID if we are recovering a deleted one
+              r.nombre = formData.nombreLista;
+              r.estado = true; // default active
+              r.created_at = Date.now();
+              r.updated_at = Date.now();
+            });
+          }
         }
 
         // 2. Actualizar Reglas de la Plantilla
@@ -283,12 +283,12 @@ export default function Prices() {
         // Limpiar clientes que tenían esta lista pero ya no
         const clientsToClear = allClients.filter(
           (c: any) =>
-            c.lista_precio_base === formData.nombreLista &&
+            c.listaPrecioBase === formData.nombreLista &&
             !formData.clientesIds.includes(c.id),
         );
         for (const c of clientsToClear) {
           await (c as any).update((r: any) => {
-            r.lista_precio_base = null;
+            r.listaPrecioBase = null;
             r.descuentoGlobal = 0;
           });
           const rP = await pProdDb.query(Q.where("cliente_id", c.id)).fetch();
@@ -301,14 +301,23 @@ export default function Prices() {
         for (const cid of formData.clientesIds) {
           const c = (await clientesDb.find(cid)) as any;
           await c.update((r: any) => {
-            r.lista_precio_base = formData.nombreLista;
+            r.listaPrecioBase = formData.nombreLista;
             r.descuentoGlobal = 0;
           });
 
           const rP = await pProdDb.query(Q.where("cliente_id", cid)).fetch();
-          for (const r of rP) await (r as any).markAsDeleted();
           const rF = await pFamDb.query(Q.where("cliente_id", cid)).fetch();
-          for (const r of rF) await (r as any).markAsDeleted();
+          
+          const targetProducts = new Set(formData.reglas.filter(r => r.tipo === "producto").map(r => r.targetId));
+          const targetFamilies = new Set(formData.reglas.filter(r => r.tipo === "familia").map(r => r.targetId));
+
+          // Limpiar las reglas que ya no existen en la nueva plantilla
+          for (const r of rP) {
+            if (!targetProducts.has((r as any)._raw.producto_id)) await (r as any).markAsDeleted();
+          }
+          for (const r of rF) {
+            if (!targetFamilies.has((r as any)._raw.familia_id)) await (r as any).markAsDeleted();
+          }
 
           for (const r of formData.reglas) {
             if (r.tipo === "global") {
@@ -316,20 +325,35 @@ export default function Prices() {
                 rec.descuentoGlobal = Number(r.descuentoPorcentaje) || 0;
               });
             } else if (r.tipo === "producto") {
-              await pProdDb.create((rec: any) => {
-                rec._raw.id = Crypto.randomUUID();
-                rec.cliente.id = cid;
-                rec.producto.id = r.targetId;
-                rec.descuentoPorcentaje = Number(r.descuentoPorcentaje) || 0;
-                rec.precioFijo = Number(r.precioFijo) || 0;
-              });
+              const existing = rP.find((rec: any) => rec._raw.producto_id === r.targetId);
+              if (existing) {
+                await (existing as any).update((rec: any) => {
+                  rec.descuentoPorcentaje = Number(r.descuentoPorcentaje) || 0;
+                  rec.precioFijo = Number(r.precioFijo) || 0;
+                });
+              } else {
+                await pProdDb.create((rec: any) => {
+                  rec._raw.id = Crypto.randomUUID();
+                  rec._raw.cliente_id = cid;
+                  rec._raw.producto_id = r.targetId;
+                  rec.descuentoPorcentaje = Number(r.descuentoPorcentaje) || 0;
+                  rec.precioFijo = Number(r.precioFijo) || 0;
+                });
+              }
             } else {
-              await pFamDb.create((rec: any) => {
-                rec._raw.id = Crypto.randomUUID();
-                rec.cliente.id = cid;
-                rec.familia.id = r.targetId;
-                rec.descuentoPorcentaje = Number(r.descuentoPorcentaje) || 0;
-              });
+              const existing = rF.find((rec: any) => rec._raw.familia_id === r.targetId);
+              if (existing) {
+                await (existing as any).update((rec: any) => {
+                  rec.descuentoPorcentaje = Number(r.descuentoPorcentaje) || 0;
+                });
+              } else {
+                await pFamDb.create((rec: any) => {
+                  rec._raw.id = Crypto.randomUUID();
+                  rec._raw.cliente_id = cid;
+                  rec._raw.familia_id = r.targetId;
+                  rec.descuentoPorcentaje = Number(r.descuentoPorcentaje) || 0;
+                });
+              }
             }
           }
         }
@@ -392,9 +416,7 @@ export default function Prices() {
         console.error("Error al sincronizar tras cambiar estado de la lista:", syncErr);
       }
 
-      // Reload local data
-      await loadPriceLists();
-
+      // Data reloads automatically via reactive subscription
       // Proactively scan for broken relationships
       if (scanIntegrity) {
         await scanIntegrity("deactivate");
@@ -462,7 +484,7 @@ export default function Prices() {
             for (const cid of item.clientesIds) {
               const c = (await clientesDb.find(cid)) as any;
               await c.update((record: any) => {
-                record.lista_precio_base = null;
+                record.listaPrecioBase = null;
               });
 
               const oldProdRules = await preciosProdDb

@@ -5,6 +5,7 @@ import { database } from "../services/DB/indexBD";
 import { supabase } from "../services/api/supabaseClient";
 import { getDeviceId } from "../services/device";
 import { Q } from "@nozbe/watermelondb";
+import { abortSync } from "../sync";
 
 interface AuthContextType {
   userId: string | null;
@@ -202,6 +203,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Función que usarás en tu SideBarMenu
   const logoutLocal = async () => {
+    abortSync();
     const deviceId = getDeviceId();
     try {
       // Deactivar sesión local
@@ -227,6 +229,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     await AsyncStorage.removeItem("activeUserId");
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem("supabase.auth.token");
+      localStorage.removeItem("activeUserId");
+      localStorage.removeItem("sync_blocked_reason");
+    }
+    
     try {
       await supabase.auth.signOut();
     } catch (e) {}

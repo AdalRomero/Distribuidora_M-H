@@ -78,7 +78,7 @@ export function useSyncErrors(tables: string[]) {
         }
 
         await database.write(async () => {
-          await record.destroyPermanently();
+          await record.markAsDeleted();
         });
       }
 

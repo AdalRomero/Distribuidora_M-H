@@ -103,7 +103,7 @@ export default function DevSyncPanel() {
       const record = await bitacoraDb.find(errorId);
 
       await database.write(async () => {
-        await record.destroyPermanently();
+        await record.markAsDeleted();
       });
 
       if (selectedError?.id === errorId) {

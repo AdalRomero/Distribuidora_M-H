@@ -127,7 +127,7 @@ export function LotSelectionModal({
                 const selected = selections.find(s => s.loteId === lote.id)?.cantidad || "";
 
                 return (
-                  <div key={lote.id} className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800">
+                  <div key={lote.id} className={`flex items-center justify-between p-3 border rounded-lg ${isCritical ? 'border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-900/20 opacity-70' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'}`}>
                     <div className="flex flex-col">
                       <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Lote: {lote.codigo_lote || "S/N"}</span>
                       <span className="text-xs text-slate-500 flex items-center gap-1">
@@ -148,9 +148,10 @@ export function LotSelectionModal({
                           value={selected}
                           onChange={(e) => updateSelection(lote.id, e.target.value)}
                           placeholder="0"
-                          className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-1 text-sm text-center focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200"
+                          className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-1 text-sm text-center focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 disabled:opacity-50 disabled:bg-slate-100"
                           max={lote.cantidad}
                           min={0}
+                          disabled={isCritical}
                         />
                       </div>
                     </div>
